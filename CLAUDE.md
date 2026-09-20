@@ -70,8 +70,10 @@ improve this."
   deploy is flight plan). The only link between a booster and a reentry
   object is the booster's `body_reenters` flag; neither the object nor the
   reentry plan stores a separation choice. `test_input_split.py` enforces
-  this over the shipped files and the serialisers; a new field goes on the
-  side the rule says, and the test is updated with it. Compatibility with
+  this over the shipped files and the serialisers. **A new field must be
+  given an owner in `field_registry.py`** — hardware is enumerated there, not
+  left over, so an unclassified field fails the suite instead of silently
+  becoming hardware. Compatibility with
   older files lives only in `upgrade_booster_dict` / `upgrade_ro_dict`; the
   `*_from_dict` constructors read the current schema and nothing else.
 
@@ -89,6 +91,7 @@ observed test-flight impact zones for analytic comparison.
 | `thrusty.py` | Tkinter GUI |
 | `trajectory.py` | 3-DOF integrator, guidance laws, range optimiser, orbital planner, reentry glide |
 | `booster_models.py` | Booster and reentry-object dataclasses, drag, thrust, staging |
+| `field_registry.py` | Which of the four files owns each dataclass field. Pure data; the key tuples and the split tests derive from it |
 | `analysis.py` | Sweep drivers (range ring, parametric sweep, footprint) and result post-processing; the GUI orchestrates these, never computes |
 | `heating.py`, `tps_ladder.py`, `survivability_report.py` | Reentry aerothermal screening |
 | `slv_performance.py` | Schilling payload-to-orbit estimator |

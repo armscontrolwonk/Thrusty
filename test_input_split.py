@@ -22,6 +22,7 @@ import json
 import pytest
 
 import booster_models as mm
+import field_registry as fr
 from booster_models import (BoosterParams, ROParams, booster_to_dict,
                             booster_from_dict, ro_to_dict, ro_from_dict,
                             apply_flight_plan, extract_flight_plan,
@@ -30,17 +31,31 @@ from booster_models import (BoosterParams, ROParams, booster_to_dict,
                             run_separation_mode, bind_ro_separation,
                             get_booster)
 
-FLIGHT_PLAN_KEYS = set(mm._FLIGHT_PLAN_TOP_KEYS) | set(mm._FLIGHT_PLAN_STAGE_KEYS)
-REENTRY_PLAN_KEYS = set(mm._REENTRY_PLAN_KEYS)
-LINK_KEY = 'body_reenters'
-DERIVED = {'separation_mode'}
-RUN_SCRATCH = set(mm._RUN_LOADOUT_KEYS) | {'ro_mass_kg', 'body_payload_kg', 'ro_separates', 'rv_separates'}
-META = {'name', 'booster', 'base_plan', 'source', 'notes', 'stages', 'stage2',
-        'reentry_object'}          # a flight plan names the object it flies
+# Every set below is READ OFF the ownership registry, never computed by
+# subtracting one set from another.  That distinction is the point of this
+# file: while hardware was "the fields nobody listed as a plan key", the
+# overlap check below could not fail, and an unclassified new field became
+# hardware in silence.  Now an unclassified field has no owner at all, and
+# test_every_field_has_a_declared_owner says so.
+def _own(registry, *owners):
+    return {k for k, v in registry.items() if v in owners}
 
-BOOSTER_HARDWARE = ({f.name for f in dc.fields(BoosterParams)}
-                    - FLIGHT_PLAN_KEYS - META - RUN_SCRATCH - {'ro'})
-RO_HARDWARE = {f.name for f in dc.fields(ROParams)} - REENTRY_PLAN_KEYS - META - DERIVED
+
+FLIGHT_PLAN_KEYS = _own(fr.BOOSTER_FIELD_OWNER,
+                        fr.FLIGHT_PLAN_TOP, fr.FLIGHT_PLAN_STAGE)
+REENTRY_PLAN_KEYS = _own(fr.RO_FIELD_OWNER, fr.REENTRY_PLAN)
+LINK_KEY = 'body_reenters'
+DERIVED = _own(fr.RO_FIELD_OWNER, fr.DERIVED) | _own(fr.BOOSTER_FIELD_OWNER, fr.DERIVED)
+# Run-time scratch: the loadout record, plus the legacy separation spellings
+# that old files still carry and the upgraders still read (those are file
+# keys, not fields of either dataclass, so the registry does not cover them).
+RUN_SCRATCH = (_own(fr.BOOSTER_FIELD_OWNER, fr.RUN_LOADOUT)
+               | {'ro_separates', 'rv_separates'})
+META = (_own(fr.BOOSTER_FIELD_OWNER, fr.META) | _own(fr.RO_FIELD_OWNER, fr.META)
+        | set(fr.PLAN_FILE_META))   # a flight plan names the object it flies
+
+BOOSTER_HARDWARE = _own(fr.BOOSTER_FIELD_OWNER, fr.HARDWARE)
+RO_HARDWARE = _own(fr.RO_FIELD_OWNER, fr.HARDWARE)
 
 # A shipped booster whose flight plan names the object it flies, for the
 # export/import link test.  Picked from the data rather than hard-coded, so it
@@ -87,8 +102,136 @@ def test_separation_is_not_a_plan_key_and_link_is_booster_hardware():
 
 
 def test_no_key_is_both_hardware_and_plan():
+    """Single ownership.
+
+    Be clear about what this does and does not prove.  A field cannot have two
+    owners in a dict, so the first two lines still hold by construction -- as
+    they did when hardware was computed by subtraction.  The difference is
+    that the construction no longer decides anything on its own: a field must
+    be IN the registry to be anything at all, and
+    test_every_field_has_a_declared_owner is what enforces that.  The last two
+    lines are real checks, because RUN_SCRATCH carries legacy file spellings
+    the registry does not cover."""
     assert not (BOOSTER_HARDWARE & FLIGHT_PLAN_KEYS)
     assert not (RO_HARDWARE & REENTRY_PLAN_KEYS)
+    assert not (BOOSTER_HARDWARE & RUN_SCRATCH)
+    assert not (RO_HARDWARE & DERIVED)
+
+
+@pytest.mark.parametrize('cls,registry,label', [
+    (BoosterParams, fr.BOOSTER_FIELD_OWNER, 'BOOSTER_FIELD_OWNER'),
+    (ROParams, fr.RO_FIELD_OWNER, 'RO_FIELD_OWNER'),
+])
+def test_every_field_has_a_declared_owner(cls, registry, label):
+    """Adding a field is a decision about which of the four files owns it.
+
+    This is the assertion that makes the rule enforceable rather than
+    conventional: a new field must be classified, and until it is, nothing
+    guesses on the author's behalf.  The old arrangement made the omission
+    invisible -- an unlisted field was hardware, and no test disagreed.
+    """
+    fields = {f.name for f in dc.fields(cls)}
+    missing = fields - set(registry)
+    assert not missing, (
+        f"{sorted(missing)} added to {cls.__name__} without an entry in "
+        f"field_registry.{label}. Decide which of the four files owns it: "
+        f"hardware belongs in the .booster.json/.ro.json, guidance and "
+        f"timings in the plan, and anything composed per run in neither.")
+    stale = set(registry) - fields
+    assert not stale, (
+        f"field_registry.{label} classifies {sorted(stale)}, which is no "
+        f"longer a field of {cls.__name__}")
+
+
+def test_the_exempt_categories_are_closed_sets():
+    """The exemptions are the one place a field can hide.
+
+    META, DERIVED and COMPOSED are excused from the hardware/plan checks, so
+    relabelling a real hardware or plan field into one of them makes it
+    invisible to every other test in this file -- and nothing else here would
+    object, because the rest reason about HARDWARE and the plan sets.  I found
+    this by trying it: marking `bus_mass_kg` as META defeated the whole file.
+
+    So the exemptions are enumerated, not open.  Growing one is a deliberate
+    edit here, with a reason, rather than a one-word change in the registry.
+    """
+    assert _own(fr.BOOSTER_FIELD_OWNER, fr.META) == {
+        'name', 'source', 'notes', 'stage2'}
+    assert _own(fr.RO_FIELD_OWNER, fr.META) == {'name', 'source', 'notes'}
+    # recomputed on load from other stored values, so stored nowhere
+    assert _own(fr.BOOSTER_FIELD_OWNER, fr.DERIVED) == {'thrust_N'}
+    assert _own(fr.RO_FIELD_OWNER, fr.DERIVED) == {'separation_mode'}
+    # the attached object, resolved per run from the plan's `reentry_object`
+    assert _own(fr.BOOSTER_FIELD_OWNER, fr.COMPOSED) == {'ro'}
+    assert not _own(fr.RO_FIELD_OWNER, fr.COMPOSED)
+
+
+def test_the_derived_key_order_is_the_file_format():
+    """Registry ORDER is a file format, so pin it.
+
+    `extract_flight_plan` builds its dict by iterating these tuples and
+    `save_flight_plan` writes it without sorting, so the order of entries in
+    field_registry is literally the key order of every plan file Thrusty
+    writes.  The registry is grouped under section comments, which invites
+    tidying; re-ordering it would silently rewrite every saved plan.  This
+    also catches a member quietly joining a tuple -- which is how
+    `_RUN_LOADOUT_KEYS` grew from 2 to 4 during this very refactor, correctly
+    but unnoticed."""
+    assert mm._FLIGHT_PLAN_TOP_KEYS == (
+        'guidance', 'burnout_angle_deg', 'loft_angle_rate_deg_s',
+        'launch_elevation_deg', 'shroud_jettison_alt_km', 'booster_jettison_s',
+        'booster_core_delay_s')
+    assert mm._FLIGHT_PLAN_STAGE_KEYS == (
+        'stage_turn_start_s', 'stage_turn_stop_s', 'stage_burnout_angle_deg',
+        'coast_time_s', 'stage_cutoff_s', 'stage_yaw_start_s',
+        'stage_yaw_stop_s', 'stage_yaw_final_az_deg',
+        'grid_fin_deploy_schedule', 'interstage_jettison_s')
+    assert mm._REENTRY_PLAN_KEYS == (
+        'glider_enabled', 'glider_guidance', 'glider_pullup_g_max',
+        'glider_terminal_dive', 'glider_terminal_alt_km',
+        'glider_bank_schedule', 'glider_dive_target_lat_deg',
+        'glider_dive_target_lon_deg', 'glider_dive_target_radius_km',
+        'glider_skip_count', 'glider_damping_zeta',
+        'glider_flap_deflection_deg', 'glider_pullup_start_alt_km',
+        'glider_aero_model', 'reentry_attitude')
+    # Written to no file, so order is free; membership is not.
+    assert set(mm._RUN_LOADOUT_KEYS) == {
+        'payload_kg', 'num_ros', 'ro_mass_kg', 'body_payload_kg'}
+
+
+def test_every_owner_is_a_real_one():
+    """Guards against a typo silently creating a new, unenforced category."""
+    known = {fr.HARDWARE, fr.FLIGHT_PLAN_TOP, fr.FLIGHT_PLAN_STAGE,
+             fr.REENTRY_PLAN, fr.RUN_LOADOUT, fr.DERIVED, fr.META, fr.COMPOSED}
+    for label, registry in (('BOOSTER_FIELD_OWNER', fr.BOOSTER_FIELD_OWNER),
+                            ('RO_FIELD_OWNER', fr.RO_FIELD_OWNER)):
+        bad = {k: v for k, v in registry.items() if v not in known}
+        assert not bad, f"field_registry.{label} uses unknown owners: {bad}"
+    # the object side has no flight-plan fields and the booster side no
+    # reentry-plan fields; a field on the wrong registry is a category error
+    assert not _own(fr.RO_FIELD_OWNER, fr.FLIGHT_PLAN_TOP, fr.FLIGHT_PLAN_STAGE)
+    assert not _own(fr.BOOSTER_FIELD_OWNER, fr.REENTRY_PLAN)
+
+
+def test_the_serialisers_agree_with_the_registry():
+    """The registry is only a single source of truth if the writers follow it.
+
+    `booster_to_dict` and `ro_to_dict` are hand-written dict literals, so they
+    can drift from the field list. Any hardware field they never write is a
+    value that silently fails to round-trip through a library file."""
+    b = get_booster("Scud-B (R-17)")
+    unwritten = BOOSTER_HARDWARE - set(booster_to_dict(b))
+    assert not unwritten, (
+        f"booster_to_dict does not write hardware fields {sorted(unwritten)}; "
+        f"they cannot survive a save/load round trip. Either serialise them, "
+        f"or say in field_registry what they really are — this is how "
+        f"ro_mass_kg, body_payload_kg and thrust_N were found to be loadout "
+        f"bookkeeping and a derived value rather than hardware.")
+    ro = ROParams(name="x", mass_kg=1.0, beta_kg_m2=1.0, shape="cone",
+                  diameter_m=0.5, length_m=1.0)
+    assert not (RO_HARDWARE - set(ro_to_dict(ro))), (
+        f"ro_to_dict does not write hardware fields "
+        f"{sorted(RO_HARDWARE - set(ro_to_dict(ro)))}")
 
 
 # ── the shipped files ───────────────────────────────────────────────────────
@@ -181,7 +324,7 @@ def test_ro_file_is_hardware_only(path):
 @pytest.mark.parametrize('path', FLIGHT_PLAN_FILES)
 def test_flight_plan_file_has_no_hardware(path):
     d = json.load(open(path))
-    leaked = set(d) & (BOOSTER_HARDWARE | {LINK_KEY})
+    leaked = set(d) & (BOOSTER_HARDWARE | DERIVED | {LINK_KEY})
     assert not leaked, f"{path} stores hardware keys {sorted(leaked)}"
     for i, st in enumerate(d.get('stages', []) or []):
         leaked = set(st) & BOOSTER_HARDWARE

@@ -10,6 +10,8 @@ Loft angle / loft angle rate for Scud-B taken from Figure 3 of the same paper.
 
 import math
 import numpy as np
+
+import field_registry as _fr
 from dataclasses import dataclass, field
 from typing import Optional
 from atmosphere import (atmosphere, dynamic_pressure,
@@ -4442,30 +4444,17 @@ load_booster_library()
 # cutoff schedule.  Shipped as flight_plans/*.flightplan.json, applied onto a
 # booster at run time.  Booster files stay hardware-only.
 # ---------------------------------------------------------------------------
-_FLIGHT_PLAN_TOP_KEYS = ('guidance', 'burnout_angle_deg', 'loft_angle_rate_deg_s',
-                      'launch_elevation_deg',
-                      # Subsystem-deployment timing read from the root booster:
-                      # when the payload shroud is jettisoned (altitude, or <=0
-                      # for the heating-flux default) and when spent strap-on
-                      # boosters separate.  Both are flight decisions, not
-                      # hardware, so they live in the flight plan.  Likewise
-                      # the strap-on core ignition delay: when the core lights
-                      # relative to the strap-ons is a flight decision.
-                      'shroud_jettison_alt_km', 'booster_jettison_s',
-                      'booster_core_delay_s')
+# Derived from the ownership registry, which is the single declaration of
+# which of the four files each field belongs to.  These were four
+# hand-maintained tuples with hardware left over as "everything else"; a field
+# nobody classified therefore became hardware silently.  Add a field to
+# BoosterParams and `field_registry.BOOSTER_FIELD_OWNER` decides where it
+# lives -- or test_input_split fails because nothing does.
+_FLIGHT_PLAN_TOP_KEYS = _fr._named(_fr.BOOSTER_FIELD_OWNER, _fr.FLIGHT_PLAN_TOP)
+_FLIGHT_PLAN_STAGE_KEYS = _fr._named(_fr.BOOSTER_FIELD_OWNER, _fr.FLIGHT_PLAN_STAGE)
 # Run-time loadout record written by compose_loadout; omitted from the
 # hardware-only booster file (the reentry object owns its mass).
-_RUN_LOADOUT_KEYS = ('payload_kg', 'num_ros')
-_FLIGHT_PLAN_STAGE_KEYS = ('stage_turn_start_s', 'stage_turn_stop_s',
-                        'stage_burnout_angle_deg', 'coast_time_s', 'stage_cutoff_s',
-                        'stage_yaw_start_s', 'stage_yaw_stop_s', 'stage_yaw_final_az_deg',
-                        # Grid-fin deployment schedule is read per active stage
-                        # (drag_force_vector receives the current stage), so it is
-                        # a per-stage flight-plan field.
-                        'grid_fin_deploy_schedule',
-                        # Interstage jettison time: WHEN the adapter drops is a
-                        # flight decision (the adapter's mass/length are hardware).
-                        'interstage_jettison_s')
+_RUN_LOADOUT_KEYS = _fr._named(_fr.BOOSTER_FIELD_OWNER, _fr.RUN_LOADOUT)
 
 
 def extract_flight_plan(p: BoosterParams) -> dict:
@@ -4661,18 +4650,12 @@ def _re_safe(s: str, maxlen: int = 60) -> str:
 #                  separation is pinned to last-stage burnout) and, eventually,
 #                  per-object aimpoints so the bus can deploy multiple reentry
 #                  objects rather than carry one as dead mass.
-_REENTRY_PLAN_KEYS = (
-    'glider_enabled', 'glider_guidance', 'glider_pullup_g_max',
-    'glider_terminal_dive', 'glider_terminal_alt_km', 'glider_bank_schedule',
-    'glider_dive_target_lat_deg', 'glider_dive_target_lon_deg',
-    'glider_dive_target_radius_km',
-    'glider_skip_count', 'glider_damping_zeta', 'glider_flap_deflection_deg',
-    'glider_pullup_start_alt_km',
-    'glider_aero_model', 'reentry_attitude',
-    # NOTE: separation_mode is NOT a plan key.  The booster↔object link is the
-    # booster's body_reenters flag (run_separation_mode); a legacy plan file
-    # that still carries separation_mode is ignored on apply.
-)
+# Derived from the ownership registry (see the note on the flight-plan keys).
+# NOTE: separation_mode is NOT a plan key.  The booster-to-object link is the
+# booster's body_reenters flag (run_separation_mode); a legacy plan file that
+# still carries separation_mode is ignored on apply.  The registry records it
+# as DERIVED for exactly that reason.
+_REENTRY_PLAN_KEYS = _fr._named(_fr.RO_FIELD_OWNER, _fr.REENTRY_PLAN)
 
 
 def extract_reentry_plan(ro: ROParams) -> dict:

@@ -677,6 +677,17 @@ The one phase that touches trajectory physics, gated to lifting forms
 - Wedge planform-span field: DONE earlier (body_span_m, 2026-07-30).
 
 ## Parked earlier in the project (context in METHODS / chat)
+- XLSX round trip loses a hand-entered thrust (noticed 2026-09-20, NOT fixed).
+  `booster_xlsx.py` deliberately injects `thrust_N` into the exported stage
+  and reads a thrust column back, but `booster_from_dict` recomputes
+  `thrust_N` from Isp, propellant mass and burn time and discards whatever
+  the file said; the GUI's own thrust field (thrusty.py, BoosterDialog) is
+  dropped the same way on the next save/load.  No `.booster.json` stores
+  thrust, so nothing on disk is affected and the JSON path is consistent —
+  but a user who types a thrust into the spreadsheet or the dialog will not
+  get it back.  Either derive it everywhere and stop offering the field, or
+  store it and stop deriving.  Surfaced by the field-ownership registry,
+  which forced `thrust_N` to be classified (it is DERIVED).
 - test_pullup's two "KNOWN FAILING" assertions — RESOLVED, AND THE RECORDED
   CAUSE WAS WRONG (2026-09-18).  `a77e64c` left
   `test_pullup_catches_higher_than_zeta_capture` and
