@@ -5419,6 +5419,7 @@ class ROEditorDialog(tk.Toplevel):
             if w is not None:
                 w.pack(side=tk.LEFT) if is_body else w.pack_forget()
         if is_body:
+            self._show_inherited_from_booster()
             self._refresh_payload_total()
         # Body nose length is the inverse: meaningful ONLY for a body (it carves
         # the airframe's nose); a separating RV uses its own length instead.
@@ -5689,6 +5690,40 @@ class ROEditorDialog(tk.Toplevel):
                             f"over M2–12)")
         except Exception:
             lbl.config(text="  0 = derive β(Mach) from geometry")
+
+    def _show_inherited_from_booster(self):
+        """Put the BOOSTER's numbers in the fields labelled "(from booster)".
+
+        They were seeded once from the STORED object and never refreshed, so
+        the editor showed a length and a diameter the run would throw away:
+        2.97 m and 0.520 m against an airframe of 7.50 m and 0.515 m.
+        FRONT_END_DESIGN.md lists this as defect C -- "effective_ro() overrides
+        the RO's length with the stage length ... the number the user typed is
+        discarded, silently" -- and requires the field to display the inherited
+        value instead, "so the human is never shown an input that the code will
+        discard".
+
+        The rule below mirrors effective_ro's inheritance exactly, fallbacks
+        included (a zero on the stage leaves the stored value standing), so the
+        two surfaces cannot drift apart again; a test pins them together.
+        `self._booster` is the RAW sidebar booster, so its last stage's burnout
+        mass is the AIRFRAME alone -- the payload is added separately, and the
+        total line below says so.
+        """
+        p = getattr(self, '_booster', None)
+        if p is None or self._plan_sep != 'body':
+            return
+        last = p
+        while getattr(last, 'stage2', None) is not None:
+            last = last.stage2
+        airframe = (last.mass_initial - last.mass_propellant
+                    if last.mass_propellant > 0 else last.mass_final)
+        for var, value, fmt in (
+                (getattr(self, '_mass_var', None), airframe, "{:.0f}"),
+                (getattr(self, '_dia_var', None), last.diameter_m, "{:.3f}"),
+                (getattr(self, '_len_var', None), last.length_m, "{:.2f}")):
+            if var is not None and value > 0:
+                var.set(fmt.format(value))
 
     def _refresh_payload_total(self):
         """Live total-reentry-mass line for a body: airframe burnout (the

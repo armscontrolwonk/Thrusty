@@ -299,3 +299,87 @@ def test_use_stores_trim_row_and_axisymmetric_zeroes_it(root):
     dlg._update_body_form_state()
     ro2 = dlg._build_ro()
     assert ro2.trim_alpha_deg == 0.0 and ro2.trim_CL0 == 0.0
+
+
+# ── the "(from booster)" fields say what the run will use ───────────────────
+
+def _body_pair(length_m=7.5, diameter_m=0.515, m0=2635.0, mprop=2335.0,
+               stored_len=2.97, stored_dia=0.52, stored_mass=300.0,
+               payload=150.0):
+    """A body-reentering booster plus an object whose STORED geometry
+    deliberately disagrees with it, which is the situation that shipped."""
+    from booster_models import BoosterParams, ROParams
+    p = BoosterParams(name="B", mass_initial=m0, mass_propellant=mprop,
+                      mass_final=m0 - mprop, diameter_m=diameter_m,
+                      length_m=length_m, thrust_N=43e3, burn_time_s=134.0,
+                      isp_s=250.0, body_reenters=True)
+    ro = ROParams(name="front end", mass_kg=stored_mass, beta_kg_m2=0.0,
+                  shape="tangent_ogive", diameter_m=stored_dia,
+                  length_m=stored_len, payload_kg=payload,
+                  body_nose_length_m=2.0)
+    return p, ro
+
+
+def test_inherited_fields_show_what_the_run_will_use(root):
+    """The editor labels mass, diameter and length "(from booster)" for a
+    non-separating body, then used to populate them from the STORED object --
+    so it showed a 2.97 m front end while the run flew the whole 7.50 m
+    airframe, and the number the user had measured off an image was discarded
+    in silence.  FRONT_END_DESIGN.md lists that as defect C and requires the
+    field to display the inherited value instead.
+
+    Pin the two surfaces to each other: whatever the editor shows under that
+    label must be what effective_ro hands the integrator."""
+    from booster_models import compose_loadout, effective_ro
+    p, ro = _body_pair()
+    dlg = thrusty.ROEditorDialog(root, ro=ro, booster=p, plan_sep='body')
+    try:
+        dlg.withdraw()
+        composed = compose_loadout(p, ro, 1)
+        composed.ro = ro
+        flown = effective_ro(composed)
+        assert float(dlg._len_var.get()) == pytest.approx(flown.length_m, abs=5e-3)
+        assert float(dlg._dia_var.get()) == pytest.approx(flown.diameter_m, abs=5e-4)
+        # the mass field is the AIRFRAME alone; the payload is added beside it
+        assert (float(dlg._mass_var.get()) + ro.payload_kg
+                == pytest.approx(flown.mass_kg, abs=0.5))
+        # ...and none of them is the stored value that the run ignores
+        assert float(dlg._len_var.get()) != pytest.approx(ro.length_m, abs=1e-3)
+    finally:
+        dlg.destroy()
+
+
+def test_inherited_mass_tracks_a_booster_edit(root):
+    """The fields were seeded once and never refreshed, so editing the
+    booster's dry mass left the editor's "= N kg reentry" line stale against
+    a run that flew something else."""
+    from booster_models import compose_loadout, effective_ro
+    p, ro = _body_pair(m0=2635.0, mprop=2275.0)      # airframe 360, not 300
+    dlg = thrusty.ROEditorDialog(root, ro=ro, booster=p, plan_sep='body')
+    try:
+        dlg.withdraw()
+        assert float(dlg._mass_var.get()) == pytest.approx(360.0, abs=0.5)
+        composed = compose_loadout(p, ro, 1)
+        composed.ro = ro
+        assert effective_ro(composed).mass_kg == pytest.approx(510.0, abs=0.5)
+        assert "510" in dlg._payload_total_lbl.cget("text")
+    finally:
+        dlg.destroy()
+
+
+def test_the_beta_estimator_is_seeded_on_the_body_that_flies(root):
+    """The β estimator seeds its cone half-angle from those same fields, so
+    while they held the stored front end it answered for a body less than half
+    the real length: a 5.0° cone rather than the airframe's 2.0°."""
+    import math
+    p, ro = _body_pair()
+    dlg = thrusty.ROEditorDialog(root, ro=ro, booster=p, plan_sep='body')
+    try:
+        dlg.withdraw()
+        d, L = float(dlg._dia_var.get()), float(dlg._len_var.get())
+        seeded = math.degrees(math.atan(1.0 / (2.0 * L / d)))
+        assert seeded == pytest.approx(2.0, abs=0.15)
+        stored = math.degrees(math.atan(1.0 / (2.0 * ro.length_m / ro.diameter_m)))
+        assert stored == pytest.approx(5.0, abs=0.15)      # what it used to be
+    finally:
+        dlg.destroy()

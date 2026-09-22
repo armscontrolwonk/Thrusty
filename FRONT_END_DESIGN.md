@@ -36,7 +36,7 @@ Reconstructing the user's a quasi-ballistic body (single stage ⌀1.1 × 6.7 m; 
 |---|-------|--------------|----------|
 | **A** | Schematic — fabrication | With no fairing, `draw_booster` ignores the reentry object entirely and draws a generic **1.6 × ⌀ = 1.76 m cone** on top of the 6.7 m stage → an **8.46 m** stack that exists nowhere in the data. | `booster_schematic.py:436` (`nl = 1.6 * nd`) |
 | **B** | Schematic — wrong shape | Even the to-scale RO drawn in the corner is rendered by `_reentry_shape()`, which **always draws a straight cone** and ignores `ro.shape`. A Von Kármán RV shows as a sharp triangle. | `booster_schematic.py:258` (`_reentry_shape`, unconditional) |
-| **C** | Physics ↔ editor mismatch | For `separation_mode = "body"`, `effective_ro()` **overrides the RO's length with the stage length**: the RO editor shows L = 2.0 m, but the body actually flown is ⌀1.1 × **6.7 m**. The number the user typed is discarded, silently. | `booster_models.py:836–839` |
+| **C** | Physics ↔ editor mismatch — **CLOSED 2026-09-22** (`_show_inherited_from_booster`; the fields now display the inherited values and a GUI test pins them to `effective_ro`) | For `separation_mode = "body"`, `effective_ro()` **overrides the RO's length with the stage length**: the RO editor shows L = 2.0 m, but the body actually flown is ⌀1.1 × **6.7 m**. The number the user typed is discarded, silently. | `booster_models.py:836–839` |
 
 Defect **C** is the deep one and the reason a plan is needed rather than two
 patches. The `fairing_fit` "0.24 m too long" warning is a *fourth* symptom: the
