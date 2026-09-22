@@ -1005,3 +1005,176 @@ def test_conical_top_diameter_maps_and_enables_the_section(root):
     assert fr._conical_var.get() is True                     # section enabled
     assert str(fr._top_dia_entry.cget("state")) == "normal"
     d.destroy()
+
+
+# ── the click path itself ───────────────────────────────────────────────────
+# Everything above drives the dialog's helpers directly.  The CLICK path was
+# never covered -- this file's own docstring said it "needs a real event loop
+# and is verified by hand".  It was not verified by hand either: the tool
+# reached the author's desk telling him, after a completed reading, to click
+# the point he had just clicked, and silently dropping every click after that.
+# These drive `_on_click` for real.
+
+class _Ev:
+    """A click at canvas coordinates (the handler reads only .x/.y)."""
+    def __init__(self, x, y):
+        self.x, self.y = x, y
+
+
+def _ready_to_measure(root, tmp_path, w=1200, h=600, anchor_px=400,
+                      anchor_m=10.0):
+    """A dialog with an image loaded and a scale anchored, ready to click."""
+    pytest.importorskip("PIL")
+    from PIL import Image
+    p = tmp_path / "fig.png"
+    Image.new("RGB", (w, h), "gray").save(p)
+    d = _open_measure_dialog(_editor(root))
+    d._im_load_path(str(p))
+    d._im_views[d._im_state["cur"]]["scale"] = im.Scale(
+        (0.0, 0.0), (float(anchor_px), 0.0), anchor_m)
+    return d
+
+
+def test_a_finished_reading_does_not_still_ask_for_the_click(root, tmp_path):
+    """The status line must describe the state the tool is actually in.
+
+    The last click of a measurement goes straight to the finish handler, so
+    the per-click progress message ("[1/2] click the second point") was never
+    refreshed.  It stayed on screen while the mode had dropped to idle and
+    the marks had been erased -- telling the user to do the one thing that
+    would now be ignored.  That, not any arithmetic, is what "sometimes it
+    accepts and sometimes it does not" was."""
+    d = _ready_to_measure(root, tmp_path)
+    try:
+        d._im_begin_measure()
+        d._im_on_click(_Ev(100, 100))
+        assert "click the second point" in d._im_status.get()   # correct here
+        d._im_on_click(_Ev(500, 300))
+        assert d._im_state["mode"] == "idle"
+        assert d._im_state.get("_pending") is not None
+        assert "click the second point" not in d._im_status.get()
+        assert "Accept" in d._im_status.get()
+    finally:
+        d.destroy()
+
+
+def test_the_finished_reading_stays_on_screen_until_accepted(root, tmp_path):
+    """Completing a measurement clears the click list, so the marks used to
+    vanish on the very click that produced the answer -- no trace of what had
+    been measured.  The pending points and the span between them stay drawn."""
+    d = _ready_to_measure(root, tmp_path)
+    try:
+        d._im_begin_measure()
+        d._im_on_click(_Ev(100, 100))
+        d._im_on_click(_Ev(500, 300))
+        assert not d._im_state["clicks"]          # the reading is finished...
+        assert d._im_canvas.find_withtag("pend")  # ...and still visible
+    finally:
+        d.destroy()
+
+
+def test_accept_disarms_itself(root, tmp_path):
+    """Accept was armed in one place and disarmed in another that only ran
+    when a NEW measurement began, so from the first Accept onward it stayed
+    lit for ever and every later press did nothing at all.  A lit button that
+    does nothing is indistinguishable from a broken tool."""
+    d = _ready_to_measure(root, tmp_path)
+    try:
+        d._im_begin_measure()
+        d._im_on_click(_Ev(100, 100))
+        d._im_on_click(_Ev(500, 300))
+        assert str(d._im_accept_btn.cget("state")) == "normal"
+        d._im_accept_btn.invoke()
+        assert d._im_state["accepted"]                  # it recorded
+        assert d._im_state.get("_pending") is None
+        assert str(d._im_accept_btn.cget("state")) == "disabled"
+    finally:
+        d.destroy()
+
+
+def test_a_click_with_nothing_armed_is_not_silent(root, tmp_path):
+    """Mode returns to idle after every completed reading, and a click then
+    hit a bare `return`: no mark, no message, no change of any kind.  It must
+    at least leave the status line saying what to press."""
+    d = _ready_to_measure(root, tmp_path)
+    try:
+        d._im_begin_measure()
+        d._im_on_click(_Ev(100, 100))
+        d._im_on_click(_Ev(500, 300))
+        d._im_accept_btn.invoke()                       # back to idle
+        d._im_status.set("")                            # prove the click writes it
+        d._im_on_click(_Ev(700, 400))
+        assert "Measure" in d._im_status.get()
+        assert not d._im_state["clicks"]                # and took no point
+    finally:
+        d.destroy()
+
+
+def test_typing_a_value_retires_an_unaccepted_reading(root, tmp_path, monkeypatch):
+    """Type value… exists so a known dimension is recorded as entered by hand.
+    It left any pending measurement armed, so Type value… then Accept replaced
+    the typed number with the older measured one AND re-stamped its provenance
+    as measured off the image -- the exact claim this path exists to avoid."""
+    d = _ready_to_measure(root, tmp_path)
+    try:
+        d._im_begin_measure()
+        d._im_on_click(_Ev(100, 100))
+        d._im_on_click(_Ev(500, 300))
+        measured = d._im_state["_pending"].value_m
+        monkeypatch.setattr("tkinter.simpledialog.askfloat",
+                            lambda *a, **k: 7.25)
+        d._im_type_value()
+        field = d._im_state["prompt"]["field"]
+        assert d._im_state["accepted"][field] == 7.25
+        assert d._im_state.get("_pending") is None
+        assert str(d._im_accept_btn.cget("state")) == "disabled"
+        d._im_accept_btn.invoke()                       # must not resurrect it
+        assert d._im_state["accepted"][field] == 7.25 != measured
+        assert type(d._im_state["measurements"][-1]).__name__ == "HandEntry"
+    finally:
+        d.destroy()
+
+
+def test_changing_the_selection_abandons_a_half_clicked_measurement(root, tmp_path):
+    """`state["prompt"]` is written only when a measurement begins, so
+    changing the checklist selection part-way through clicking left the
+    in-flight reading pointing at the OLD field: one stale point plus the next
+    click spanned two unrelated features and recorded it under the wrong
+    dimension.  Switching views already reset this way; selection now does."""
+    d = _ready_to_measure(root, tmp_path)
+    try:
+        d._im_begin_measure()
+        d._im_on_click(_Ev(100, 100))
+        assert d._im_state["mode"] == "measure" and d._im_state["clicks"]
+        d._im_on_prompt()                        # user picks another dimension
+        assert d._im_state["mode"] == "idle"
+        assert not d._im_state["clicks"]
+    finally:
+        d.destroy()
+
+
+def test_a_refusal_does_not_look_like_a_success(root, tmp_path):
+    """Refusal and success rendered in the same green, so "nothing recorded"
+    read as "recorded" at a glance.  The refusal also names the floor in
+    METRES and says zooming cannot help, because clicks are stored in image
+    pixels and reaching for zoom is the natural, useless response."""
+    d = _ready_to_measure(root, tmp_path)
+    try:
+        d._im_begin_measure()
+        d._im_on_click(_Ev(300, 300))
+        d._im_on_click(_Ev(303, 300))            # ~3 px: under the floor
+        assert d._im_state.get("_pending") is None
+        assert str(d._im_accept_btn.cget("state")) == "disabled"
+        text = d._im_result.get()
+        assert "refused" in text and "Zooming will not help" in text
+        ok_dlg = _ready_to_measure(root, tmp_path)
+        try:
+            ok_dlg._im_begin_measure()
+            ok_dlg._im_on_click(_Ev(100, 100))
+            ok_dlg._im_on_click(_Ev(500, 300))
+            assert (str(d._im_result_lbl.cget("foreground"))
+                    != str(ok_dlg._im_result_lbl.cget("foreground")))
+        finally:
+            ok_dlg.destroy()
+    finally:
+        d.destroy()

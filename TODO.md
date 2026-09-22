@@ -677,6 +677,23 @@ The one phase that touches trajectory physics, gated to lifting forms
 - Wedge planform-span field: DONE earlier (body_span_m, 2026-07-30).
 
 ## Parked earlier in the project (context in METHODS / chat)
+- Measure tool R4 floor: the MESSAGE was the problem, not the rule
+  (2026-09-22).  The 5 px floor itself stands -- an investigation proposed
+  making it warn-only and that was rejected on review: the tool's stated
+  philosophy is that the image PROPOSES and the human COMMITS, but a span
+  under ~5 px is dominated by click error (one pixel of slip is a double-digit
+  percentage), so proposing it at all would be proposing noise.  What was
+  wrong is that the refusal said only "below the 5 px resolution floor" and
+  the user's natural response -- zoom in and click more carefully -- cannot
+  work, because clicks are stored in image pixels and divided by the zoom.
+  The message now gives the floor in METRES at that image's scale, says
+  plainly that zooming will not help, and names the two things that do (a
+  higher-resolution figure, or Type value...).  Still open, lower priority:
+  the floor is an absolute pixel count, so the SAME feature is refused on an
+  800 px scan and accepted on a 3000 px one, and 4.9 px is refused silently
+  while 5.1 px is accepted with no caution at all.  A band -- refuse below,
+  caution up to ~15 px -- would remove the cliff.  Needs a considered
+  decision about what the tool is willing to propose, not a quick edit.
 - XLSX round trip loses a hand-entered thrust (noticed 2026-09-20, NOT fixed).
   `booster_xlsx.py` deliberately injects `thrust_N` into the exported stage
   and reads a thrust column back, but `booster_from_dict` recomputes

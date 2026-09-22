@@ -2820,6 +2820,23 @@ def _open_image_measure_dialog(parent, title, prompts, apply_fn,
                                    (y0 + y1) / 2 - 9 - 12 * (i % 3), text=lab,
                                    fill="#3c6", font=("TkDefaultFont", 8),
                                    tags="ann")
+        # A reading that is finished but NOT yet accepted stays on screen, in
+        # its own colour.  Completing a measurement clears state["clicks"], so
+        # the marks used to vanish on the very click that produced the answer:
+        # no trace of what had been measured, while the panel quietly showed a
+        # number.  That is what "the second click does nothing" looked like.
+        if state.get("_pending") is not None and state.get("_pending_pts"):
+            _pp = state["_pending_pts"]
+            if _pp[-1] == state["cur"]:
+                _ppts = [(a * z, b * z) for a, b in _pp[:-1]]
+                for _x, _y in _ppts:
+                    canvas.create_oval(_x - 3, _y - 3, _x + 3, _y + 3,
+                                       outline="#fa0", width=2, tags="pend")
+                for _a, _b in ((0, 1), (0, 2))[:max(1, len(_ppts) - 1)]:
+                    if _b < len(_ppts):
+                        canvas.create_line(*_ppts[_a], *_ppts[_b],
+                                           fill="#fa0", width=2,
+                                           dash=(4, 3), tags="pend")
         for ix, iy in state["clicks"]:
             x, y = ix * z, iy * z
             canvas.create_oval(x - 3, y - 3, x + 3, y + 3, outline="#ff4",
@@ -2918,9 +2935,36 @@ def _open_image_measure_dialog(parent, title, prompts, apply_fn,
         if n < len(steps):
             status.set(f"[{n}/{len(steps)}]  {steps[n]}")
 
+    def _sync_status():
+        """The status line says what the tool is ACTUALLY waiting for.
+
+        It used to be written only by `_click_progress`, which runs on every
+        click EXCEPT the last one -- the last click goes straight to
+        `_finish_measure`.  So a completed reading left the line saying
+        "[1/2] click the second point" while the mode had already dropped to
+        idle and the click marks had been erased.  The tool was instructing
+        the user to do the one thing it would now silently ignore, which is
+        exactly how a working measurement looked like a broken one."""
+        if state["mode"] == "scale":
+            return                      # _begin_scale owns that wording
+        if state["mode"] == "measure":
+            _click_progress(); return
+        if state.get("_pending") is not None:
+            status.set("Reading ready — Accept to record it, "
+                       "or Measure to click it again.")
+            return
+        p = _label_by_field.get(prompt_var.get())
+        status.set(f"Press Measure to click {p['field']}."
+                   if p else "Pick a dimension, then press Measure.")
+
     def _on_click(ev):
         v = _cv()
-        if state["mode"] not in ("scale", "measure") or v["img"] is None:
+        if v["img"] is None:
+            return
+        if state["mode"] not in ("scale", "measure"):
+            # Not a no-op in silence: an ignored click used to leave no mark,
+            # no message and no change of any kind, so the tool looked dead.
+            _sync_status()
             return
         z = v["zoom"]
         state["clicks"].append((canvas.canvasx(ev.x) / z,
@@ -2936,6 +2980,13 @@ def _open_image_measure_dialog(parent, title, prompts, apply_fn,
             _click_progress()
 
     canvas.bind("<Button-1>", _on_click)
+    # Control-click is how a one-button Mac right-clicks, and Tk would
+    # otherwise deliver it to <Button-1> as a measurement point.  A
+    # double-click would plant two points on the same spot, giving a zero
+    # span that the resolution floor then refuses -- a trap for a user who
+    # has learned that single clicks sometimes do nothing.
+    canvas.bind("<Control-Button-1>", lambda e: "break")
+    canvas.bind("<Double-Button-1>", lambda e: "break")
 
     # Zoom (wheel, about the cursor) + pan (right- or middle-drag).  Clicks
     # are stored in original-image px, so zoom never touches a measurement.
@@ -3285,8 +3336,17 @@ def _open_image_measure_dialog(parent, title, prompts, apply_fn,
         clock_combo.pack(anchor=tk.W, fill=tk.X)          # hidden until selected
 
     result_var = tk.StringVar(value="")
-    ttk.Label(panel, textvariable=result_var, foreground="#2a7",
-              wraplength=250, justify=tk.LEFT).pack(anchor=tk.W)
+    # Kept addressable: a refusal must not be the same green as a success.
+    # Both used to render identically, so "nothing recorded" read as "recorded"
+    # at a glance -- half of "it sometimes accepts and sometimes does not".
+    _OK_FG, _BAD_FG = "#2a7", "#c0392b"
+    result_lbl = ttk.Label(panel, textvariable=result_var, foreground=_OK_FG,
+                           wraplength=250, justify=tk.LEFT)
+    result_lbl.pack(anchor=tk.W)
+
+    def _say(text, ok=True):
+        result_lbl.config(foreground=_OK_FG if ok else _BAD_FG)
+        result_var.set(text)
 
     _label_by_field = {}
 
@@ -3302,6 +3362,14 @@ def _open_image_measure_dialog(parent, title, prompts, apply_fn,
             prompt_var.set(labels[0]); _on_prompt()
 
     def _on_prompt(*_):
+        # Abandon anything half-clicked.  `state["prompt"]` is only written by
+        # _begin_measure, so a selection change used to leave the in-flight
+        # measurement pointing at the OLD field: one stale point plus the next
+        # click completed a span across two unrelated features and recorded it
+        # under the wrong dimension.  _select_view already resets this way.
+        if state["mode"] == "measure":
+            state["mode"] = "idle"
+            _clear_marks()
         p = _label_by_field.get(prompt_var.get())
         prompt_hint.config(text=(p["label"] + f"   [{p['view']} view]") if p else "")
         _draw_prompt_diagram(p)
@@ -3362,9 +3430,9 @@ def _open_image_measure_dialog(parent, title, prompts, apply_fn,
         # survives until the new reading is Accepted), and set mode BEFORE
         # rendering so the old overlay mark hides for the redo.
         prev = state["accepted"].get(p["field"])
-        result_var.set("" if prev is None else
-                       f"re-measuring {p['field']} — recorded {prev:.4g} "
-                       "stays until you Accept the new reading")
+        _say("" if prev is None else
+             f"re-measuring {p['field']} — recorded {prev:.4g} "
+             "stays until you Accept the new reading")
         state["mode"] = "measure"
         _clear_marks()
         _click_progress()
@@ -3378,14 +3446,17 @@ def _open_image_measure_dialog(parent, title, prompts, apply_fn,
             state["_pending_pts"] = (vertex, a1, a2, state["cur"])
             _clear_marks(); state["mode"] = "idle"
             if m.refused:
-                result_var.set("✗ " + "; ".join(m.flags)
-                               + " — nothing recorded.")
+                _say("✗ " + "; ".join(m.flags) + " — nothing recorded.",
+                     ok=False)
+                _sync_status()
                 return
             conv = (f"  (LE↔root {m.raw_deg:.1f}° → Λ)"
                     if getattr(m, "complement", False) else "")
-            result_var.set(f"{p['field']} = {m.value_deg:.1f}°{conv}  "
-                           "(anchor-free)\nAccept to record, or re-measure.")
+            _say(f"{p['field']} = {m.value_deg:.1f}°{conv}  "
+                 "(anchor-free)\nAccept to record, or re-measure.")
             state["_pending"] = m
+            _render()                   # keep the reading on screen
+            _sync_status()
 
             def _accept_angle():
                 mm = state.get("_pending")
@@ -3397,8 +3468,9 @@ def _open_image_measure_dialog(parent, title, prompts, apply_fn,
                 vtx, r1, r2, pview = state["_pending_pts"]
                 state["annotations"][mm.field] = (
                     pview, r1, r2, f"{mm.field} = {mm.value_deg:.1f}°", vtx)
-                result_var.set(f"✓ recorded {mm.field} = {mm.value_deg:.1f}°")
+                _say(f"✓ recorded {mm.field} = {mm.value_deg:.1f}°")
                 state["_pending"] = None
+                acc_btn.config(state="disabled")
                 _refresh_angle_checks()
                 _render()
                 _advance_prompt()
@@ -3416,12 +3488,20 @@ def _open_image_measure_dialog(parent, title, prompts, apply_fn,
         state["_pending_pts"] = (p1, p2, state["cur"])
         _clear_marks(); state["mode"] = "idle"
         if m.refused:
-            result_var.set("✗ " + "; ".join(m.flags) + " — nothing recorded.")
+            q = _cv()["scale"].pixel_quantum_m()
+            _say("✗ " + "; ".join(m.flags) + " — nothing recorded.\n"
+                 f"The floor is {im.RESOLUTION_FLOOR_PX * q:.3g} m on this "
+                 "image. Zooming will not help (clicks are stored in image "
+                 "pixels): use a higher-resolution figure, or Type value….",
+                 ok=False)
+            _sync_status()
             return
         flag = ("  (" + "; ".join(m.flags) + ")") if m.flags else ""
-        result_var.set(f"{p['field']} = {m.value_m:.4g} m   [{m.quantum_str()}]"
-                       f"{flag}\nAccept to record, or re-measure.")
+        _say(f"{p['field']} = {m.value_m:.4g} m   [{m.quantum_str()}]"
+             f"{flag}\nAccept to record, or re-measure.")
         state["_pending"] = m
+        _render()                       # keep the reading on screen
+        _sync_status()
 
         def _accept():
             mm = state.get("_pending")
@@ -3433,8 +3513,13 @@ def _open_image_measure_dialog(parent, title, prompts, apply_fn,
             pp1, pp2, pview = state["_pending_pts"]
             state["annotations"][mm.field] = (
                 pview, pp1, pp2, f"{mm.field} = {mm.value_m:.4g} m", None)
-            result_var.set(f"✓ recorded {mm.field} = {mm.value_m:.4g} m")
+            _say(f"✓ recorded {mm.field} = {mm.value_m:.4g} m")
             state["_pending"] = None
+            # Accept was armed in exactly one place and disarmed in exactly
+            # one other (_begin_measure), so from the first Accept onward it
+            # stayed lit for ever and every later press was a silent no-op --
+            # the button said "I will record this" and did nothing.
+            acc_btn.config(state="disabled")
             _refresh_closure()
             _render()
             _advance_prompt()
@@ -3457,6 +3542,7 @@ def _open_image_measure_dialog(parent, title, prompts, apply_fn,
             result_var.set(result_var.get()
                            + f"\n→ selection advanced to {nxt['field']} — "
                              f"re-select {done_field} to redo it")
+        _sync_status()
 
     def _type_value():
         """Manual entry for a dimension the user already knows precisely (a
@@ -3478,11 +3564,17 @@ def _open_image_measure_dialog(parent, title, prompts, apply_fn,
             parent=dlg, minvalue=0.0)
         if v is None:
             return
+        # Retire any un-accepted reading first.  Without this, Type value…
+        # followed by Accept silently replaced the typed number with the older
+        # measured one AND re-stamped its provenance as measured-off-the-image
+        # -- the exact claim this path exists to avoid making.
+        state["_pending"] = None
+        acc_btn.config(state="disabled")
         he = im.HandEntry(p["field"], v)
         state["accepted"][he.field] = he.value_m
         state["measurements"] = [x for x in state["measurements"]
                                  if x.field != he.field] + [he]
-        result_var.set(f"✓ entered {he.field} = {v:g} m (by hand, not measured)")
+        _say(f"✓ entered {he.field} = {v:g} m (by hand, not measured)")
         _refresh_closure()
         _advance_prompt()
         _note_advance(he.field)
@@ -3716,6 +3808,12 @@ def _open_image_measure_dialog(parent, title, prompts, apply_fn,
     dlg._im_prompt_var = prompt_var
     dlg._im_diag = diag_canvas
     dlg._im_on_prompt = _on_prompt
+    dlg._im_on_click = _on_click
+    dlg._im_accept_btn = acc_btn
+    dlg._im_status = status
+    dlg._im_result = result_var
+    dlg._im_result_lbl = result_lbl
+    dlg._im_begin_scale = _begin_scale
     return dlg
 
 
