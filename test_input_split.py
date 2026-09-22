@@ -631,3 +631,87 @@ def test_shipped_object_declares_capability_consistently(path):
     rp = mm.load_reentry_plan(d['name']) or {}
     if rp.get('glider_enabled'):
         assert d['maneuvering'] is True, f"{path}: plan glides an object that cannot"
+
+
+# ── nothing in a shipped file is unaccounted for ────────────────────────────
+# The checks above ask whether a key is on the WRONG side.  This asks the
+# other question: is it on any side at all?  A key nobody has classified is
+# how the rule erodes -- it is read by whatever happens to look for it, it
+# survives every round trip, and no test objects.  Shipped files are
+# current-schema by rule (CLAUDE.md: compatibility lives only in the
+# upgraders), so an old spelling here is a defect too, not just an unknown.
+
+FILE_META = set(fr.FILE_META)
+BOOSTER_FILE_KEYS = set(fr.BOOSTER_FIELD_OWNER) | FILE_META
+RO_FILE_KEYS = set(fr.RO_FIELD_OWNER) | FILE_META
+FLIGHT_PLAN_FILE_KEYS = (set(mm._FLIGHT_PLAN_TOP_KEYS) | set(fr.PLAN_FILE_META)
+                         | FILE_META)
+REENTRY_PLAN_FILE_KEYS = (set(mm._REENTRY_PLAN_KEYS) | set(fr.PLAN_FILE_META)
+                          | set(fr.PLAN_ONLY_KEYS) | FILE_META)
+
+_UNKNOWN_HELP = (
+    "Give it an owner in field_registry if it is a real field; if it is an "
+    "older spelling, it belongs only in a user file, because shipped files "
+    "are current-schema and compatibility lives in upgrade_booster_dict / "
+    "upgrade_ro_dict.")
+
+
+def _unknown(path, where, keys, allowed):
+    extra = sorted(set(keys) - allowed)
+    return (f"{path} {where} carries {extra}, which no registry accounts for. "
+            f"{_UNKNOWN_HELP}") if extra else ""
+
+
+@pytest.mark.parametrize('path', BOOSTER_FILES)
+def test_booster_file_has_no_unknown_keys(path):
+    d = json.load(open(path))
+    for i, st in enumerate(_stages(d)):
+        msg = _unknown(path, f"stage {i + 1}", st, BOOSTER_FILE_KEYS)
+        assert not msg, msg
+
+
+@pytest.mark.parametrize('path', RO_FILES)
+def test_object_file_has_no_unknown_keys(path):
+    msg = _unknown(path, "", json.load(open(path)), RO_FILE_KEYS)
+    assert not msg, msg
+
+
+@pytest.mark.parametrize('path', FLIGHT_PLAN_FILES)
+def test_flight_plan_file_has_no_unknown_keys(path):
+    d = json.load(open(path))
+    msg = _unknown(path, "", d, FLIGHT_PLAN_FILE_KEYS)
+    assert not msg, msg
+    for i, st in enumerate(d.get('stages') or []):
+        msg = _unknown(path, f"stage {i + 1}", st, set(mm._FLIGHT_PLAN_STAGE_KEYS))
+        assert not msg, msg
+
+
+@pytest.mark.parametrize('path', REENTRY_PLAN_FILES)
+def test_reentry_plan_file_has_no_unknown_keys(path):
+    msg = _unknown(path, "", json.load(open(path)), REENTRY_PLAN_FILE_KEYS)
+    assert not msg, msg
+
+
+def test_the_serialisers_write_only_accounted_keys():
+    """The walk above guards the files that exist; this guards the ones the
+    program will write next.  A serialiser that emits a key no registry knows
+    would seed exactly what the walk is there to catch."""
+    b = get_booster("Scud-B (R-17)")
+    for form in (booster_to_dict(b), booster_to_dict(b, include_flight_plan=False)):
+        for i, st in enumerate(_stages(form)):
+            assert not (set(st) - BOOSTER_FILE_KEYS), (
+                f"booster_to_dict stage {i + 1} writes "
+                f"{sorted(set(st) - BOOSTER_FILE_KEYS)}")
+    ro = ROParams(name="x", mass_kg=1.0, beta_kg_m2=1.0, shape="cone",
+                  diameter_m=0.5, length_m=1.0)
+    for form in (ro_to_dict(ro), ro_to_dict(ro, include_reentry_plan=False)):
+        assert not (set(form) - RO_FILE_KEYS), (
+            f"ro_to_dict writes {sorted(set(form) - RO_FILE_KEYS)}")
+    fp = extract_flight_plan(b)
+    assert not (set(fp) - FLIGHT_PLAN_FILE_KEYS), (
+        f"extract_flight_plan writes {sorted(set(fp) - FLIGHT_PLAN_FILE_KEYS)}")
+    for st in fp.get('stages') or []:
+        assert not (set(st) - set(mm._FLIGHT_PLAN_STAGE_KEYS))
+    rp = extract_reentry_plan(ro)
+    assert not (set(rp) - REENTRY_PLAN_FILE_KEYS), (
+        f"extract_reentry_plan writes {sorted(set(rp) - REENTRY_PLAN_FILE_KEYS)}")

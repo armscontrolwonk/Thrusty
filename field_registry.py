@@ -246,6 +246,13 @@ PLAN_FILE_META = frozenset({
 PLAN_ONLY_KEYS = frozenset({'commanded_LD'})
 
 
+# The schema-version marker `upgrade_booster_dict` / `upgrade_ro_dict` stamp
+# on a dict they have converted.  No shipped file carries one -- they are
+# already current -- but a file saved after an upgrade can, so a key walk has
+# to allow it.
+FILE_META = frozenset({'schema'})
+
+
 def _named(registry, owner):
     """Field names with this owner, in registry order."""
     return tuple(k for k, v in registry.items() if v == owner)
