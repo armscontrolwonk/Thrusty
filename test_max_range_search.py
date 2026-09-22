@@ -102,3 +102,52 @@ def test_fixed_turn_stop_still_sweeps_angle():
     r = maximize_range(p, 39.0, 125.0, 90.0, gt_turn_stop_s=30.0)
     assert r["max_range_km"] > 0.0
     assert r["optimal_gt_turn_stop_s"] == 30.0
+
+
+# ── the stall guard ─────────────────────────────────────────────────────────
+
+def test_a_stalled_run_raises_instead_of_hanging():
+    """An adaptive step cannot always cross a sharp change in the derivative.
+    If the vehicle sits on one rather than passing through it, the step size
+    collapses and the run never ends -- no error, no progress, and in the GUI
+    a frozen window.  Strypi VII R does exactly that: it reaches Mach 1.001 at
+    1.4 km and stays there, taking 459 s to fly what its near-identical
+    sibling flies in 0.22 s.  Raise instead, with the stall point named."""
+    from trajectory import IntegratorStalled, integrate_trajectory
+    import booster_models as bm
+    bm.load_booster_library()
+    with pytest.raises(IntegratorStalled) as exc:
+        integrate_trajectory(bm.get_booster("Strypi VII R"), 40.0, 40.0, 90.0,
+                             max_time_s=3600.0)
+    msg = str(exc.value)
+    assert "stopped advancing" in msg
+    assert "Mach" in msg and "evaluations" in msg
+
+
+def test_the_guard_leaves_healthy_vehicles_alone():
+    """The threshold has to sit far above normal behaviour.  Every shipped
+    vehicle that flies normally stays under 250 consecutive evaluations
+    without advancing; the limit is 50,000."""
+    import booster_models as bm
+    from trajectory import integrate_trajectory
+    bm.load_booster_library()
+    for name in ("No-dong", "Scud-B (R-17)", "AUR", "Taepodong-II",
+                 "Strypi VIII R"):
+        r = integrate_trajectory(bm.get_booster(name), 40.0, 40.0, 90.0,
+                                 max_time_s=3600.0)
+        assert r["range_km"] > 0, name
+
+
+def test_the_guard_can_be_switched_off():
+    """Someone who would rather wait keeps the option.  Proved on behaviour
+    rather than internals: a deliberately tiny limit trips on a healthy
+    vehicle, and zero lets that same vehicle finish."""
+    from trajectory import IntegratorStalled, integrate_trajectory
+    import booster_models as bm
+    bm.load_booster_library()
+    with pytest.raises(IntegratorStalled):
+        integrate_trajectory(bm.get_booster("Scud-B (R-17)"), 40.0, 40.0, 90.0,
+                             max_time_s=600.0, stall_evals=10)
+    r = integrate_trajectory(bm.get_booster("Scud-B (R-17)"), 40.0, 40.0, 90.0,
+                             max_time_s=600.0, stall_evals=0)
+    assert r["range_km"] > 0

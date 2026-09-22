@@ -677,6 +677,22 @@ The one phase that touches trajectory physics, gated to lifting forms
 - Wedge planform-span field: DONE earlier (body_span_m, 2026-07-30).
 
 ## Parked earlier in the project (context in METHODS / chat)
+- Strypi VII R STALLS THE INTEGRATOR — now fails loudly, needs a data or model
+  decision (2026-09-22).  It reaches Mach 1.001 at 1.4 km and stays there: the
+  adaptive step collapses on the transonic drag kink and the run took 459 s to
+  fly what Strypi VIII R flies in 0.22 s.  With the new stall guard it raises
+  IntegratorStalled after 4.5 s instead.  No test flew it, which is why nobody
+  noticed.  NOT the fin thickness on its own: VII R's fins are byte-identical
+  to VIII R's (span 1.118, thickness 0.102), so it is an interaction with that
+  vehicle's mass/thrust history putting it on the kink rather than through it.
+  A user vehicle showed the same Mach 1.001 signature with a far worse fin
+  thickness/span ratio (0.40 against a shipped worst of 0.10).  Two candidate
+  fixes, neither yet chosen: smooth the transonic Cd build-up so its
+  derivative is continuous (the honest fix, but it moves every vehicle's
+  transonic drag slightly and would need re-validating against Forden Table 3),
+  or give the reentry/boost solver an explicit transonic step limit so it
+  crosses M1 rather than resolving it.  Decide before the Rust port, since the
+  port will inherit whichever behaviour is frozen.
 - Measure tool R4 floor: the MESSAGE was the problem, not the rule
   (2026-09-22).  The 5 px floor itself stands -- an investigation proposed
   making it warn-only and that was rejected on review: the tool's stated

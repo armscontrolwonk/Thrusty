@@ -57,7 +57,7 @@ from booster_models import (BOOSTER_DB, get_booster,
                            load_reentry_plan, save_reentry_plan)
 from trajectory import (integrate_trajectory, maximize_range, aim_booster,
                         plan_orbital_insertion, MaxRangeCancelled,
-                        wheelon_burnout_angle)
+                        IntegratorStalled, wheelon_burnout_angle)
 from coordinates import (range_between, initial_bearing_deg,
                          min_energy_flight_time_s, rotation_corrected_azimuth)
 import analysis
@@ -13376,6 +13376,16 @@ class BoosterFlyoutApp(tk.Tk):
             self.after(0, self._on_result_ready)
         except MaxRangeCancelled:
             self.after(0, lambda: self._status_var.set("Max Range cancelled."))
+        except IntegratorStalled as e:
+            # Not a crash and not a slow run: the solver could not get past a
+            # point and would never have finished.  Say where it stopped, so
+            # the vehicle can be corrected, rather than leaving the window
+            # frozen with no explanation (which is what used to happen).
+            _msg = str(e)
+            self.after(0, lambda: self._status_var.set(
+                "Run abandoned — the integrator stalled."))
+            self.after(0, lambda m=_msg: messagebox.showerror(
+                "Integrator stalled", m))
         except Exception as e:
             _err_msg = str(e)
             import traceback as _tb

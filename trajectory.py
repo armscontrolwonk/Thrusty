@@ -81,7 +81,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from gravity import gravity_ecef, GM, RE
-from atmosphere import atmosphere
+from atmosphere import atmosphere, speed_of_sound
 import heating
 from coordinates import (
     geodetic_to_ecef, ecef_to_geodetic,
@@ -103,6 +103,36 @@ from booster_models import (
 
 class MaxRangeCancelled(Exception):
     """Raised by maximize_range() when a cancel_event is set by the caller."""
+
+
+class IntegratorStalled(Exception):
+    """The solver stopped advancing and would not have finished.
+
+    An adaptive step cannot always get past a place where the derivative
+    turns sharply -- a drag build-up that kinks at Mach 1 is the usual one --
+    and if the vehicle happens to sit on that point rather than pass through
+    it, the step size collapses and the run never ends.  There is no error to
+    report and no progress either: the solver keeps evaluating at the same
+    instant for as long as it is allowed to.
+
+    Observed on a real vehicle: 1.37 million evaluations pinned at t = 16.7 s,
+    2.5 km altitude, Mach 1.001, with a healthy thrust-to-weight of 3.55.  A
+    shipped vehicle (Strypi VII R) reaches the same state and takes 459 s to
+    fly what its near-identical sibling flies in 0.22 s.
+
+    Raising beats hanging: the caller gets the stall point and can act on it,
+    a sweep marks that one case failed instead of freezing, and the window
+    stays usable.  `integrate_trajectory(..., stall_evals=0)` disables the
+    guard for anyone who would rather wait.
+    """
+
+
+# Consecutive evaluations at or behind the furthest time reached before the
+# run is called stalled.  Every shipped vehicle that flies normally stays
+# under 250 (the worst is No-dong at 248, on runs of at most 5,624
+# evaluations in total); a stalled one sits there for millions.  50,000 is
+# 200x the healthy worst and still trips in well under a second.
+STALL_EVAL_LIMIT = 50_000
 
 
 # ---------------------------------------------------------------------------
@@ -1033,6 +1063,33 @@ def _eom(t, state, params, cutoff_time, azimuth_rad, gt_turn_start_s,
         ignites; used by the two-phase orbital insertion pitch program to
         switch from the boost pitch to the horizontal final-stage burn.
     """
+    # ── Stall watch ───────────────────────────────────────────────────────
+    # Refuse to evaluate forever at an instant the solver cannot get past.
+    # The step size collapses where the derivative kinks (the transonic drag
+    # rise is the usual place) if the vehicle sits on the kink instead of
+    # crossing it, and nothing else would ever stop the run.  See
+    # IntegratorStalled.
+    _sw = getattr(params, '_stall_watch', None)
+    if _sw is not None:
+        if t > _sw[0]:
+            _sw[0] = t
+            _sw[1] = 0
+        else:
+            _sw[1] += 1
+            if _sw[1] >= _sw[2]:
+                _s_lat, _s_lon, _s_alt = ecef_to_geodetic(state[:3])
+                _s_v = float(np.linalg.norm(state[3:]))
+                _s_snd = speed_of_sound(max(_s_alt, 0.0))
+                raise IntegratorStalled(
+                    f"the integrator stopped advancing at t = {_sw[0]:.2f} s "
+                    f"({_s_alt / 1000.0:.2f} km, {_s_v:.0f} m/s"
+                    + (f", Mach {_s_v / _s_snd:.3f}" if _s_snd > 1.0 else "")
+                    + f") after {_sw[1]:,} evaluations at that instant. "
+                    "The step size has collapsed, most often on a sharp change "
+                    "in drag near Mach 1. Check the vehicle's aerodynamic "
+                    "inputs — fin thickness against span is the usual culprit "
+                    "— or pass stall_evals=0 to let it run regardless.")
+
     pos = state[:3]
     vel = state[3:]
 
@@ -1980,6 +2037,7 @@ def integrate_trajectory(params: BoosterParams,
                          alpha_induced_drag: bool = False,
                          terrain_dem: bool = False,
                          launch_elev_m: float = None,
+                         stall_evals: int = STALL_EVAL_LIMIT,
                          _search_mode: bool = False):
     """
     Integrate a booster trajectory from launch to impact.
@@ -2221,6 +2279,11 @@ def integrate_trajectory(params: BoosterParams,
     # Commanded pull-up phase latch [0 fall | 1 pulling | 2 handed off] —
     # one-way per mission; persists across integration passes, reset here.
     params._pullup_phase = [0]
+    # [furthest t reached, consecutive evaluations since it last advanced].
+    # _eom keeps it; see IntegratorStalled.
+    params._stall_watch = [float('-inf'), 0,
+                           (stall_evals if stall_evals and stall_evals > 0
+                            else float('inf'))]
     # Shroud heating-jettison latch [armed, jettisoned, t_jettison], used only
     # when shroud_jettison_alt_km <= 0 (heating default).  armed once q_dot has
     # risen above the fairing flux (past max-q); jettisoned on the first drop
