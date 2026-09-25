@@ -208,7 +208,7 @@ mm.USER_RO_DIRS = [str(_RO_LIBRARY_PATH)]      # plan-named objects resolve here
 # Canonical RVs that ship with the code, next to this file (e.g. SWERVE, AHW).
 # These are always available; the writable user library above overrides them.
 _BUNDLED_RO_LIBRARY_PATH = Path(__file__).resolve().parent / "ro_library"
-# Back-compat: reentry objects used to live in rv_library/*.ro.json.  We still
+# Back-compat: reentry objects used to live in rv_library/*.rv.json.  We still
 # read those (old locally-saved files) but only ever write the new .ro.json form.
 _LEGACY_RO_LIBRARY_PATH = _THRUSTY_ROOT / "rv_library"
 _DIR_GUIDANCE     = _THRUSTY_ROOT / "guidance"
@@ -351,8 +351,14 @@ def _load_ro_library():
     for d in dirs:
         if not d.exists():
             continue
-        # Accept both the new .ro.json and legacy .ro.json extensions.
-        files = sorted(list(d.glob("*.ro.json")) + list(d.glob("*.ro.json")))
+        # Both extensions, legacy FIRST so a new-form file of the same name
+        # overwrites it in RO_DB rather than the other way round.  These two
+        # globs were identical -- the rv->ro terminology sweep (11b31ac)
+        # rewrote the string literal inside the legacy one, so every .rv.json
+        # in rv_library/ became invisible while README kept promising they
+        # "are still read", and the directory above kept being walked for
+        # nothing.
+        files = sorted(d.glob("*.rv.json")) + sorted(d.glob("*.ro.json"))
         for fp in files:
             try:
                 ro = ro_from_dict(json.loads(fp.read_text()))
@@ -362,7 +368,7 @@ def _load_ro_library():
                 _rp = load_reentry_plan(ro.name, extra_dirs=mm.USER_REENTRY_PLAN_DIRS)
                 if _rp is not None:
                     ro = apply_reentry_plan(ro, _rp)
-                key = ro.name or fp.stem.replace(".ro", "").replace(".ro", "")
+                key = ro.name or fp.stem.replace(".ro", "").replace(".rv", "")
                 RO_DB[key] = lambda _r=ro: _r
             except Exception as exc:
                 print(f"Warning: could not load Reentry object '{fp.name}': {exc}")

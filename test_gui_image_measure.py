@@ -1178,3 +1178,38 @@ def test_a_refusal_does_not_look_like_a_success(root, tmp_path):
             ok_dlg.destroy()
     finally:
         d.destroy()
+
+
+# ── legacy reentry-object files still load ──────────────────────────────────
+
+def test_legacy_rv_json_objects_are_still_read(root, tmp_path, monkeypatch):
+    """`rv_library/*.rv.json` is the pre-rename spelling, and README and the
+    code comment both promise it still loads.  It had stopped: the rv->ro
+    terminology sweep rewrote the string literal inside the legacy glob, so
+    the loader globbed `*.ro.json` twice and the legacy directory was walked
+    for nothing."""
+    import json as _json
+    legacy = tmp_path / "rv_library"; legacy.mkdir()
+    newdir = tmp_path / "ro_library"; newdir.mkdir()
+
+    def _obj(name, mass):
+        return _json.dumps({"name": name, "mass_kg": mass, "beta_kg_m2": 2222.0,
+                            "shape": "cone", "diameter_m": 0.5, "length_m": 1.5})
+
+    # (a) reachable ONLY through the legacy spelling -- this is the regression
+    (legacy / "Only_Legacy.rv.json").write_text(_obj("Only Legacy", 111.0))
+    # (b) present in both spellings -- the new form must win
+    (legacy / "Both.rv.json").write_text(_obj("Both", 111.0))
+    (newdir / "Both.ro.json").write_text(_obj("Both", 999.0))
+
+    monkeypatch.setattr(thrusty, "_BUNDLED_RO_LIBRARY_PATH", tmp_path / "empty")
+    monkeypatch.setattr(thrusty, "_LEGACY_RO_LIBRARY_PATH", legacy)
+    monkeypatch.setattr(thrusty, "_RO_LIBRARY_PATH", newdir)
+    thrusty._load_ro_library()
+
+    assert "Only Legacy" in thrusty.RO_DB, (
+        "a .rv.json object reachable only through the legacy spelling did not "
+        "load -- the legacy glob is broken again")
+    assert thrusty.RO_DB["Only Legacy"]().mass_kg == 111.0
+    assert thrusty.RO_DB["Both"]().mass_kg == 999.0, (
+        "the new-form file must override the legacy one of the same name")
