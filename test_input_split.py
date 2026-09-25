@@ -715,3 +715,83 @@ def test_the_serialisers_write_only_accounted_keys():
     rp = extract_reentry_plan(ro)
     assert not (set(rp) - REENTRY_PLAN_FILE_KEYS), (
         f"extract_reentry_plan writes {sorted(set(rp) - REENTRY_PLAN_FILE_KEYS)}")
+
+
+# ── which shipped files a saved copy is standing in front of ────────────────
+
+def _lib(tmp_path, kind, name, payload):
+    d = tmp_path / kind
+    d.mkdir(exist_ok=True)
+    (d / name).write_text(json.dumps(payload))
+    return str(d)
+
+
+def test_no_user_directories_means_nothing_is_shadowed():
+    """The headless default. A golden-output run must be able to assert it is
+    reading shipped data and nothing else."""
+    s = mm.shadowed_library_entries(flight_plan_dirs=[], reentry_plan_dirs=[],
+                                    ro_dirs=[])
+    assert s == {'flight_plan': {}, 'reentry_plan': {}, 'reentry_object': {}}
+    assert mm.describe_shadows(s) == ""
+
+
+def test_a_saved_copy_of_a_shipped_plan_is_reported(tmp_path):
+    """The case that went unnoticed in use: a saved reentry plan overriding a
+    shipped one decided what flew, and nothing said so."""
+    name = json.load(open(REENTRY_PLAN_FILES[0]))
+    stem = REENTRY_PLAN_FILES[0].split('/')[-1]
+    d = _lib(tmp_path, "reentry_plans", stem, dict(name or {}, glider_enabled=False))
+    s = mm.shadowed_library_entries(flight_plan_dirs=[], reentry_plan_dirs=[d],
+                                    ro_dirs=[])
+    key = stem[:-len(".reentryplan.json")]
+    assert key in s['reentry_plan']
+    shipped, user = s['reentry_plan'][key]
+    assert shipped.endswith(stem) and user.endswith(stem)
+    assert shipped != user
+    assert key in mm.describe_shadows(s)
+
+
+def test_a_user_file_with_no_shipped_counterpart_is_not_a_shadow(tmp_path):
+    """Adding is not replacing.  Flagging every user file would bury the ones
+    that actually stand in front of something."""
+    d = _lib(tmp_path, "reentry_plans", "Nothing_Like_It.reentryplan.json",
+             {"glider_enabled": True})
+    s = mm.shadowed_library_entries(flight_plan_dirs=[], reentry_plan_dirs=[d],
+                                    ro_dirs=[])
+    assert s['reentry_plan'] == {}
+
+
+def test_a_named_variant_is_not_a_shadow(tmp_path):
+    """A variant is a deliberate, separately-listed artifact chosen from a
+    dropdown.  Only the DEFAULT slot can stand in front of a shipped file."""
+    stem = REENTRY_PLAN_FILES[0].split('/')[-1][:-len(".reentryplan.json")]
+    d = _lib(tmp_path, "reentry_plans", f"{stem}__my_variant.reentryplan.json",
+             {"glider_enabled": False})
+    s = mm.shadowed_library_entries(flight_plan_dirs=[], reentry_plan_dirs=[d],
+                                    ro_dirs=[])
+    assert s['reentry_plan'] == {}
+
+
+def test_an_object_is_matched_on_its_name_not_its_filename(tmp_path):
+    """Objects are keyed by the `name` field, which is what RO_DB uses, so a
+    renamed file still shadows and an identically-named file in a different
+    filename does too."""
+    # from ro_library/ specifically: RO_FILES also globs loose root-level
+    # objects, which `_load_ro_library` never reads and so cannot be shadowed
+    library = sorted(glob.glob('ro_library/*.ro.json'))
+    shipped = json.load(open(library[0]))
+    d = _lib(tmp_path, "ro_library", "renamed_on_disk.ro.json",
+             dict(shipped, mass_kg=1.0))
+    s = mm.shadowed_library_entries(flight_plan_dirs=[], reentry_plan_dirs=[],
+                                    ro_dirs=[d])
+    assert shipped['name'] in s['reentry_object']
+
+
+def test_the_same_directory_twice_is_not_a_shadow_of_itself(tmp_path):
+    """Running in place points a user directory at the bundled one.  It must
+    not report every shipped file as overriding itself."""
+    import os
+    bundled = os.path.dirname(os.path.abspath(REENTRY_PLAN_FILES[0]))
+    s = mm.shadowed_library_entries(flight_plan_dirs=[],
+                                    reentry_plan_dirs=[bundled], ro_dirs=[])
+    assert s['reentry_plan'] == {}

@@ -4790,3 +4790,111 @@ def save_reentry_plan(name: str, rp: dict, out_dir, plan: str = None) -> str:
     path = d / reentry_plan_filename(name, plan)
     path.write_text(_json.dumps(rp, indent=2) + "\n")
     return str(path)
+
+
+# ---------------------------------------------------------------------------
+# Library provenance — which shipped files a user file is currently standing
+# in front of.
+#
+# Every library here resolves the same way: the bundled directory loads first
+# and a same-named file in a user directory replaces it, per key, silently.
+# That is deliberate and useful -- it is how a saved edit survives an update
+# -- but nothing ever said it had happened, so a stale personal file could
+# decide what flew while the shipped file sat unread.  Observed: a saved
+# reentry plan with `glider_enabled: false` made a shipped glider fly
+# ballistic, and the only hint was the trajectory being wrong.
+#
+# Detection lives here rather than in the GUI because it is a property of the
+# resolution order, it is wanted headless (a golden-output run must be able to
+# assert it is reading shipped data), and the GUI computes nothing.
+# ---------------------------------------------------------------------------
+
+def _shadows_in(bundled_dir, user_dirs, pattern, key_of):
+    """{key: (shipped path, overriding path)} for one library.
+
+    A shadow is a name the bundled directory supplies AND a user directory
+    supplies again.  A user file with no shipped counterpart is not a shadow:
+    it adds, it does not replace, and flagging it would bury the ones that do.
+    """
+    from pathlib import Path as _P
+    bundled = {}
+    b = _P(bundled_dir)
+    if b.exists():
+        for fp in sorted(b.glob(pattern)):
+            k = key_of(fp)
+            if k:
+                bundled.setdefault(k, fp)
+    out = {}
+    for d in [_P(x) for x in (user_dirs or ())]:
+        if not d.exists() or d.resolve() == b.resolve():
+            continue
+        for fp in sorted(d.glob(pattern)):
+            k = key_of(fp)
+            if k and k in bundled:
+                out[k] = (str(bundled[k]), str(fp))
+    return out
+
+
+def _name_in_file(fp, fallback_suffix):
+    """The library key a file claims, preferring its own `name` field."""
+    try:
+        n = str(_json.loads(fp.read_text()).get('name', '') or '').strip()
+    except Exception:
+        n = ''
+    return n or fp.name[:-len(fallback_suffix)]
+
+
+def shadowed_library_entries(flight_plan_dirs=None, reentry_plan_dirs=None,
+                             ro_dirs=None):
+    """Every shipped name a user file is currently overriding.
+
+    Returns {'flight_plan': {...}, 'reentry_plan': {...}, 'reentry_object':
+    {...}}, each mapping the name to (shipped path, overriding path).  Empty
+    dicts mean the run is reading shipped data only.
+
+    Defaults to the module's live USER_* lists, so a caller that has not
+    configured anything sees what the program itself would resolve.  Only
+    DEFAULT plans count: a named variant is a deliberate, separately-listed
+    artifact, not something standing in front of a shipped file.
+    """
+    fp_dirs = (USER_FLIGHT_PLAN_DIRS if flight_plan_dirs is None
+               else flight_plan_dirs)
+    rp_dirs = (USER_REENTRY_PLAN_DIRS if reentry_plan_dirs is None
+               else reentry_plan_dirs)
+    o_dirs = USER_RO_DIRS if ro_dirs is None else ro_dirs
+
+    def _plan_key(suffix):
+        def k(fp):
+            stem = fp.name[:-len(suffix)]
+            return None if '__' in stem else stem      # '__' marks a variant
+        return k
+
+    return {
+        'flight_plan': _shadows_in(
+            _BUNDLED_FLIGHT_PLANS, fp_dirs, "*.flightplan.json",
+            _plan_key(".flightplan.json")),
+        'reentry_plan': _shadows_in(
+            _BUNDLED_REENTRY_PLANS, rp_dirs, "*.reentryplan.json",
+            _plan_key(".reentryplan.json")),
+        'reentry_object': _shadows_in(
+            _Path(__file__).resolve().parent / "ro_library", o_dirs,
+            "*.ro.json", lambda fp: _name_in_file(fp, ".ro.json")),
+    }
+
+
+def describe_shadows(shadows) -> str:
+    """One human-readable block, or '' when nothing is shadowed."""
+    order = (('reentry_plan', 'Reentry plans'),
+             ('reentry_object', 'Reentry objects'),
+             ('flight_plan', 'Flight plans'))
+    lines = []
+    for key, label in order:
+        entries = shadows.get(key) or {}
+        if not entries:
+            continue
+        lines.append(f"{label}:")
+        for name, (shipped, user) in sorted(entries.items()):
+            lines.append(f"    {name}")
+            lines.append(f"        flying : {user}")
+            lines.append(f"        shipped: {shipped}")
+    return "\n".join(lines)

@@ -8120,6 +8120,7 @@ class BoosterFlyoutApp(tk.Tk):
         self._build_menu()
         self._build_ui()
         self._on_booster_changed()   # populate params tab with default booster
+        self._announce_library_overrides()
 
     # ------------------------------------------------------------------
     # Utility
@@ -8203,6 +8204,11 @@ class BoosterFlyoutApp(tk.Tk):
         ref_menu.add_separator()
         ref_menu.add_command(label="Offline Gazetteer…",
                              command=self._manage_gazetteer)
+        # Which shipped files your own saved copies are standing in front of.
+        # The override is silent by design (it is how an edit survives an
+        # update), which is exactly why it needs somewhere to be looked up.
+        ref_menu.add_command(label="Library Overrides…",
+                             command=self._show_library_overrides)
         analysis_menu.add_separator()
         analysis_menu.add_cascade(label="Reference Data", menu=ref_menu)
         menubar.add_cascade(label="Analysis", menu=analysis_menu)
@@ -16198,6 +16204,61 @@ class BoosterFlyoutApp(tk.Tk):
         self._launch_lat.set(f"{lat:.4f}")
         self._launch_lon.set(f"{lon:.4f}")
         self._status_var.set(f"Site '{name}' loaded from {Path(path).name}")
+
+    def _announce_library_overrides(self):
+        """Say on the status line, once at startup, that saved copies are in
+        force — the override is otherwise completely silent, and a file edited
+        months ago goes on deciding every run."""
+        try:
+            n = sum(len(v) for v in mm.shadowed_library_entries().values())
+        except Exception:
+            return
+        if n:
+            self._status_var.set(
+                f"Ready.  {n} shipped file{'s' if n != 1 else ''} overridden "
+                f"by your saved copies — Analysis ▸ Reference Data ▸ "
+                f"Library Overrides… to see which.")
+
+    def _show_library_overrides(self):
+        """List every shipped file a saved copy of yours is overriding.
+
+        The four libraries all resolve bundled-first, user-wins, per key, and
+        said nothing about it.  A stale personal file could therefore decide
+        what flew while the shipped file sat unread -- a saved reentry plan
+        with gliding switched off made a shipped glider fly ballistic, and the
+        only symptom was a wrong trajectory.
+        """
+        shadows = mm.shadowed_library_entries()
+        text = mm.describe_shadows(shadows)
+        n = sum(len(v) for v in shadows.values())
+        if not n:
+            messagebox.showinfo(
+                "Library overrides",
+                "Nothing is overridden — every booster, object and plan in "
+                "this session comes from the files shipped with Thrusty.",
+                parent=self)
+            return
+        dlg = tk.Toplevel(self)
+        dlg.title("Library overrides")
+        dlg.transient(self)
+        frm = ttk.Frame(dlg, padding=10)
+        frm.pack(fill=tk.BOTH, expand=True)
+        ttk.Label(frm, justify=tk.LEFT, wraplength=680, text=(
+            f"{n} shipped file{'s' if n != 1 else ''} "
+            f"{'are' if n != 1 else 'is'} being overridden by a saved copy of "
+            "your own.  The saved copy is what flies.\n\n"
+            "This is normal — it is how your edits survive an update — but a "
+            "file you changed once and forgot keeps deciding every run, so it "
+            "is worth knowing which ones."
+        )).pack(anchor=tk.W, pady=(0, 8))
+        box = tk.Text(frm, width=96, height=min(26, 4 + text.count("\n")),
+                      wrap=tk.NONE, font=("TkFixedFont", 10))
+        box.insert("1.0", text)
+        box.configure(state=tk.DISABLED)
+        box.pack(fill=tk.BOTH, expand=True)
+        ttk.Button(frm, text="Close", command=dlg.destroy).pack(
+            anchor=tk.E, pady=(8, 0))
+        self._center_dialog(dlg)
 
     def _show_about(self):
         messagebox.showinfo(

@@ -50,6 +50,12 @@ improve this."
   plotting only. A formula or sweep loop belongs in a core module
   (`analysis.py`, `coordinates.py`, `booster_models.py`, …) with a test;
   the dialog calls it. This keeps the core portable and testable headless.
+- **A user file that overrides a shipped one is visible, not silent.** All
+  four libraries resolve bundled-first, user-wins, per key.
+  `booster_models.shadowed_library_entries()` reports what is being
+  overridden; the GUI says so on the status line at startup and lists it
+  under Analysis ▸ Reference Data ▸ Library Overrides. Keep new library
+  lookups reportable the same way.
 - **Tests read only what is committed.** `conftest.py` blanks the user
   library paths (`USER_FLIGHT_PLAN_DIRS` and friends) that `thrusty.py` sets
   on import, so a run never picks up `~/Documents/Thrusty/`. Any script that
