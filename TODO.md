@@ -677,6 +677,20 @@ The one phase that touches trajectory physics, gated to lifting forms
 - Wedge planform-span field: DONE earlier (body_span_m, 2026-07-30).
 
 ## Parked earlier in the project (context in METHODS / chat)
+- Plan files carry no provenance, and now they can (2026-09-22).  The FIELD
+  was never missing: `source`/`notes` are allowed by `PLAN_FILE_META`, both
+  plan editors have Source and Notes boxes, and the flight-plan write-through
+  has always carried them across a rebuild.  What was missing is that the
+  REENTRY write-through rebuilt from `extract_reentry_plan` alone and dropped
+  them, so anything typed into the Reentry Plan dialog was gone after one Run
+  — which is why all 7 shipped reentry plans and all 13 flight plans hold zero
+  words.  Fixed by mirroring `_raw_active_plan`.  STILL OPEN, and it is
+  curation not code: the 20 shipped plan files say nothing about where their
+  numbers came from.  The ones that most need it are the guidance values a
+  reader cannot check — `burnout_angle_deg` and `loft_angle_rate_deg_s` on
+  each flight plan, and `commanded_LD` on each reentry plan.  Do NOT invent
+  citations to fill them; leave a plan blank rather than guess, and write the
+  note when the number's source is actually known.
 - Strypi VII R STALLS THE INTEGRATOR — now fails loudly, needs a data or model
   decision (2026-09-22).  It reaches Mach 1.001 at 1.4 km and stays there: the
   adaptive step collapses on the transonic drag kink and the run took 459 s to

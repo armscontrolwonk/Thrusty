@@ -383,3 +383,43 @@ def test_the_beta_estimator_is_seeded_on_the_body_that_flies(root):
         assert stored == pytest.approx(5.0, abs=0.15)      # what it used to be
     finally:
         dlg.destroy()
+
+
+# ── provenance on a plan file survives a run ────────────────────────────────
+
+def test_a_reentry_plans_provenance_survives_a_run(root, tmp_path, monkeypatch):
+    """Both plan editors have Source and Notes boxes, and the flight side has
+    always carried them across a rebuild -- _raw_active_plan's docstring says
+    every flow that rebuilds a plan must start from the raw file "or those
+    keys are silently destroyed on the next save".  The reentry side had no
+    such helper and rebuilt from extract_reentry_plan alone, so a source and
+    notes typed into the Reentry Plan dialog did not survive a single Run.
+    That is why no reentry plan in the library holds any provenance."""
+    import json as _json
+    import booster_models as bm
+    plans = tmp_path / "reentry_plans"
+    plans.mkdir()
+    ro = bm.ro_from_dict(_json.load(open("ro_library/C-HGB.ro.json")))
+    stamped = dict(bm.extract_reentry_plan(ro),
+                   source="FE-2 EA 2019 sec 2.5.6",
+                   notes="commanded L/D held at the airframe capability")
+    bm.save_reentry_plan(ro.name, stamped, plans)
+    monkeypatch.setattr(bm, "USER_REENTRY_PLAN_DIRS", [str(plans)])
+    monkeypatch.setattr(thrusty, "_REENTRY_PLAN_LIBRARY_PATH", plans)
+
+    app = thrusty.BoosterFlyoutApp()
+    try:
+        app.withdraw()
+        monkeypatch.setattr(app, "_active_reentry_object",
+                            lambda: (ro.name, ro))
+        monkeypatch.setattr(app, "_active_reentry_plan_name", lambda: None)
+        app._snapshot_reentry_plan()
+        back = _json.load(open(plans / bm.reentry_plan_filename(ro.name)))
+        assert back.get("source") == "FE-2 EA 2019 sec 2.5.6", (
+            "the run rebuilt the plan and dropped its source")
+        assert "airframe capability" in (back.get("notes") or ""), (
+            "the run rebuilt the plan and dropped its notes")
+        # and it still wrote the behaviour keys it owns
+        assert "glider_guidance" in back
+    finally:
+        app.destroy()

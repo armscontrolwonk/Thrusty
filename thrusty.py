@@ -10727,6 +10727,24 @@ class BoosterFlyoutApp(tk.Tk):
                                          plan=pn) or {})
         return raw
 
+    def _raw_active_reentry_plan(self, name, plan_name=None, use_active=True):
+        """Raw merged reentry-plan file content for object `name`.
+
+        The mirror of _raw_active_plan, and there for the same reason its
+        docstring gives: provenance (source/notes) and any key added later
+        exist ONLY in the file, so a flow that rebuilds a plan from
+        extract_reentry_plan alone destroys them on the next save.  This side
+        had no such helper and did exactly that.
+        """
+        raw = mm.load_reentry_plan(
+            name, extra_dirs=mm.USER_REENTRY_PLAN_DIRS) or {}
+        pn = plan_name if plan_name is not None else (
+            self._active_reentry_plan_name() if use_active else None)
+        if pn:
+            raw = {**raw, **(mm.load_reentry_plan(
+                name, extra_dirs=mm.USER_REENTRY_PLAN_DIRS, plan=pn) or {})}
+        return raw
+
     @staticmethod
     def _fnum(sv):
         s = sv.get().strip()
@@ -10998,8 +11016,17 @@ class BoosterFlyoutApp(tk.Tk):
         if base_ro is None:
             return
         plan = extract_reentry_plan(base_ro)          # full keyset + commanded_LD
-        plan.update(self._reentry_plan_kwargs())      # panel mission-time fields
         _pv = self._active_reentry_plan_name()
+        # Keys the panel does not own -- provenance, and anything added later
+        # -- live only in the file; extract_reentry_plan cannot know about
+        # them.  Carry them across, or a single Run destroys them: a source
+        # and notes typed into the Reentry Plan dialog did not survive one.
+        # The flight side has done this since it was written; this side never
+        # did, which is why every reentry plan in the library holds no
+        # provenance at all.
+        for _k, _v in (self._raw_active_reentry_plan(name, _pv) or {}).items():
+            plan.setdefault(_k, _v)
+        plan.update(self._reentry_plan_kwargs())      # panel mission-time fields
         try:
             save_reentry_plan(name, plan, _REENTRY_PLAN_LIBRARY_PATH, plan=_pv)
         except Exception as exc:
