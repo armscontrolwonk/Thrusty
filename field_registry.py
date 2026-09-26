@@ -192,6 +192,7 @@ RO_FIELD_OWNER = {
     # ── hardware: the airframe ─────────────────────────────────────────
     'mass_kg':                         HARDWARE,
     'beta_kg_m2':                      HARDWARE,
+    'beta_ref_mach':                   HARDWARE,   # the Mach beta is stated at
     'shape':                           HARDWARE,
     'diameter_m':                      HARDWARE,
     'length_m':                        HARDWARE,
