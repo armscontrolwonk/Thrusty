@@ -3,6 +3,7 @@
     "embedded_ro": {
       "_ro": {
         "beta_kg_m2": 8000.0,
+        "beta_ref_mach": 0.0,
         "biconic": false,
         "body_form": "axisymmetric",
         "body_nose_length_m": 0.0,
@@ -139,6 +140,7 @@
       "pbv_length_m": 0.0,
       "ro": {
         "beta_kg_m2": 8000.0,
+        "beta_ref_mach": 0.0,
         "biconic": false,
         "body_form": "axisymmetric",
         "body_nose_length_m": 0.0,
@@ -210,6 +212,7 @@
     "embedded_rv": {
       "_ro": {
         "beta_kg_m2": 8000.0,
+        "beta_ref_mach": 0.0,
         "biconic": false,
         "body_form": "axisymmetric",
         "body_nose_length_m": 0.0,
@@ -346,6 +349,7 @@
       "pbv_length_m": 0.0,
       "ro": {
         "beta_kg_m2": 8000.0,
+        "beta_ref_mach": 0.0,
         "biconic": false,
         "body_form": "axisymmetric",
         "body_nose_length_m": 0.0,
@@ -3136,6 +3140,7 @@
     "inline_ro_fields": {
       "_ro": {
         "beta_kg_m2": 9000.0,
+        "beta_ref_mach": 0.0,
         "biconic": false,
         "body_form": "axisymmetric",
         "body_nose_length_m": 0.0,
@@ -3272,6 +3277,7 @@
       "pbv_length_m": 0.0,
       "ro": {
         "beta_kg_m2": 9000.0,
+        "beta_ref_mach": 0.0,
         "biconic": false,
         "body_form": "axisymmetric",
         "body_nose_length_m": 0.0,
@@ -3343,6 +3349,7 @@
     "inline_rv_fields": {
       "_ro": {
         "beta_kg_m2": 9000.0,
+        "beta_ref_mach": 0.0,
         "biconic": false,
         "body_form": "axisymmetric",
         "body_nose_length_m": 0.0,
@@ -3479,6 +3486,7 @@
       "pbv_length_m": 0.0,
       "ro": {
         "beta_kg_m2": 9000.0,
+        "beta_ref_mach": 0.0,
         "biconic": false,
         "body_form": "axisymmetric",
         "body_nose_length_m": 0.0,
@@ -4470,6 +4478,7 @@
   "ros": {
     "body_form_absent": {
       "beta_kg_m2": 8000.0,
+      "beta_ref_mach": 0.0,
       "biconic": false,
       "body_form": "axisymmetric",
       "body_nose_length_m": 0.0,
@@ -4528,6 +4537,7 @@
     },
     "body_form_unknown": {
       "beta_kg_m2": 8000.0,
+      "beta_ref_mach": 0.0,
       "biconic": false,
       "body_form": "axisymmetric",
       "body_nose_length_m": 0.0,
@@ -4586,6 +4596,7 @@
     },
     "cap_explicit_false": {
       "beta_kg_m2": 8000.0,
+      "beta_ref_mach": 0.0,
       "biconic": false,
       "body_form": "axisymmetric",
       "body_nose_length_m": 0.0,
@@ -4644,6 +4655,7 @@
     },
     "cap_from_enabled": {
       "beta_kg_m2": 8000.0,
+      "beta_ref_mach": 0.0,
       "biconic": false,
       "body_form": "axisymmetric",
       "body_nose_length_m": 0.0,
@@ -4702,6 +4714,7 @@
     },
     "cap_from_ld": {
       "beta_kg_m2": 8000.0,
+      "beta_ref_mach": 0.0,
       "biconic": false,
       "body_form": "axisymmetric",
       "body_nose_length_m": 0.0,
@@ -4760,6 +4773,7 @@
     },
     "cap_from_wing": {
       "beta_kg_m2": 8000.0,
+      "beta_ref_mach": 0.0,
       "biconic": false,
       "body_form": "axisymmetric",
       "body_nose_length_m": 0.0,
@@ -4818,6 +4832,7 @@
     },
     "cap_none": {
       "beta_kg_m2": 8000.0,
+      "beta_ref_mach": 0.0,
       "biconic": false,
       "body_form": "axisymmetric",
       "body_nose_length_m": 0.0,
@@ -4876,6 +4891,7 @@
     },
     "carries_plan_keys": {
       "beta_kg_m2": 8000.0,
+      "beta_ref_mach": 0.0,
       "biconic": false,
       "body_form": "axisymmetric",
       "body_nose_length_m": 0.0,
@@ -4940,6 +4956,7 @@
     },
     "file:AHW.ro.json": {
       "beta_kg_m2": 9000.0,
+      "beta_ref_mach": 0.0,
       "biconic": false,
       "body_form": "axisymmetric",
       "body_nose_length_m": 0.0,
@@ -4998,6 +5015,7 @@
     },
     "file:Al_Hussein_warhead.ro.json": {
       "beta_kg_m2": 0.0,
+      "beta_ref_mach": 0.0,
       "biconic": false,
       "body_form": "axisymmetric",
       "body_nose_length_m": 0.0,
@@ -5056,6 +5074,7 @@
     },
     "file:C-HGB.ro.json": {
       "beta_kg_m2": 15000.0,
+      "beta_ref_mach": 0.0,
       "biconic": false,
       "body_form": "axisymmetric",
       "body_nose_length_m": 0.0,
@@ -5116,6 +5135,7 @@
       "name": "Generic maneuvering body",
       "mass_kg": 500.0,
       "beta_kg_m2": 6000.0,
+      "beta_ref_mach": 0.0,
       "shape": "cone",
       "diameter_m": 0.95,
       "length_m": 7.5,
@@ -5172,6 +5192,7 @@
     },
     "file:Generic-RV.ro.json": {
       "beta_kg_m2": 10000.0,
+      "beta_ref_mach": 0.0,
       "biconic": false,
       "body_form": "axisymmetric",
       "body_nose_length_m": 0.0,
@@ -5232,6 +5253,7 @@
       "name": "Generic body missile warhead",
       "mass_kg": 988.0,
       "beta_kg_m2": 0.0,
+      "beta_ref_mach": 0.0,
       "shape": "tangent_ogive",
       "diameter_m": 1.1,
       "length_m": 9.18,
@@ -5288,6 +5310,7 @@
     },
     "file:HTV-2.ro.json": {
       "beta_kg_m2": 26000.0,
+      "beta_ref_mach": 0.0,
       "biconic": false,
       "body_form": "axisymmetric",
       "body_nose_length_m": 0.0,
@@ -5346,6 +5369,7 @@
     },
     "file:Mk21.ro.json": {
       "beta_kg_m2": 75000.0,
+      "beta_ref_mach": 0.0,
       "biconic": false,
       "body_form": "axisymmetric",
       "body_nose_length_m": 0.0,
@@ -5404,6 +5428,7 @@
     },
     "file:No-dong_warhead.ro.json": {
       "beta_kg_m2": 3653.7,
+      "beta_ref_mach": 0.0,
       "biconic": false,
       "body_form": "axisymmetric",
       "body_nose_length_m": 0.0,
@@ -5464,6 +5489,7 @@
       "name": "SWERVE",
       "mass_kg": 300.0,
       "beta_kg_m2": 24733.0,
+      "beta_ref_mach": 0.0,
       "shape": "cone",
       "diameter_m": 0.5385,
       "length_m": 2.743,
@@ -5520,6 +5546,7 @@
     },
     "file:Scud-B_warhead.ro.json": {
       "beta_kg_m2": 0.0,
+      "beta_ref_mach": 0.0,
       "biconic": false,
       "body_form": "axisymmetric",
       "body_nose_length_m": 0.0,
@@ -5578,6 +5605,7 @@
     },
     "file:Strypi_VII_R_payload.ro.json": {
       "beta_kg_m2": 2651.7,
+      "beta_ref_mach": 0.0,
       "biconic": false,
       "body_form": "axisymmetric",
       "body_nose_length_m": 0.0,
@@ -5636,6 +5664,7 @@
     },
     "file:Taepodong-I_payload.ro.json": {
       "beta_kg_m2": 4096.2,
+      "beta_ref_mach": 0.0,
       "biconic": false,
       "body_form": "axisymmetric",
       "body_nose_length_m": 0.0,
@@ -5694,6 +5723,7 @@
     },
     "glide_absent": {
       "beta_kg_m2": 8000.0,
+      "beta_ref_mach": 0.0,
       "biconic": false,
       "body_form": "axisymmetric",
       "body_nose_length_m": 0.0,
@@ -5752,6 +5782,7 @@
     },
     "glide_azimuth_command": {
       "beta_kg_m2": 8000.0,
+      "beta_ref_mach": 0.0,
       "biconic": false,
       "body_form": "axisymmetric",
       "body_nose_length_m": 0.0,
@@ -5810,6 +5841,7 @@
     },
     "glide_constant_bank": {
       "beta_kg_m2": 8000.0,
+      "beta_ref_mach": 0.0,
       "biconic": false,
       "body_form": "axisymmetric",
       "body_nose_length_m": 0.0,
@@ -5868,6 +5900,7 @@
     },
     "glide_skip_to_equilibrium": {
       "beta_kg_m2": 8000.0,
+      "beta_ref_mach": 0.0,
       "biconic": false,
       "body_form": "axisymmetric",
       "body_nose_length_m": 0.0,
@@ -5926,6 +5959,7 @@
     },
     "modern_control": {
       "beta_kg_m2": 8000.0,
+      "beta_ref_mach": 0.0,
       "biconic": false,
       "body_form": "axisymmetric",
       "body_nose_length_m": 0.0,
@@ -5984,6 +6018,7 @@
     },
     "sep_non_separating": {
       "beta_kg_m2": 8000.0,
+      "beta_ref_mach": 0.0,
       "biconic": false,
       "body_form": "axisymmetric",
       "body_nose_length_m": 0.0,
@@ -6042,6 +6077,7 @@
     },
     "sep_separating_rv": {
       "beta_kg_m2": 8000.0,
+      "beta_ref_mach": 0.0,
       "biconic": false,
       "body_form": "axisymmetric",
       "body_nose_length_m": 0.0,

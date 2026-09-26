@@ -649,7 +649,8 @@ def _polar_cd(C_L: float, pol: '_Polar') -> float:
         - (pol.C_L_star - cl0) * (pol.C_L_star - cl0))
 
 
-def _aero_polar(ro, ld_override: float = None) -> '_Polar':
+def _aero_polar(ro, ld_override: float = None,
+                beta_override: float = None) -> '_Polar':
     """The drag polar as a `_Polar` record (Munk 1924; Ashley & Landahl §6-7).
 
     Linear slender-body theory gives C_L = 2α referenced to A_ref = π·d²/4;
@@ -685,7 +686,10 @@ def _aero_polar(ro, ld_override: float = None) -> '_Polar':
         d = 0.5                                 # generic HGV fallback
     A_ref = 0.25 * np.pi * d * d
     m   = float(getattr(ro, 'mass_kg', 0.0) or 0.0)
-    bet = float(getattr(ro, 'beta_kg_m2', 0.0) or 0.0)
+    # beta_override: the local-Mach β from a stated-β table (beta_mach_table),
+    # so the polar's C_D0 follows Mach with k held fixed.  None = the scalar.
+    bet = float(beta_override if beta_override
+                else (getattr(ro, 'beta_kg_m2', 0.0) or 0.0))
     LD  = float(ld_override if ld_override is not None
                 else (getattr(ro, 'glider_LD', 0.0) or 0.0))
     if m > 0.0 and bet > 0.0:
@@ -1114,6 +1118,12 @@ def _eom(t, state, params, cutoff_time, azimuth_rad, gt_turn_start_s,
                     and getattr(_ero, 'reentry_attitude', 'trim') != 'tumbling'):
                 _beta_eff = _beta_tab(speed / _a_snd)
             drag_mag = q * ro_mass / _beta_eff
+            # A STATED-β table (beta_ref_mach > 0) also drives the glide
+            # polar's C_D0, so zero-lift drag is Mach-consistent whether or
+            # not the vehicle is lifting.  The derived-body tables do not set
+            # this flag: their polar keeps its scalar reference β, unchanged.
+            _beta_pol = (_beta_eff if getattr(params, '_beta_polar_mach', False)
+                         else None)
             # Glide-phase activation.  The lifting phase begins at APOGEE — the
             # physical start of the descending glide — which the pre-/post-apogee
             # integration split already encodes in _glider_phase1 (True on the
@@ -1252,7 +1262,7 @@ def _eom(t, state, params, cutoff_time, azimuth_rad, gt_turn_start_s,
                                 if q > 1.0:
                                     if getattr(_ero, 'glider_aero_model',
                                                'polar') == 'polar':
-                                        _polp = _aero_polar(_ero, _ld_eff)
+                                        _polp = _aero_polar(_ero, _ld_eff, _beta_pol)
                                         _C_L = min(_L_struct / (q * _polp.A_ref),
                                                    _polp.C_L_max)
                                         lift_mag = q * _polp.A_ref * _C_L
@@ -1289,7 +1299,7 @@ def _eom(t, state, params, cutoff_time, azimuth_rad, gt_turn_start_s,
                             _g_eff = max(g_mag - speed*speed/r_mag, 0.0)
                             if q > 1.0:
                                 if _polar:
-                                    _pol=_aero_polar(_ero, _ld_eff)
+                                    _pol=_aero_polar(_ero, _ld_eff, _beta_pol)
                                     _CLstar=min(_pol.C_L_star, _pol.C_L_max)
                                     _L_nom=q*_pol.A_ref*_CLstar
                                 else:
@@ -1358,7 +1368,7 @@ def _eom(t, state, params, cutoff_time, azimuth_rad, gt_turn_start_s,
                                 _L_target = (ro_mass * _g_eff / _cos_b
                                              - _k_h * (_hdot - speed * _gstar))
                                 if _polar:
-                                    _pol = _aero_polar(_ero, _ld_eff)
+                                    _pol = _aero_polar(_ero, _ld_eff, _beta_pol)
                                     # aerodynamic lift ceiling: C_L <= C_L,max
                                     _C_L = min(max(_L_target / (q * _pol.A_ref), 0.0),
                                                _pol.C_L_max)
@@ -1380,7 +1390,7 @@ def _eom(t, state, params, cutoff_time, azimuth_rad, gt_turn_start_s,
                             else:
                                 lift_mag = 0.0
                         elif getattr(_ero, 'glider_aero_model', 'polar') == 'polar':
-                            _pol = _aero_polar(_ero, _ld_eff)
+                            _pol = _aero_polar(_ero, _ld_eff, _beta_pol)
                             _Aref = _pol.A_ref
                             _C_L_lim = _pol.C_L_max     # geometry-anchored ceiling
                             _L_max = _ero.glider_pullup_g_max * g_mag * ro_mass
@@ -2194,6 +2204,35 @@ def integrate_trajectory(params: BoosterParams,
                     params.ro = _dc.replace(_ro, glider_LD=_ld)
         except Exception:
             pass   # leave glider_LD at 0; glide modes will treat it as no lift
+
+    # Stated-β Mach table (beta_ref_mach > 0).  The entered β is held exact at
+    # its stated Mach; the object's own geometry supplies only the relative
+    # variation (booster_models.beta_mach_table).  An ENTERED L/D is scaled so
+    # k stays fixed — the Mach variation is zero-lift drag, and lands in C_D0.
+    # Guards: a derived-body table already present wins (that path writes its
+    # derived value back into beta_kg_m2 / glider_LD), and a tumbling body keeps
+    # its tumbling β.  beta_ref_mach = 0 skips all of this: byte-identical.
+    _sro = params.ro
+    if (_sro is not None
+            and float(getattr(_sro, 'beta_ref_mach', 0.0) or 0.0) > 0.0
+            and getattr(_sro, 'reentry_attitude', 'trim') != 'tumbling'
+            and getattr(params, '_beta_of_mach', None) is None):
+        try:
+            from booster_models import beta_mach_table as _bmt
+            _tab = _bmt(_sro)
+            if _tab is not None:
+                params = copy.copy(params)
+                _tm, _tb = _tab['machs'], _tab['beta']
+                params._beta_of_mach = (lambda M, _x=_tm, _y=_tb:
+                                        float(np.interp(M, _x, _y)))
+                _ld0 = float(getattr(_sro, 'glider_LD', 0.0) or 0.0)
+                if _ld0 > 0.0 and getattr(params, '_ld_of_mach', None) is None:
+                    _tl = _ld0 * _tab['ld_scale']
+                    params._ld_of_mach = (lambda M, _x=_tm, _y=_tl:
+                                          float(np.interp(M, _x, _y)))
+                    params._beta_polar_mach = True
+        except Exception:
+            pass   # any failure leaves the scalar β: never worse than before
 
     total_burn = total_burn_time(params)
     if cutoff_time_s is None:

@@ -3851,6 +3851,16 @@ class ROEditorDialog(tk.Toplevel):
         self._beta_entry = ttk.Entry(_beta_row, textvariable=self._beta_var, width=10)
         self._beta_entry.pack(side=tk.LEFT)
         ttk.Label(_beta_row, text=" kg/m²").pack(side=tk.LEFT)
+        # The Mach at which β is stated.  0 = constant β at every Mach (legacy).
+        # > 0: β is exact there and the object's geometry supplies the Mach
+        # variation (booster_models.beta_mach_table).  The estimators stamp the
+        # Mach they evaluated at when you press Use.
+        ttk.Label(_beta_row, text="  at Mach").pack(side=tk.LEFT)
+        self._beta_mach_var = tk.StringVar(
+            value=(f"{ro.beta_ref_mach:g}"
+                   if (ro and getattr(ro, 'beta_ref_mach', 0.0) > 0) else "0"))
+        ttk.Entry(_beta_row, textvariable=self._beta_mach_var,
+                  width=5).pack(side=tk.LEFT, padx=(4, 0))
         ttk.Button(_beta_row, text="Estimate…",
                    command=self._calc_beta).pack(side=tk.LEFT, padx=(6, 0))
         # Inline derived-β preview for a non-separating body (managed in
@@ -4075,11 +4085,6 @@ class ROEditorDialog(tk.Toplevel):
         self._LD_var.trace_add("write", lambda *_a: self._refresh_ld_preview())
         # β is half of the pair the preview now tests, so a β edit must
         # refresh the note too.
-        try:
-            self._beta_var.trace_add(
-                "write", lambda *_a: self._refresh_ld_preview())
-        except (AttributeError, tk.TclError):
-            pass
         # Structural pull-up limit (hardware).  The reentry plan COMMANDS a g
         # at or below this — the same shape as commanded L/D ≤ capability.
         ttk.Label(self._glider_frm, text="Pull-up g-limit (structural):").grid(
@@ -4121,6 +4126,23 @@ class ROEditorDialog(tk.Toplevel):
             foreground="#888888", justify=tk.LEFT, wraplength=340)
         self._wing_hint_lbl.grid(row=4, column=0, columnspan=2, sticky=tk.W,
                                  pady=(2, 0))
+        # β + L/D pairing note.  Its own label, visible for EVERY separation
+        # mode: the L/D derive label above is body-only (grid_remove'd for a
+        # separating object), and a separating object is exactly where both β
+        # and L/D are typed.  Advisory only — nothing here blocks a save.
+        self._pairing_lbl = ttk.Label(self._glider_frm, text="",
+                                      foreground="gray40", justify=tk.LEFT,
+                                      wraplength=340)
+        self._pairing_lbl.grid(row=5, column=0, columnspan=3, sticky=tk.W,
+                               pady=(4, 0))
+        for _pv in ('_beta_var', '_beta_mach_var', '_LD_var', '_mass_var',
+                    '_dia_var', '_len_var', '_nose_var', '_body_span_var',
+                    '_shape_var', '_glider_var'):
+            _pvar = getattr(self, _pv, None)
+            if _pvar is not None:
+                _pvar.trace_add("write",
+                                lambda *_a: self._refresh_pairing_note())
+        self.after_idle(self._refresh_pairing_note)
 
         self._sync_wing_derived()
         self._update_glider_state()
@@ -4425,6 +4447,11 @@ class ROEditorDialog(tk.Toplevel):
         def _use():
             if _result[0] is not None and _result[0] != float('inf'):
                 self._beta_var.set(f"{_result[0]:.0f}")
+                # β is only meaningful at the Mach it was evaluated at.
+                try:
+                    self._beta_mach_var.set(f"{float(mach_var.get()):g}")
+                except (ValueError, AttributeError, tk.TclError):
+                    pass
                 # Also stamp the absolute nose-tip radius (eps × base radius)
                 # back into the editor so heating uses the same geometry.
                 try:
@@ -4667,6 +4694,10 @@ class ROEditorDialog(tk.Toplevel):
             if _result[0] is not None:
                 beta0, ldmax, a_star, cl0 = _result[0]
                 self._beta_var.set(f"{beta0:.0f}")
+                try:     # β(α=0) belongs to the Mach the sweep ran at
+                    self._beta_mach_var.set(f"{float(mach_var.get()):g}")
+                except (ValueError, AttributeError, tk.TclError):
+                    pass
                 # (L/D)max pre-fills the glider L/D — the capability figure the
                 # airframe supports, quoted from the SAME α* as the β above.
                 try:
@@ -4901,6 +4932,7 @@ class ROEditorDialog(tk.Toplevel):
             name    = self._name_var.get().strip() or "(unnamed)"
             mass_kg = float(self._mass_var.get())
             beta    = float(self._beta_var.get())
+            beta_mach = max(0.0, float(self._beta_mach_var.get() or 0.0))
             shape   = self._shape_key()          # merged Shape selector
             dia     = float(self._dia_var.get())
             length  = float(self._len_var.get())
@@ -4908,7 +4940,8 @@ class ROEditorDialog(tk.Toplevel):
         except ValueError:
             messagebox.showerror(
                 "Invalid input",
-                "Mass, β, diameter, length, and nose radius must be numbers.",
+                "Mass, β, β Mach, diameter, length, and nose radius must be "
+                "numbers.",
                 parent=self)
             return None
 
@@ -5042,6 +5075,7 @@ class ROEditorDialog(tk.Toplevel):
 
         ro_new = ROParams(
             name=name, mass_kg=mass_kg, beta_kg_m2=beta,
+            beta_ref_mach=beta_mach,
             shape=shape, diameter_m=dia, length_m=length,
             nose_radius_m=nose_rn,
             biconic=biconic, fore_length_m=fore_len_m,
@@ -5418,20 +5452,54 @@ class ROEditorDialog(tk.Toplevel):
     _PAIRING_COLOUR = {'none': "gray40", 'ok': "gray40",
                        'warn': "#8a6d00", 'bad': "#a03000"}
 
-    def _pairing_note(self, typed_ld):
-        """One-line verdict on the typed (β, L/D) pair against the object's own
-        geometry.  Message text lives in `booster_models.pairing_note()` so it
-        is testable without a display; this only picks the colour and supplies
-        the fallback.  WARN ONLY — nothing here blocks a save.
-        """
-        _plain = "typed value — clear to 0 to derive from geometry"
+    def _pairing_ro(self):
+        """The object as typed, for the pairing check: live geometry from
+        `_preview_ro()` plus the TYPED β, L/D, β-Mach and body form.
+        `_preview_ro()` alone will not do — it is the derive-mode preview and
+        carries β = L/D = 0 and no body form.  None when β or L/D is not a
+        positive number (nothing to check)."""
         try:
-            text, sev = mm.pairing_note(self._preview_ro())
-        except Exception:
-            self._pairing_colour = self._PAIRING_COLOUR['none']
-            return _plain
-        self._pairing_colour = self._PAIRING_COLOUR.get(sev, "gray40")
-        return f"typed — {text}" if text else _plain
+            beta = float(self._beta_var.get() or 0.0)
+            ld = float(self._LD_var.get() or 0.0)
+            bmach = float(self._beta_mach_var.get() or 0.0)
+        except (ValueError, tk.TclError, AttributeError):
+            return None
+        if beta <= 0.0 or ld <= 0.0:
+            return None
+        try:
+            span = float(self._body_span_var.get() or 0.0)
+        except (ValueError, tk.TclError, AttributeError):
+            span = 0.0
+        import dataclasses as _dc
+        return _dc.replace(self._preview_ro(), beta_kg_m2=beta, glider_LD=ld,
+                           beta_ref_mach=max(0.0, bmach),
+                           body_form=self._body_form_key(),
+                           body_span_m=max(0.0, span))
+
+    def _refresh_pairing_note(self):
+        """Refresh the β + L/D pairing note.  Message text lives in
+        `booster_models.pairing_note()` (testable without a display); this only
+        builds the typed object and picks the colour.  Never raises."""
+        lbl = getattr(self, '_pairing_lbl', None)
+        if lbl is None:
+            return
+        try:
+            on = bool(self._glider_var.get())
+        except (tk.TclError, AttributeError):
+            on = False
+        text, sev = "", "none"
+        if on:
+            try:
+                ro = self._pairing_ro()
+                if ro is not None:
+                    text, sev = mm.pairing_note(ro)
+            except Exception:
+                text, sev = "", "none"
+        try:
+            lbl.config(text=(f"β + L/D: {text}" if text else ""),
+                       foreground=self._PAIRING_COLOUR.get(sev, "gray40"))
+        except tk.TclError:
+            pass
 
     def _refresh_ld_preview(self):
         """Update the inline L/D preview next to the field (body mode): the
@@ -5445,14 +5513,7 @@ class ROEditorDialog(tk.Toplevel):
         except (ValueError, tk.TclError):
             _ld = 0.0
         if _ld > 0.0:
-            # A typed L/D is an assertion, and _aero_polar back-solves whatever
-            # k reconciles it with the typed β — so the polar can never
-            # disagree (docs/aero_polar_calibration.md §2).  Say so here
-            # instead: the swept geometry's C_D is a one-sided FLOOR, so this
-            # can report "less drag than the shape has" and never the reverse.
-            # WARN ONLY — the value is always accepted.
-            lbl.config(text=self._pairing_note(_ld),
-                       foreground=self._pairing_colour)
+            lbl.config(text="typed value — clear to 0 to derive from geometry")
             return
         if self._booster is None:
             lbl.config(text="0 = derive from geometry (nose + body + fins)")

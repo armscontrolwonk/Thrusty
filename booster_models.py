@@ -308,6 +308,13 @@ class ROParams:
     name:       str
     mass_kg:    float   # single-RV mass (kg)
     beta_kg_m2: float   # ballistic coefficient β = m/(Cd·A) (kg/m²)
+    # Mach at which beta_kg_m2 is stated.  0.0 = legacy CONSTANT β at every
+    # Mach (byte-identical to files that predate the field).  > 0: the entered
+    # β is held EXACT at this Mach and the object's own geometry supplies only
+    # the RELATIVE variation, β(M) = β · C_D0(M_ref)/C_D0(M) — derive, don't
+    # invent (beta_mach_table).  Hardware: it qualifies the β measurement,
+    # like a unit, not how a particular run is flown.
+    beta_ref_mach: float = 0.0
 
     # Geometry — for Cd model on boost phase and for β-calculator round-trip
     shape:      str   = ""    # key from NOSE_SHAPES; "" → Forden Cd fallback
@@ -757,6 +764,7 @@ def ro_to_dict(ro: ROParams, include_reentry_plan: bool = True) -> dict:
         'name':                  ro.name,
         'mass_kg':               ro.mass_kg,
         'beta_kg_m2':            ro.beta_kg_m2,
+        'beta_ref_mach':         ro.beta_ref_mach,
         'shape':                 ro.shape,
         'diameter_m':            ro.diameter_m,
         'length_m':              ro.length_m,
@@ -870,6 +878,7 @@ def ro_from_dict(d: dict) -> ROParams:
         name=str(d.get('name', 'RV')),
         mass_kg=float(d['mass_kg']),
         beta_kg_m2=float(d['beta_kg_m2']),
+        beta_ref_mach=float(d.get('beta_ref_mach', 0.0) or 0.0),
         shape=str(d.get('shape', '')),
         diameter_m=float(d.get('diameter_m', 0.0)),
         length_m=float(d.get('length_m', 0.0)),
@@ -3373,6 +3382,41 @@ def check_beta_ld_pairing(sweep, mass_kg, a_ref_m2, beta_kg_m2, glider_LD,
     return out
 
 
+def _ro_sweep_kwargs(ro):
+    """Map a reentry object's stored geometry onto `lifting_body_sweep()`
+    keyword arguments.  Returns (kwargs, a_ref_m2, reason) — kwargs is None
+    with a reason when the object lacks the geometry to sweep.  Shared by the
+    pairing check and the β(Mach) table so there is one mapping, not two.
+    β is always BASE-referenced here (A_ref = π·d²/4), for every form."""
+    import math
+    form = str(getattr(ro, 'body_form', '') or 'axisymmetric')
+    d = float(getattr(ro, 'diameter_m', 0.0) or 0.0)
+    L = float(getattr(ro, 'length_m', 0.0) or 0.0)
+    m = float(getattr(ro, 'mass_kg', 0.0) or 0.0)
+    if not (d > 0.0 and L > 0.0):
+        return None, 0.0, 'object has no diameter/length to sweep'
+    a_ref = 0.25 * math.pi * d * d
+    kw = dict(mass_kg=m, a_ref_m2=a_ref, length_m=L)
+    theta = math.degrees(math.atan2(d / 2.0, L))
+    if form == 'wedge':
+        span = float(getattr(ro, 'body_span_m', 0.0) or 0.0)
+        if span <= 0.0:
+            return None, a_ref, 'wedge body has no body_span_m; sweep needs the span'
+        kw.update(form='wedge', span_m=span, depth_m=d)
+    elif form == 'half_cone':
+        s_e = float(getattr(ro, 'wing_span_exposed_m', 0.0) or 0.0)
+        c_r = float(getattr(ro, 'wing_root_chord_m', 0.0) or 0.0)
+        wing = 0.0
+        if s_e > 0.0 and c_r > 0.0:
+            sw = math.radians(float(getattr(ro, 'wing_sweep_deg', 0.0) or 0.0))
+            c_t = max(0.0, c_r - s_e * math.tan(sw))
+            wing = 0.5 * (c_r + c_t) * s_e
+        kw.update(form='half_cone', theta_deg=theta, wing_exposed_m2=wing)
+    else:
+        kw.update(form='cone', theta_deg=theta)
+    return kw, a_ref, ''
+
+
 def sweep_and_check_ro(ro, mach=5.0, reynolds_length=None,
                        wall_temp_ratio=1.0, turbulent=True,
                        tol=PAIRING_DRAG_TOL):
@@ -3396,39 +3440,15 @@ def sweep_and_check_ro(ro, mach=5.0, reynolds_length=None,
     Returns the `check_beta_ld_pairing()` dict, with 'insufficient' whenever
     the object lacks the geometry to sweep.  Never raises on bad data.
     """
-    import math
-
     def _bad(why):
         return dict(verdict='insufficient', reason=why, conditions={})
 
-    form = str(getattr(ro, 'body_form', '') or 'axisymmetric')
-    d = float(getattr(ro, 'diameter_m', 0.0) or 0.0)
-    L = float(getattr(ro, 'length_m', 0.0) or 0.0)
-    m = float(getattr(ro, 'mass_kg', 0.0) or 0.0)
-    if not (d > 0.0 and L > 0.0):
-        return _bad('object has no diameter/length to sweep')
-    a_ref = 0.25 * math.pi * d * d
-    kw = dict(mach=mach, reynolds_length=reynolds_length,
-              wall_temp_ratio=wall_temp_ratio, turbulent=turbulent,
-              mass_kg=m, a_ref_m2=a_ref, length_m=L)
-    theta = math.degrees(math.atan2(d / 2.0, L))
-    if form == 'wedge':
-        span = float(getattr(ro, 'body_span_m', 0.0) or 0.0)
-        if span <= 0.0:
-            return _bad('wedge body has no body_span_m; sweep needs the span')
-        kw.update(form='wedge', span_m=span, depth_m=d)
-        kw['a_ref_m2'] = a_ref                # beta is base-referenced
-    elif form == 'half_cone':
-        s_e = float(getattr(ro, 'wing_span_exposed_m', 0.0) or 0.0)
-        c_r = float(getattr(ro, 'wing_root_chord_m', 0.0) or 0.0)
-        wing = 0.0
-        if s_e > 0.0 and c_r > 0.0:
-            sw = math.radians(float(getattr(ro, 'wing_sweep_deg', 0.0) or 0.0))
-            c_t = max(0.0, c_r - s_e * math.tan(sw))
-            wing = 0.5 * (c_r + c_t) * s_e
-        kw.update(form='half_cone', theta_deg=theta, wing_exposed_m2=wing)
-    else:
-        kw.update(form='cone', theta_deg=theta)
+    kw, a_ref, why = _ro_sweep_kwargs(ro)
+    if kw is None:
+        return _bad(why)
+    m = kw['mass_kg']
+    kw.update(mach=mach, reynolds_length=reynolds_length,
+              wall_temp_ratio=wall_temp_ratio, turbulent=turbulent)
     try:
         sweep = lifting_body_sweep(**kw)
     except (ValueError, ZeroDivisionError) as exc:
@@ -3470,6 +3490,11 @@ def check_ro_pairing_band(ro, machs=PAIRING_MACH_BAND, **kw):
     Use this, not the single-Mach form, whenever the object does not state the
     conditions its beta belongs to.
     """
+    # A stated reference Mach removes the ambiguity the band exists for: the
+    # entered β belongs to that Mach, so test the pair there and only there.
+    _m_ref = float(getattr(ro, 'beta_ref_mach', 0.0) or 0.0)
+    if _m_ref > 0.0:
+        machs = (_m_ref,)
     best, by_mach = None, {}
     for M in machs:
         r = sweep_and_check_ro(ro, mach=float(M), **kw)
@@ -3497,6 +3522,98 @@ def check_ro_pairing_band(ro, machs=PAIRING_MACH_BAND, **kw):
     return out
 
 
+# Mach grid for the stated-β table.  Below M3 the hypersonic build-up floors
+# (cd_cone_hypersonic uses max(M, 3)), so the table is flat there; np.interp
+# clamps outside the grid.  The upper end covers a boost-glide entry.
+BETA_MACH_GRID = (1.5, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0, 12.0, 15.0, 20.0, 25.0)
+
+
+def beta_mach_table(ro, machs=BETA_MACH_GRID):
+    """β(Mach) for an object whose entered β is stated at `ro.beta_ref_mach`.
+
+    The entered β is held EXACT at the reference Mach.  The object's own
+    geometry supplies only the RELATIVE variation — derive, don't invent::
+
+        β(M)   = β_entered · C_D0(M_ref) / C_D0(M)
+        L/D(M) = L/D_entered · sqrt(C_D0(M_ref) / C_D0(M))
+
+    The L/D line keeps the drag-due-to-lift factor k FIXED at its reference-
+    Mach value: with C_D0 = m/(β·A) and k = 1/(4·C_D0·(L/D)²), scaling both as
+    above leaves k unchanged.  The Mach variation is zero-lift (base) drag, so
+    it belongs in C_D0 and costs peak L/D where C_D0 rises — it is not absorbed
+    into k (docs/aero_polar_calibration.md §4a).
+
+    C_D0(M) comes from the SAME build-up the "Estimate Object β" dialog uses,
+    so a β estimated at Mach X and stamped with X reproduces itself:
+    cd_cone_hypersonic / cd_biconic_hypersonic (θ = atan(r_b/L), ε = 2·r_n/d,
+    wing zero-lift drag from the stored planform) for a body of revolution,
+    and the α = 0 row of lifting_body_sweep at the same Cf for the lifting
+    forms.  In every form the only Mach-dependent term is base drag, 2/(γM²) —
+    the p_base → 0 limit, exact at hypersonic speed and an upper bound that
+    OVERSTATES base drag toward low supersonic Mach.  So the table's low-Mach
+    end is the least certain part: β there is biased low.
+
+    Returns None when `beta_ref_mach` is 0 (constant β — the legacy
+    behaviour), when β is not entered, or when the geometry cannot be swept.
+    Otherwise a dict: machs, cd0, ratio (= C_D0(M_ref)/C_D0(M)), ref_mach,
+    cd0_ref, beta (β·ratio), ld_scale (sqrt(ratio)), source.
+    """
+    import math
+    import numpy as _np
+    m_ref = float(getattr(ro, 'beta_ref_mach', 0.0) or 0.0)
+    beta = float(getattr(ro, 'beta_kg_m2', 0.0) or 0.0)
+    if m_ref <= 0.0 or beta <= 0.0:
+        return None
+    form = str(getattr(ro, 'body_form', '') or 'axisymmetric')
+    d = float(getattr(ro, 'diameter_m', 0.0) or 0.0)
+    L = float(getattr(ro, 'length_m', 0.0) or 0.0)
+    if not (d > 0.0 and L > 0.0):
+        return None
+    a_base = 0.25 * math.pi * d * d
+
+    if form == 'axisymmetric':
+        rn = float(getattr(ro, 'nose_radius_m', 0.0) or 0.0)
+        eps = max(0.0, min(2.0 * rn / d, 1.0))
+        s_w = float(wing_geometry(ro)[0] or 0.0)
+        war = s_w / a_base if a_base > 0.0 else 0.0
+        bic = (biconic_angles(d, L, float(getattr(ro, 'fore_length_m', 0.0) or 0.0),
+                              float(getattr(ro, 'break_diameter_m', 0.0) or 0.0), rn)
+               if getattr(ro, 'biconic', False) else None)
+        if bic:
+            th1, th2, br = bic[0], bic[1], bic[2]
+            cd0 = lambda M: cd_biconic_hypersonic(th1, th2, br, eps, mach=M,
+                                                  wing_area_ratio=war)['total']
+            source = 'cd_biconic_hypersonic'
+        else:
+            th = math.degrees(math.atan2(d / 2.0, L))
+            cd0 = lambda M: cd_cone_hypersonic(th, eps, mach=M,
+                                               wing_area_ratio=war)['total']
+            source = 'cd_cone_hypersonic'
+    else:
+        kw, _a, _why = _ro_sweep_kwargs(ro)
+        if kw is None:
+            return None
+        kw = dict(kw, cf=CONE_CF_TURBULENT, alpha_min_deg=0.0,
+                  alpha_max_deg=0.0, n_alpha=1)
+
+        def cd0(M, _kw=kw):
+            return lifting_body_sweep(mach=M, **_kw)['trim']['C_D0']
+        source = f'lifting_body_sweep({form}, alpha=0)'
+
+    try:
+        grid = _np.asarray(sorted(set(float(x) for x in machs) | {m_ref}))
+        cds = _np.asarray([float(cd0(M)) for M in grid])
+        c_ref = float(cd0(m_ref))
+    except (ValueError, ZeroDivisionError, TypeError, KeyError):
+        return None
+    if not (c_ref > 0.0 and _np.all(_np.isfinite(cds)) and _np.all(cds > 0.0)):
+        return None
+    ratio = c_ref / cds
+    return dict(machs=grid, cd0=cds, ratio=ratio, ref_mach=m_ref,
+                cd0_ref=c_ref, beta=beta * ratio, ld_scale=_np.sqrt(ratio),
+                source=source)
+
+
 def pairing_note(ro, machs=PAIRING_MACH_BAND, **kw):
     """One-line, user-facing verdict on an object's stored (β, glider_LD) pair.
 
@@ -3514,11 +3631,15 @@ def pairing_note(ro, machs=PAIRING_MACH_BAND, **kw):
         return ('', 'none')
     ceil = float(r.get('ld_ceiling', 0.0) or 0.0)
     m_ok = tuple(r.get('mach_ok') or ())
+    # A stated β Mach tests ONE Mach, so the wording must not claim a band.
+    single = len(tuple(r.get('mach_band') or ())) == 1
+    where = f"at M {r['mach_band'][0]:g}" if single else None
     if v == 'ok':
         surplus = float(r.get('implied_parasite', 0.0) or 0.0)
-        band = (f"M {min(m_ok):.0f}–{max(m_ok):.0f}" if len(m_ok) > 1
-                else (f"M {m_ok[0]:.0f}" if m_ok else "the swept band"))
-        return (f"consistent with the shape over {band}; implies "
+        band = where or (f"over M {min(m_ok):.0f}–{max(m_ok):.0f}" if len(m_ok) > 1
+                         else (f"at M {m_ok[0]:.0f}" if m_ok
+                               else "over the swept band"))
+        return (f"consistent with the shape {band}; implies "
                 f"+{surplus:.3f} C_D of parasite drag the geometry does not "
                 f"model", 'ok')
     if v == 'marginal':
@@ -3531,9 +3652,10 @@ def pairing_note(ro, machs=PAIRING_MACH_BAND, **kw):
         bc = float(r.get('beta_ceiling', 0.0) or 0.0)
         return (f"β claims less drag than the shape has — its own β ceiling "
                 f"is {bc:,.0f} kg/m²", 'bad')
-    return (f"no Mach supports this pair — at this β the shape reaches about "
-            f"L/D {ceil:.2f}; check the fin and nose geometry before the "
-            f"numbers", 'bad')
+    lead = (f"{where}, this pair is not supported" if single
+            else "no Mach supports this pair")
+    return (f"{lead} — at this β the shape reaches about L/D {ceil:.2f}; "
+            f"check the fin and nose geometry before the numbers", 'bad')
 
 
 def wing_geometry(ro):

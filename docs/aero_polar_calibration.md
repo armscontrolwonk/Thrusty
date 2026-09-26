@@ -219,9 +219,12 @@ partly an artefact of the Mach chosen. Only *"no Mach in the band supports
 this"* is defensible.
 
 `pairing_note()` is the pure text/severity formatter, kept out of the GUI so it
-is testable without a display; `thrusty._pairing_note` only picks a colour. The
-note appears inline beside the L/D field and is **advisory only** — nothing
-blocks a save. `test_beta_ld_pairing.py` carries the unit tests and a
+is testable without a display. In the object editor the note has its own line
+in the Maneuvering box, visible for every separation mode, and is **advisory
+only** — nothing blocks a save. (The first version hung off the body-only L/D
+preview label and was fed the derive-mode preview object, which carries β =
+L/D = 0, so it never appeared for any separating object. Fixed, with a GUI
+regression test in `test_beta_ref_mach.py`.) `test_beta_ld_pairing.py` carries the unit tests and a
 characterisation table of the shipped library, so a change to any object's β,
 L/D or dimensions surfaces in review.
 
@@ -264,11 +267,28 @@ body — which is exactly why the check warns rather than blocks.
    carryover factors but assumes a circular **cylinder**, which a cone frustum
    is not, and it is likely generous for small fins near the base, where much
    of the span sits in the body's boundary and entropy layers.
-5. **Constant β in the schema.** A Mach-dependent β would need a schema and
-   integrator pass, not a data edit. `_beta_of_mach` and `_ld_of_mach` already
-   exist for derived no-separation bodies, but the setup gate at
-   trajectory.py:2115 requires `glider_LD <= 0` — so an *entered* L/D is
-   constant across Mach by construction.
+5. **Constant β in the schema — DONE.** `ROParams.beta_ref_mach` (hardware)
+   states the Mach at which `beta_kg_m2` holds. 0 = the legacy constant β,
+   byte-identical for every existing file (verified on full trajectories).
+   When set, `booster_models.beta_mach_table` holds the entered β exact at
+   that Mach and takes only the *relative* variation from the object's own
+   zero-lift build-up — the same one the β estimator uses, so an estimate at
+   Mach X stamped with X reproduces itself. An entered L/D is scaled by
+   `sqrt(C_D0(M_ref)/C_D0(M))`, which keeps `k` fixed: the variation is
+   zero-lift drag and lands in C_D0, per §4a. The integrator drives both the
+   zero-lift drag and the glide polar from the tables; the pairing check tests
+   at the stated Mach instead of the band; both estimator dialogs stamp their
+   Mach into the new editor field on *Use*. Two cautions. The only
+   Mach-dependent term is base drag, `2/(γM²)`, the p_base → 0 limit, which
+   overstates base drag toward low supersonic Mach — the low-Mach end of the
+   table is biased toward low β. And the reference Mach matters about as much
+   as β itself: the same β stated at M5 versus M15 moves a horizontal-burnout
+   glide from 1363 km to 937 km (1173 km at constant β).
+6. **A tumbling object makes ascent integration crawl.** With
+   `reentry_attitude = 'tumbling'` the boost phase spends its time in
+   `drag_force_vector` → `_cd_nose_shape` taking very small steps; a flight
+   that takes under a second otherwise does not finish in minutes. Found while
+   testing item 5, in code item 5 does not touch; not investigated.
 
 ## References
 
