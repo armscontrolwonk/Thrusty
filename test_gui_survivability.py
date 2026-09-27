@@ -200,6 +200,29 @@ def test_schematic_tab_exists_and_tracks_booster_switch(app):
     assert "Strypi" in t_strypi and "No-dong" in t_nodong
 
 
+def test_schematic_title_gives_the_vehicle_length_not_just_the_stack(app):
+    """An uncovered separating object is drawn beside the stack, not on it,
+    so the stack alone is short of the vehicle: the headline must be the
+    vehicle's length and say it is stack + object (numbers from the core)."""
+    import booster_models as mm
+    import booster_schematic as bsch
+    from matplotlib.figure import Figure
+    p = mm.booster_from_dict(json.load(
+        open("booster_library/Strypi_VIII_R.booster.json")))
+    ro = mm.ro_from_dict(json.load(open("ro_library/C-HGB.ro.json")))
+    p = mm.compose_loadout(p, ro, 1)
+    p.ro = ro
+    app._update_schematic(p, "Probe")
+    head, sub = app._schem_ax.get_title().splitlines()
+    info = bsch.draw_booster(Figure().add_subplot(111), p)
+    assert head.endswith(f"{info['overall_length_m']:.1f} m")
+    assert sub == (f"{info['total_height_m']:.1f} m stack + "
+                   f"{info['front_object_length_m']:.1f} m object")
+    p.ro = None                                 # nothing beside: one line
+    app._update_schematic(p, "Probe")
+    assert "\n" not in app._schem_ax.get_title()
+
+
 # ── Booster Parameters Front-End: guidance is sourced from the live plan ────
 def test_front_end_guidance_tracks_reentry_plan_not_object_default(app):
     """The Front End "Guidance:" row is a reentry-PLAN choice, so switching the

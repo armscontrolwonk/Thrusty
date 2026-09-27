@@ -358,6 +358,102 @@ def test_no_reentry_object_when_none_composed():
     assert info["total_height_m"] > 0          # renders fine, RO just omitted
 
 
+# ── an uncovered separating object is drawn beside the stack, not on it ─────
+def _stack_len(p):
+    return sum(float(s.length_m) + (float(s.interstage_length_m or 0.0)
+                                    if s.has_interstage else 0.0)
+               for s in stage_chain(p))
+
+
+def _adapter_widths(ax, y0, length):
+    """(bottom, top) width of the body patch spanning y0 → y0+length."""
+    from matplotlib.patches import Polygon, Rectangle
+    for patch in ax.patches:
+        if not isinstance(patch, (Polygon, Rectangle)):
+            continue
+        v = patch.get_patch_transform().transform(patch.get_path().vertices) \
+            if isinstance(patch, Rectangle) else patch.get_path().vertices
+        if abs(v[:, 1].min() - y0) < 1e-9 \
+                and abs(v[:, 1].max() - (y0 + length)) < 1e-9 \
+                and abs(v[:, 0].max() + v[:, 0].min()) < 1e-6:   # centreline
+            lo = v[abs(v[:, 1] - y0) < 1e-9, 0]
+            hi = v[abs(v[:, 1] - (y0 + length)) < 1e-9, 0]
+            return lo.max() - lo.min(), hi.max() - hi.min()
+    return None
+
+
+def test_uncovered_separating_object_is_not_also_stacked_as_a_nose():
+    """No fairing and a separating object: the object IS the front end and is
+    drawn to scale beside the stack, so the stack ends at its top stage — no
+    'payload / RV' nose on top (whose length, stored or the 1.6×⌀ fallback,
+    the physics never flies) and no containment verdict against it.  The
+    vehicle's length is still reported: the stack plus the object."""
+    p, ro = _with_ro()
+    assert not p.body_reenters
+    assert all(not (s.shroud_length_m or 0) for s in stage_chain(p))
+    ax = _ax()
+    info = draw_booster(ax, p)
+    assert info["total_height_m"] == pytest.approx(_stack_len(p))
+    assert info["front_object_length_m"] == pytest.approx(ro.length_m)
+    assert info["overall_length_m"] == pytest.approx(_stack_len(p)
+                                                     + ro.length_m)
+    fe = info["front_end"]
+    assert fe["kind"] == "separate_object"
+    assert fe["body_diameter_m"] == pytest.approx(ro.diameter_m)
+    assert not any("payload / RV" in t.get_text() for t in ax.texts)
+    assert not any(f.startswith("nose") for f in info["flags"])
+    assert not any("⚠" in t.get_text() for t in ax.texts)
+    # the object itself is still drawn, beside the stack
+    assert any(t.get_text().startswith("reentry object") for t in ax.texts)
+
+
+def test_the_stacked_nose_stays_when_nothing_else_draws_the_front_end():
+    """Without an object, or with one inside a fairing, the stack still
+    carries its front end, and the vehicle length is the stack as drawn."""
+    bare = _load("Strypi_VIII_R")
+    ax = _ax()
+    info = draw_booster(ax, bare)
+    assert info["total_height_m"] > _stack_len(bare)          # nose on top
+    assert any("payload / RV" in t.get_text() for t in ax.texts)
+    assert info["front_object_length_m"] == 0.0
+    assert info["overall_length_m"] == info["total_height_m"]
+
+    p, _ = _with_ro()
+    top = stage_chain(p)[-1]
+    top.shroud_length_m = 2.0; top.shroud_diameter_m = 0.7
+    top.shroud_nose_length_m = 0.9; top.shroud_nose_shape = "cone"
+    info = draw_booster(_ax(), p)
+    assert info["front_end"]["kind"] == "fairing"
+    assert info["total_height_m"] == pytest.approx(_stack_len(p) + 2.0)
+    assert info["overall_length_m"] == info["total_height_m"]
+
+
+def test_interstage_on_top_tapers_to_the_uncovered_object():
+    """An interstage declared on the LAST stage is the adapter to the object
+    riding on it, so its diameters are derived the same way as between
+    stages — this stage's top → the object's base — instead of holding the
+    stage ⌀ as a straight band.  Narrower object: a taper."""
+    import booster_models as mm
+    from booster_models import ro_from_dict
+    p = _load("Strypi_VIII_R")
+    ro = ro_from_dict(dict(json.load(open("ro_library/C-HGB.ro.json")),
+                           diameter_m=0.4))
+    p = mm.compose_loadout(p, ro, 1)
+    p.ro = ro
+    top = stage_chain(p)[-1]
+    top.has_interstage = True; top.interstage_length_m = 0.5
+    ax = _ax()
+    info = draw_booster(ax, p)
+    y0 = _stack_len(p) - 0.5                     # adapter base = stage top
+    assert _adapter_widths(ax, y0, 0.5) == pytest.approx((top.diameter_m, 0.4))
+    assert info["total_height_m"] == pytest.approx(_stack_len(p))
+    # with nothing riding on it the adapter holds the stage ⌀, as before
+    p.ro = None
+    ax = _ax(); draw_booster(ax, p)
+    assert _adapter_widths(ax, y0, 0.5) == pytest.approx(
+        (top.diameter_m, top.diameter_m))
+
+
 def test_equal_aspect_is_enforced():
     """Proportion honesty is the whole point: the axes must be metre-true in
     both directions, not stretched to fit the panel — including after the

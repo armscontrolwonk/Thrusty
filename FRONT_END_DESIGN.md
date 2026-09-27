@@ -140,6 +140,15 @@ stored, flown, and drawn, and the guarantee that those three agree.
 - **Separating RVs** (`separating_ro`). Their length is a real independent input;
   the corner-drawn RO already uses its own geometry. Only defect **B** (wrong
   shape in the corner drawing) touches them, and its fix is shape-only.
+  *Later (2026-09-27):* with **no fairing**, the separating object is the
+  front end and is drawn only in the corner — the stack no longer also carries a
+  "payload / RV" nose (stored `nose_length_m` or the 1.6×⌀ fallback), which the
+  physics never flew (`_boost_front_geometry` flies the object's own shape and
+  length). The stack ends at the top stage, or at its interstage, whose top ⌀ is
+  now derived from the object's base. The headline reports stack + object, and
+  `fairing_fit` checks only against a declared fairing. One rule,
+  `booster_schematic.exposed_front_object`, serves the schematic and the 3-D
+  export.
 - **Multi-object loadouts** (N > 1). The bus-face blunt-cylinder nose
   (`_boost_front_geometry`, `_multi`) is a deliberate conservative choice and
   stays. Body mode already pins N = 1.

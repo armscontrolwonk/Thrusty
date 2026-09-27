@@ -9485,9 +9485,15 @@ class BoosterFlyoutApp(tk.Tk):
             return          # sidebar init may fire before the tab exists
         import booster_schematic as bsch
         info = bsch.draw_booster(self._schem_ax, p, title=name)
-        self._schem_ax.set_title(
-            f"{name}   —   {info['total_height_m']:.1f} m",
-            fontsize=11, weight="bold")
+        # An uncovered separating object is drawn beside the stack, so the
+        # stack alone is short of the vehicle: headline the vehicle's length
+        # and say what it is made of.
+        _obj = info['front_object_length_m']
+        _head = f"{name}   —   {info['overall_length_m']:.1f} m"
+        if _obj > 0:
+            _head += (f"\n{info['total_height_m']:.1f} m stack"
+                      f" + {_obj:.1f} m object")
+        self._schem_ax.set_title(_head, fontsize=11, weight="bold")
         self._schem_canvas.draw_idle()
 
     def _export_blender(self):

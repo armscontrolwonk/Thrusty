@@ -108,6 +108,28 @@ def _stage_top_diameter(s):
     return d
 
 
+def exposed_front_object(p):
+    """The reentry object that caps the stack with nothing over it — a
+    SEPARATING object and no fairing — else None.
+
+    It is the vehicle's front end in flight (_boost_front_geometry flies its
+    own shape and length), and it is drawn to scale BESIDE the stack, so the
+    stack stops at the top stage or its adapter: stacking a nose as well
+    would show the front end twice, at a length nothing flies.  A fairing
+    encloses its object, and a non-separating body is the last stage itself,
+    so neither has one.  The schematic and the 3-D export both ask here."""
+    if any((getattr(s, "shroud_length_m", 0.0) or 0.0) > 0.0
+           for s in stage_chain(p)):
+        return None
+    from booster_models import effective_ro
+    ro = effective_ro(p)
+    if ro is None or getattr(ro, "separation_mode", "separating_ro") == "body":
+        return None
+    if float(getattr(ro, "diameter_m", 0.0) or 0.0) <= 0.0:
+        return None
+    return ro
+
+
 def _reentry_shape(ax, x0, y0, diam, length, nose_r, color, edge):
     """A reentry vehicle drawn nose-up: a cone of base `diam` and height
     `length` from the base at y0, with the tip blunted to radius `nose_r`
@@ -361,8 +383,13 @@ def _nose_patch(ax, x0, y0, diam, length, color, edge, shape):
 
 def draw_booster(ax, p, title=None):
     """Draw the stack on `ax` (cleared first).  Returns a summary dict:
-    {'total_height_m': float, 'flags': [str, ...]} — flags list every place a
-    fallback stood in for unset data."""
+    {'total_height_m': float, 'overall_length_m': float,
+    'front_object_length_m': float, 'flags': [str, ...], 'front_end': {...}}
+    — total_height_m is the stack as drawn; when an uncovered separating
+    object caps it (drawn beside, see exposed_front_object) its length is
+    front_object_length_m and overall_length_m adds it back, so the vehicle's
+    length is still reported.  flags list every place a fallback stood in for
+    unset data."""
     ax.clear()
     stages = stage_chain(p)
     flags = []
@@ -389,6 +416,8 @@ def draw_booster(ax, p, title=None):
                   and shroud_stage is None)
     front_end = {"kind": "none", "shape": "", "nose_length_m": 0.0,
                  "body_diameter_m": 0.0}
+    # A separating object with no fairing is drawn beside the stack, not on it.
+    _front_obj = exposed_front_object(p)
     _bn_len = 0.0
     _bn_shape = ""
     # A declared biconic body draws its two cones (fore cone + aft frustum),
@@ -456,16 +485,21 @@ def draw_booster(ax, p, title=None):
         # step, never a smoothing frustum (inventing one would hide an
         # unspecified transition, which this panel exists to surface).  A real
         # adapter is drawn ONLY when the stage declares an interstage; its
-        # diameters are DERIVED (this stage's top -> the next stage's base) so
-        # nothing about the transition is fabricated.
+        # diameters are DERIVED (this stage's top -> the base of whatever sits
+        # on it: the next stage, or an uncovered object riding the last stage)
+        # so nothing about the transition is fabricated.
         y = y + L
         if getattr(s, "has_interstage", False) \
                 and (getattr(s, "interstage_length_m", 0.0) or 0) > 0:
             il = float(s.interstage_length_m)
             d_is_bot = d_top                                    # this stage's top
             nxt = stages[i + 1] if i + 1 < len(stages) else None
-            d_is_top = float(getattr(nxt, "diameter_m", 0.0) or d_top) if nxt \
-                else d_top                                       # next base, or hold
+            if nxt is not None:
+                d_is_top = float(getattr(nxt, "diameter_m", 0.0) or d_top)
+            elif _front_obj is not None:
+                d_is_top = float(_front_obj.diameter_m)         # object's base
+            else:
+                d_is_top = d_top                                 # hold
             _body_patch(ax, x0, y, d_is_bot, d_is_top, il, SHROUD, BODY_E)
             _im = getattr(s, "interstage_mass_kg", 0.0) or 0.0
             _jt = getattr(s, "interstage_jettison_s", None)
@@ -508,11 +542,19 @@ def draw_booster(ax, p, title=None):
         # The nose was carved into the last stage above (subtractive); nothing
         # is stacked on top.  nose_base_d for the aerospike is the body ⌀.
         nose_base_d = top_surface_d or float(_eff_ro.diameter_m) or 1.0
+    elif _front_obj is not None:
+        # The object IS the front end and is drawn to scale in the corner;
+        # nothing is stacked here, so the stack ends at the stage / adapter.
+        front_end = {"kind": "separate_object",
+                     "shape": getattr(_front_obj, "shape", "") or "",
+                     "nose_length_m": float(_front_obj.length_m or 0.0),
+                     "body_diameter_m": float(_front_obj.diameter_m)}
+        nose_base_d = float(_front_obj.diameter_m)
     else:
         nd = top_surface_d or 1.0
-        # Shape from the composed reentry object when one is present (a
-        # separating RV shows its OWN declared profile, not a generic cone);
-        # else the top stage's stored nose shape.
+        # No object drawn beside the stack (none composed, or one with no ⌀
+        # set): the stack carries its own front end.  Shape from the composed
+        # object when there is one, else the top stage's stored nose shape.
         shape = ((getattr(_eff_ro, "shape", "") if _eff_ro is not None else "")
                  or getattr(top, "nose_shape", "") or "")
         nl = float(getattr(top, "nose_length_m", 0.0) or 0.0)
@@ -539,7 +581,12 @@ def draw_booster(ax, p, title=None):
     # diameter): aerospike_LD = spike length / D, aerospike_dD = disk ⌀ / D
     # (0 = pointed).  A top-level booster property, so read from the root node.
     a_LD = float(getattr(p, "aerospike_LD", 0.0) or 0.0)
-    if a_LD > 0:
+    if a_LD > 0 and _front_obj is not None:
+        # The probe stands on the nose, and the nose is the separate object —
+        # a spike out of the stack's flat top would be drawn nowhere real.
+        flags.append("aerospike not drawn — it rides the separate "
+                     "object's nose")
+    elif a_LD > 0:
         a_dD = float(getattr(p, "aerospike_dD", 0.0) or 0.0)
         L_spike = a_LD * nose_base_d
         tip_y = y + L_spike
@@ -626,8 +673,8 @@ def draw_booster(ax, p, title=None):
             and float(getattr(_ro, "diameter_m", 0.0) or 0.0) > 0):
         _draw_reentry_object(ax, _ro, _view_right, yl, veh_right=xl[1])
         # Containment check: does this RO actually fit inside the drawn
-        # front end (fairing / nose region)?  The SWERVE-on-STARS-1 case —
-        # a 2.6 m RV over a 1.1 m nose — drew fine and said nothing.
+        # fairing?  (fairing_fit is None without one — an uncovered object
+        # is the front end, drawn right here, not inside anything.)
         from fairing_fit import fairing_fit, fairing_fit_note, \
             fairing_fit_short
         _fit = fairing_fit(p)
@@ -642,7 +689,11 @@ def draw_booster(ax, p, title=None):
     if title:
         ax.set_title(title, fontsize=11, weight="bold")
     ax.axis("off")
-    return {"total_height_m": y, "flags": flags, "front_end": front_end}
+    _obj_len = (float(getattr(_front_obj, "length_m", 0.0) or 0.0)
+                if _front_obj is not None else 0.0)
+    return {"total_height_m": y, "overall_length_m": y + _obj_len,
+            "front_object_length_m": _obj_len,
+            "flags": flags, "front_end": front_end}
 
 
 def _draw_cg_marker(ax, p, total_h):

@@ -34,7 +34,8 @@ The emitted script is plain Python — tests compile() it."""
 import math
 import os
 
-from booster_schematic import stage_chain, _stage_top_diameter, fin_polygon
+from booster_schematic import (stage_chain, _stage_top_diameter, fin_polygon,
+                               exposed_front_object)
 
 _PROFILE_N = 24        # points per curved nose profile
 
@@ -156,6 +157,8 @@ def vehicle_elements(p):
     shroud_stage = next(
         (s for s in stages
          if (getattr(s, "shroud_length_m", 0.0) or 0.0) > 0.0), None)
+    # An uncovered separating object is placed beside the stack, not on it.
+    front_obj = exposed_front_object(p)
 
     stage_bases = []                      # (stage, aft-base z, ⌀) per stage
     for i, s in enumerate(stages):
@@ -183,8 +186,12 @@ def vehicle_elements(p):
                 and _f(getattr(s, "interstage_length_m", 0.0)) > 0:
             il = _f(s.interstage_length_m)
             nxt = stages[i + 1] if i + 1 < len(stages) else None
-            d_is_top = (_f(getattr(nxt, "diameter_m", 0.0)) or d_top) if nxt \
-                else d_top
+            if nxt is not None:
+                d_is_top = _f(getattr(nxt, "diameter_m", 0.0)) or d_top
+            elif front_obj is not None:
+                d_is_top = _f(front_obj.diameter_m)      # the object's base
+            else:
+                d_is_top = d_top
             # Hollow adapter: an open frustum tube (no end caps) — it's a
             # shell between two stages, not a solid.  Profile is just the
             # wall, so both ends stay open.
@@ -219,6 +226,10 @@ def vehicle_elements(p):
         revolves.append(("Fairing", profile, (0.0, 0.0, z), "full"))
         nose_base_d = sd
         z += sl
+    elif front_obj is not None:
+        # The object is the front end and is exported beside the stack
+        # (below); nothing is stacked here, as in the 2-D schematic.
+        nose_base_d = _f(front_obj.diameter_m)
     else:
         nd = top_surface_d or 1.0
         shape = getattr(top, "nose_shape", "") or ""
@@ -235,7 +246,10 @@ def vehicle_elements(p):
         z += nl
 
     a_LD = _f(getattr(p, "aerospike_LD", 0.0))
-    if a_LD > 0:
+    if a_LD > 0 and front_obj is not None:
+        flags.append("aerospike not drawn — it rides the separate "
+                     "object's nose")
+    elif a_LD > 0:
         L_spike = a_LD * nose_base_d
         r_stalk = 0.015 * nose_base_d
         flags.append("aerospike stalk ⌀ not stored — 0.03×⌀ nominal")

@@ -2,15 +2,17 @@
 
 The SWERVE-on-STARS-1 case (2026-08-11): a ⌀0.48 × 2.6 m RV composed onto
 a stack whose drawn nose region is barely over a metre tall — visibly
-impossible, and nothing said so.  This module is the warning.
+impossible, and nothing said so.  This module was the warning.  Since
+2026-09-27 a separating object with no fairing is drawn BESIDE the stack
+and no nose is stacked (booster_schematic.exposed_front_object), so that
+case no longer draws anything for the object to overrun: containment is
+checked only against a declared fairing.
 
 The check is geometric containment, derive-don't-invent throughout: the
-front-end ENVELOPE comes from the same stored fields (and the same
+fairing ENVELOPE comes from the same stored fields (and the same
 fallbacks, stated in the result) that booster_schematic draws and
-blender_export ships — a declared fairing gives cylinder + nose profile;
-a declared bare nose gives its profile; nothing declared gives the
-schematic's flagged 1.6×⌀ fallback cone, and the warning says it checked
-against that.  The RO's bounding radius profile uses its own true
+blender_export ships — cylinder + nose profile, and the warning says
+when an unset dimension was stood in for.  The RO's bounding radius profile uses its own true
 geometry (sphere-cone tangency, ogive/Haack curves, biconic break); a
 wedge or half-cone uses the circumscribed cone — their rectangular /
 half-disc sections must clear the same circle.  Wing panels with a
@@ -50,39 +52,30 @@ def _interp(samples, z):
 
 
 def front_envelope(p):
-    """The front-end internal envelope as ascending (z, r) samples from
-    its base plane, plus (kind, notes): a declared fairing (cylinder +
-    nose profile), else the top stage's declared nose, else the
-    schematic's flagged fallback nose.  None when there is no geometry
-    at all to check against."""
+    """The fairing's internal envelope as ascending (z, r) samples from
+    its base plane, plus (kind, notes).  None when no fairing is declared
+    — nothing then encloses the object (a separating object IS the front
+    end and is drawn beside the stack; a non-separating body is the last
+    stage) — or when there is no geometry to check against."""
     stages = stage_chain(p)
     if not stages:
         return None
-    top = stages[-1]
-    top_d = _stage_top_diameter(top)
+    top_d = _stage_top_diameter(stages[-1])
     shroud = next((s for s in stages
                    if _f(getattr(s, "shroud_length_m", 0.0)) > 0.0), None)
+    if shroud is None:
+        return None
     notes = []
-    if shroud is not None:
-        sd = _f(getattr(shroud, "shroud_diameter_m", 0.0)) or top_d
-        if not _f(getattr(shroud, "shroud_diameter_m", 0.0)):
-            notes.append("fairing ⌀ unset — top-stage ⌀ used")
-        sl = _f(getattr(shroud, "shroud_length_m", 0.0))
-        nose = _f(getattr(shroud, "shroud_nose_length_m", 0.0))
-        if not 0.0 < nose <= sl:
-            nose = 0.45 * sl
-            notes.append("fairing nose length unset — 0.45 L used")
-        shape = getattr(shroud, "shroud_nose_shape", "") or "cone"
-        kind = "fairing"
-    else:
-        sd = top_d or 1.0
-        nose = sl = _f(getattr(top, "nose_length_m", 0.0))
-        if sl <= 0.0:
-            nose = sl = 1.6 * sd
-            notes.append("nose unset — checked against the drawn "
-                         "1.6×⌀ fallback cone")
-        shape = getattr(top, "nose_shape", "") or "cone"
-        kind = "nose region"
+    sd = _f(getattr(shroud, "shroud_diameter_m", 0.0)) or top_d
+    if not _f(getattr(shroud, "shroud_diameter_m", 0.0)):
+        notes.append("fairing ⌀ unset — top-stage ⌀ used")
+    sl = _f(getattr(shroud, "shroud_length_m", 0.0))
+    nose = _f(getattr(shroud, "shroud_nose_length_m", 0.0))
+    if not 0.0 < nose <= sl:
+        nose = 0.45 * sl
+        notes.append("fairing nose length unset — 0.45 L used")
+    shape = getattr(shroud, "shroud_nose_shape", "") or "cone"
+    kind = "fairing"
     R = 0.5 * sd
     if R <= 0.0 or sl <= 0.0:
         return None
@@ -190,7 +183,7 @@ def fairing_fit_note(fit):
         parts.append(f"radius over by {fit['max_interference_m']:.2g} m "
                      f"at {fit['at_z_m']:.2g} m above the base")
     msg = (f"payload does NOT fit the {fit['kind']}: " + "; ".join(parts))
-    fallback = next((s for s in fit["notes"] if "fallback" in s), None)
+    fallback = next((s for s in fit["notes"] if "unset" in s), None)
     if fallback:
         msg += f" ({fallback})"
     return msg

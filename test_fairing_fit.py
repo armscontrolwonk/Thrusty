@@ -1,8 +1,9 @@
 """fairing_fit: the payload-vs-front-end containment warning.
 
-House rules: identities against stored fields (the SWERVE-on-STARS-1
-length overrun is arithmetic, not eyeball), fallbacks surface in the
-result rather than hiding, a fitting payload stays silent."""
+House rules: identities against stored fields (a length overrun is
+arithmetic, not eyeball), fallbacks surface in the result rather than
+hiding, a fitting payload stays silent, and with no fairing there is
+nothing to fit inside."""
 
 import json
 import math
@@ -11,6 +12,7 @@ import pytest
 
 import fairing_fit as ff
 from booster_models import BoosterParams, booster_from_dict, ro_from_dict
+from booster_schematic import stage_chain
 
 
 def _stage(name, dia, length, **kw):
@@ -31,29 +33,44 @@ def _load_ro(name):
     return ro_from_dict(json.load(open(f"ro_library/{name}.ro.json")))
 
 
-def test_swerve_on_stars1_fires_the_warning():
-    """The motivating case: SWERVE on STARS-1, which declares NO fairing and
-    NO nose — the check runs against the drawn 1.6×⌀ fallback cone (top stage
-    ⌀0.71 → 1.136 m) and the object overruns it."""
+def test_swerve_on_stars1_has_nothing_to_be_contained_in():
+    """The motivating case, retired 2026-09-27: SWERVE on STARS-1 declares NO
+    fairing, so the object is the front end — drawn beside the stack, with no
+    nose stacked for it to overrun (booster_schematic.exposed_front_object).
+    Checking it against an invented 1.6×⌀ cone was a verdict on a drawing
+    nobody flies, so no check applies."""
     veh = _load_booster("STARS-1")
+    assert all(not (s.shroud_length_m or 0) for s in stage_chain(veh))
+    veh.ro = _load_ro("SWERVE")
+    assert ff.fairing_fit(veh) is None
+    assert ff.fairing_fit_note(ff.fairing_fit(veh)) == ""
+
+
+def test_too_long_under_a_fairing_is_the_blunted_length_overrun():
+    """Under a fairing too short for it, SWERVE overruns by exactly its
+    PHYSICAL length (the blunted sphere-cone, apex identity
+    L − rn/sinθ + rn — the same body the 3-D export revolves, not the
+    sharp-cone reference length) minus the envelope.  Taken from the
+    OBJECT: the identity holds for any dimensions, so it must not be
+    re-typed as literals here.  An unset fairing nose length is stood in
+    for, and the warning says so."""
     ro = _load_ro("SWERVE")
+    veh = _stage("V", 1.0, 8.0, shroud_length_m=2.0, shroud_diameter_m=1.0,
+                 shroud_nose_length_m=0.9, shroud_nose_shape="cone")
     veh.ro = ro
     fit = ff.fairing_fit(veh)
     assert fit is not None and not fit["fits"]
-    assert fit["kind"] == "nose region"
-    assert fit["env_len_m"] == pytest.approx(1.6 * 0.71)
-    # the RO's PHYSICAL length is the blunted sphere-cone (apex identity
-    # L − rn/sinθ + rn — the same body the 3-D export revolves), not the
-    # sharp-cone reference length.  Taken from the OBJECT: the identity holds
-    # for any dimensions, so it must not be re-typed as literals here.
+    assert fit["kind"] == "fairing"
+    assert fit["env_len_m"] == pytest.approx(2.0)
     th = math.atan2(ro.diameter_m / 2, ro.length_m)
     L_blunt = ro.length_m - ro.nose_radius_m / math.sin(th) + ro.nose_radius_m
     assert fit["ro_len_m"] == pytest.approx(L_blunt)
-    assert fit["len_over_m"] == pytest.approx(L_blunt - 1.6 * 0.71)
+    assert fit["len_over_m"] == pytest.approx(L_blunt - 2.0)
     note = ff.fairing_fit_note(fit)
     assert "does NOT fit" in note and "too long" in note
-    assert "fallback" in note                  # the envelope was invented —
-                                               # the warning says so
+    assert "unset" not in note                 # every dimension was declared
+    veh.shroud_nose_length_m = 0.0             # now one is stood in for —
+    assert "nose length unset" in ff.fairing_fit_note(ff.fairing_fit(veh))
 
 
 def test_fitting_payload_stays_silent():
@@ -130,7 +147,8 @@ def test_no_check_without_an_ro_or_dims():
 def test_oml_assumption_is_stated():
     """The envelope has no stored wall thickness — every result says it
     checked the outer mold line."""
-    veh = _load_booster("STARS-1")
+    veh = _stage("V", 1.0, 8.0, shroud_length_m=2.0, shroud_diameter_m=1.0,
+                 shroud_nose_length_m=0.9, shroud_nose_shape="cone")
     veh.ro = _load_ro("SWERVE")
     assert any("outer mold line" in n for n in ff.fairing_fit(veh)["notes"])
 
@@ -145,8 +163,9 @@ def test_schematic_and_export_surface_the_warning():
     from booster_schematic import draw_booster
     import blender_export as bx
 
-    veh = _load_booster("STARS-1")
-    veh.ro = _load_ro("SWERVE")
+    veh = _stage("V", 1.0, 8.0, shroud_length_m=2.0, shroud_diameter_m=1.0,
+                 shroud_nose_length_m=0.9, shroud_nose_shape="cone")
+    veh.ro = _load_ro("SWERVE")                # 2.7 m under a 2.0 m fairing
     ax = Figure(figsize=(4, 8)).add_subplot(111)
     info = draw_booster(ax, veh)
     assert any("does NOT fit" in f for f in info["flags"])

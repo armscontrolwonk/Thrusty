@@ -605,6 +605,30 @@ def test_nose_and_fairing_have_open_bases_stages_capped():
     assert by3["RO_Body"][0] == (0.0, 0.0)
 
 
+def test_uncovered_separating_object_is_not_also_stacked_as_a_nose():
+    """Same rule as the 2-D schematic (booster_schematic.exposed_front_object):
+    with no fairing, a separating object is the front end and is exported
+    beside the stack, so no Payload_Nose is stacked and no containment
+    verdict is raised; an adapter on the last stage runs from the stage ⌀
+    to the object's base ⌀.  With no object, both are as before."""
+    veh = _stage("V", 1.0, 8.0, has_interstage=True, interstage_length_m=0.5)
+    veh.ro = ro_from_dict(dict(json.load(open("ro_library/C-HGB.ro.json")),
+                               diameter_m=0.6))
+    els = bx.vehicle_elements(veh)
+    by = {n: prof for n, prof, _p, _s in els["revolves"]}
+    assert "Payload_Nose" not in by and "RO_Body" in by
+    assert by["Interstage_1"] == [pytest.approx((0.5, 0.0)),
+                                  pytest.approx((0.3, 0.5))]
+    assert els["total_height_m"] == pytest.approx(8.5)
+    assert not any("fit" in f for f in els["flags"])
+    veh.ro = None
+    els = bx.vehicle_elements(veh)
+    by = {n: prof for n, prof, _p, _s in els["revolves"]}
+    assert "Payload_Nose" in by
+    assert by["Interstage_1"] == [pytest.approx((0.5, 0.0)),
+                                  pytest.approx((0.5, 0.5))]
+
+
 def test_estimate_cg_uses_real_per_stage_lengths():
     """Regression: estimate_cg treated the root length_m as the WHOLE stack
     and squeezed a multi-stage vehicle, floating the CG up into stage 2.
