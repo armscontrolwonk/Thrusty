@@ -4657,6 +4657,60 @@ def _re_safe(s: str, maxlen: int = 60) -> str:
 # as DERIVED for exactly that reason.
 _REENTRY_PLAN_KEYS = _fr._named(_fr.RO_FIELD_OWNER, _fr.REENTRY_PLAN)
 
+# Every key a reentry-plan FILE may carry: the plan fields, the plan-only
+# commanded_LD, plan-file identity and provenance, the schema marker, and the
+# variant name save_reentry_plan stamps.  Anything else is retired or foreign.
+REENTRY_PLAN_FILE_KEYS = (frozenset(_REENTRY_PLAN_KEYS) | _fr.PLAN_FILE_META
+                          | _fr.PLAN_ONLY_KEYS | _fr.FILE_META | {'name'})
+
+
+def bank_schedule_from_rows(rows) -> list:
+    """Typed bank-schedule rows -> [[start_s, end_s, bank_deg], ...].
+
+    `rows` holds (start, end, bank) cells as the user typed them.  An all-blank
+    row is skipped.  Any other row must parse completely, or ValueError is
+    raised naming the row and what is wrong: the integrator holds a bank only
+    while start <= t <= end (mission-elapsed seconds), so a row with no end,
+    or an end not after its start, would fly nothing -- and it used to be
+    dropped without a word, saving an empty schedule over a good one.  A
+    trailing degree sign, the Unicode minus and a lone decimal comma are
+    accepted, because people type them."""
+    import re as _re
+    names = ("start time", "end time", "bank angle")
+    out = []
+    for i, cells in enumerate(rows, start=1):
+        cells = [str('' if c is None else c).strip() for c in cells]
+        if not any(cells):
+            continue
+        missing = [n for n, c in zip(names, cells) if not c]
+        if missing:
+            raise ValueError(
+                f"Bank #{i}: enter the {' and '.join(missing)}. A bank is held "
+                f"from its start time to its end time (mission seconds).")
+        vals = []
+        for n, c in zip(names, cells):
+            t = c.rstrip('°').strip().replace('\u2212', '-')
+            if _re.fullmatch(r'[+-]?\d{1,3},\d{3}', t):
+                raise ValueError(
+                    f"Bank #{i}: the {n} '{c}' is ambiguous. Type "
+                    f"{t.replace(',', '')} or {t.replace(',', '.')}.")
+            if t.count(',') == 1 and '.' not in t:
+                t = t.replace(',', '.')                 # a decimal comma
+            try:
+                v = float(t)
+            except ValueError:
+                raise ValueError(f"Bank #{i}: the {n} '{c}' is not a number.") \
+                    from None
+            if not math.isfinite(v):
+                raise ValueError(f"Bank #{i}: the {n} must be a finite number.")
+            vals.append(v)
+        s, e, b = vals
+        if not e > s:
+            raise ValueError(f"Bank #{i}: the end time ({e:g} s) must be after "
+                             f"the start time ({s:g} s).")
+        out.append([s, e, b])
+    return out
+
 
 def extract_reentry_plan(ro: ROParams) -> dict:
     """Pull the reentry plan out of a reentry object into a plain dict.
@@ -4785,6 +4839,12 @@ def save_reentry_plan(name: str, rp: dict, out_dir, plan: str = None) -> str:
     from pathlib import Path as _P
     d = _P(out_dir)
     d.mkdir(parents=True, exist_ok=True)
+    # Only keys a plan file may carry.  Writers rebuild a plan over the raw
+    # file so its provenance survives, which would otherwise carry retired
+    # keys (separation_mode, glider_beta_entry_kg_m2) forward for ever.
+    # Nothing reads them -- apply_reentry_plan takes the plan fields and
+    # commanded_LD only -- so they are dropped here, at the one write.
+    rp = {k: v for k, v in rp.items() if k in REENTRY_PLAN_FILE_KEYS}
     if plan and plan != DEFAULT_PLAN_LABEL:
         rp = {**rp, 'name': plan, 'reentry_object': name}
     path = d / reentry_plan_filename(name, plan)

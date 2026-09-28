@@ -523,23 +523,40 @@ def _bind_typeahead(cb):
     • Enter / Tab                 → best-prefix match + fire the event
     • ↓ arrow                     → move keyboard focus into the popup list
     • Escape                      → dismiss popup, leave field unchanged
-    • FocusOut (click elsewhere)  → silently snap to best match
+    • FocusOut (click elsewhere)  → an uncommitted edit reverts to the last
+                                    committed value (typing is not selecting)
     """
-    _all   = list(cb['values'])
+    # The item list is read LIVE from the combobox every time.  It used to be
+    # captured here once, and every commit path wrote that snapshot back into
+    # cb['values'] -- so a dropdown whose values are refreshed later (the
+    # flight-plan and reentry-plan lists, which gain variants) collapsed to
+    # whatever it held at bind time ('(default)') after a single pick, and a
+    # typed variant name could never match.  The popup is a separate Listbox
+    # and never narrows cb['values'], so nothing needs restoring.
+    def _all():
+        return list(cb['values'])
     _popup = [None]   # Toplevel reference (reused, not recreated)
     _lb    = [None]   # Listbox inside the popup
+    _before = [cb.get()]   # the text just before the current edit began
+    _typed  = [False]      # an edit is in progress (text differs from _before)
+    _mine   = [None]       # the text as the user's last key left it
 
     cb.config(state='normal')
 
     def _is_sep(v): return v.startswith('─')
 
     def _best(prefix):
+        # An exact name beats a longer one that merely starts with it, so
+        # 'orbital' never resolves to an earlier 'Orbital 400 km'.
+        items = [v for v in _all() if not _is_sep(v)]
         p = prefix.lower()
-        return next((v for v in _all if not _is_sep(v) and v.lower().startswith(p)), None)
+        return (next((v for v in items if v == prefix), None)
+                or next((v for v in items if v.lower() == p), None)
+                or next((v for v in items if v.lower().startswith(p)), None))
 
     def _matches(prefix):
         p = prefix.lower()
-        return [v for v in _all if not _is_sep(v) and v.lower().startswith(p)]
+        return [v for v in _all() if not _is_sep(v) and v.lower().startswith(p)]
 
     # ── popup lifecycle ───────────────────────────────────────────────────
 
@@ -590,12 +607,10 @@ def _bind_typeahead(cb):
             _dismiss()
             cb.focus_set()
             cb.set(value)
-            cb['values'] = _all
             cb.event_generate('<<ComboboxSelected>>')
 
     def _commit_fire(event=None):
         _dismiss()
-        cb['values'] = _all
         m = _best(cb.get())
         if m:
             cb.set(m)
@@ -618,16 +633,34 @@ def _bind_typeahead(cb):
             if focused is _lb[0]:
                 return   # user is navigating the popup — let _pick handle it
             _dismiss()
-            cb['values'] = _all
-            m = _best(cb.get())
-            if m:
-                cb.set(m)
+            # Clicking away is not a selection.  Snapping an abandoned edit to
+            # its best match set the text WITHOUT <<ComboboxSelected>>, so the
+            # field could name one plan while another was active -- and the
+            # next Run saved the panel over the plan the field named.  Put
+            # back the text from before the edit (Enter, Tab or a pick commit
+            # instead) -- unless the app has set a value since the last key,
+            # which then stands.
+            if _typed[0] and cb.get() == _mine[0]:
+                cb.set(_before[0])
+            _typed[0] = False
         except Exception:
             pass
 
     def _on_selected(event=None):
-        cb['values'] = _all
+        _before[0] = cb.get()
+        _typed[0] = False
         _dismiss()
+
+    def _on_focus_in(event=None):
+        if not _typed[0]:
+            _before[0] = cb.get()
+
+    def _on_key_press(event=None):
+        # A widget binding runs before the class binding edits the text, so
+        # this is the value on screen when an edit starts -- including one the
+        # app set itself (Max Range, a booster switch) with no event.
+        if not _typed[0]:
+            _before[0] = cb.get()
 
     # ── key handler ───────────────────────────────────────────────────────
 
@@ -636,8 +669,13 @@ def _bind_typeahead(cb):
         if keysym == 'Escape':
             _dismiss()
             return
-        if keysym in ('Return', 'KP_Enter', 'Tab'):
+        if keysym in ('Return', 'KP_Enter'):
             _commit_fire()
+            return
+        if keysym in ('Tab', 'ISO_Left_Tab'):
+            # Tab out is committed on the PRESS (below).  A Tab release that
+            # arrives here was pressed in the previous field: focus came in
+            # by Tab and nothing was typed, so there is nothing to commit.
             return
         if keysym == 'Down':
             if _lb[0] and _popup[0] and _popup[0].winfo_exists():
@@ -646,6 +684,8 @@ def _bind_typeahead(cb):
                     _lb[0].selection_set(0)
             return
         typed = cb.get()
+        _typed[0] = typed != _before[0]          # an arrow or Cmd+C edits nothing
+        _mine[0] = typed
         if not typed:
             _dismiss()
             return
@@ -657,7 +697,19 @@ def _bind_typeahead(cb):
 
     cb.bind('<KeyRelease>', _on_key)
     cb.bind('<FocusOut>',   _commit_silent_later)
+    cb.bind('<KeyPress>',   _on_key_press, add='+')
+    cb.bind('<FocusIn>',    _on_focus_in, add='+')
+    # Tab commits an edit like Enter, as documented.  Its KeyRelease reaches
+    # the NEXT widget (focus has moved), so it is caught on the press; nothing
+    # is returned, so focus traversal carries on.  Tabbing through a field
+    # nobody edited selects nothing -- a selection reloads the panel.
+    cb.bind('<KeyPress-Tab>',
+            lambda e: _commit_fire() if _typed[0] else None, add='+')
     cb.bind('<<ComboboxSelected>>', _on_selected, add='+')
+    # The handlers, for tests: a withdrawn window cannot take keyboard focus,
+    # so generated key events never reach it.
+    return {'key_press': _on_key_press, 'on_key': _on_key,
+            'commit_fire': _commit_fire, 'commit_silent': _do_commit_silent}
 
 
 # Bundled sites (read-only) come from launch_sites.json in the source tree.
@@ -6065,19 +6117,23 @@ class ReentryPlanDialog(tk.Toplevel):
                 return float(sv.get().strip())
             except (ValueError, AttributeError):
                 return default
+        # Bank schedule first: a row that cannot be flown stops the Save and
+        # says which, instead of being dropped and an empty schedule written
+        # over the saved one.  The dialog stays open with the typed rows.
+        # Only when the grid is on screen: an analytic law has none, so its
+        # stored schedule is left exactly as it is, not judged unseen.
+        _banks = None
+        if self._family == 'numerical':
+            try:
+                _banks = mm.bank_schedule_from_rows(
+                    (_bv['start'].get(), _bv['end'].get(), _bv['bank'].get())
+                    for _bv in self._bank_vars)
+            except ValueError as exc:
+                messagebox.showerror("Bank schedule", str(exc), parent=self)
+                return
         cmd = _num(self._cmd_ld_var, self._cap)
         if self._cap > 0:
             cmd = min(cmd, self._cap)          # clamp: fly it worse, never better
-        # Bank schedule: keep only fully-filled rows.
-        _banks = []
-        for _bv in self._bank_vars:
-            _s, _e, _b = (_bv['start'].get().strip(), _bv['end'].get().strip(),
-                          _bv['bank'].get().strip())
-            if _s and _e and _b:
-                try:
-                    _banks.append([float(_s), float(_e), float(_b)])
-                except ValueError:
-                    pass
         # Dive-at-target: radius 0 disables it.
         _dt_rad = _num(self._dt_rad_var, 0.0) if self._dt_on_var.get() else 0.0
         self._result = {
@@ -6095,13 +6151,14 @@ class ReentryPlanDialog(tk.Toplevel):
             'glider_aero_model': ('polar'
                                   if 'polar' in self._aero_var.get().lower()
                                   else 'constant_LD'),
-            'glider_bank_schedule':     _banks,
             'glider_dive_target_lat_deg':   _num(self._dt_lat_var, 0.0),
             'glider_dive_target_lon_deg':   _num(self._dt_lon_var, 0.0),
             'glider_dive_target_radius_km': _dt_rad,
             'source': self._source_var.get().strip(),
             'notes':  self._notes_text.get("1.0", "end-1c").strip(),
         }
+        if _banks is not None:
+            self._result['glider_bank_schedule'] = _banks
         self.destroy()
 
     @property
@@ -10959,7 +11016,10 @@ class BoosterFlyoutApp(tk.Tk):
             else "Equilibrium glide (Tracy)"
             if _guid == "equilibrium_glide"
             else "Ballistic (drag · gravity · rotation)")
-        self._main_dive_alt_var.set(f"{ro.glider_terminal_alt_km:.0f}")
+        # Full precision (:g), never :.0f -- these strings are written back to
+        # the plan file by the next write-through, so rounding here silently
+        # rewrote a saved 10.5 deg bank as 10 (and a 0.4 deg bank as 0).
+        self._main_dive_alt_var.set(f"{ro.glider_terminal_alt_km:g}")
         self._main_pullup_alt_var.set(
             f"{getattr(ro, 'glider_pullup_start_alt_km', 0.0):g}")
         _sched = ro.glider_bank_schedule or []
@@ -10967,9 +11027,9 @@ class BoosterFlyoutApp(tk.Tk):
         for _i, _bvars in enumerate(self._main_bank_vars):
             if _i < len(_sched):
                 _bs, _be, _bk = _sched[_i]
-                _bvars['start'].set(f"{_bs:.0f}")
-                _bvars['end'].set(f"{_be:.0f}")
-                _bvars['bank'].set(f"{_bk:.0f}")
+                _bvars['start'].set(f"{float(_bs)!r}")
+                _bvars['end'].set(f"{float(_be)!r}")
+                _bvars['bank'].set(f"{float(_bk)!r}")
             else:
                 _bvars['start'].set('')
                 _bvars['end'].set('')
@@ -10983,11 +11043,11 @@ class BoosterFlyoutApp(tk.Tk):
             _dt_r = float(getattr(ro, 'glider_dive_target_radius_km', 0.0) or 0.0)
             self._main_dive_target_var.set(_dt_r > 0.0)
             self._main_dt_lat_var.set(
-                f"{getattr(ro, 'glider_dive_target_lat_deg', 0.0):.4f}")
+                f"{float(getattr(ro, 'glider_dive_target_lat_deg', 0.0))!r}")
             self._main_dt_lon_var.set(
-                f"{getattr(ro, 'glider_dive_target_lon_deg', 0.0):.4f}")
+                f"{float(getattr(ro, 'glider_dive_target_lon_deg', 0.0))!r}")
             self._main_dt_radius_var.set(
-                f"{_dt_r:.0f}" if _dt_r > 0.0 else "20")
+                f"{_dt_r!r}" if _dt_r > 0.0 else "20")
         if hasattr(self, '_main_skip_count_var'):
             self._main_skip_count_var.set(str(getattr(ro, 'glider_skip_count', 1)))
         if hasattr(self, '_main_zeta_var'):
