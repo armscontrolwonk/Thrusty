@@ -6706,13 +6706,17 @@ class RangeRingDialog(tk.Toplevel):
             booster, lat, lon, n_az=self._N_AZ,
             guidance=guidance, burnout_angle_deg=la,
             gt_turn_start_s=gt_start_s, gt_turn_stop_s=gt_stop_s)
+        # The generator computes an azimuth when asked for it, so Stop is
+        # honoured AFTER the one in flight has been kept and BEFORE the next
+        # is started -- as the pre-generator loop did.  Checked first, a Stop
+        # during the last azimuth discarded a finished ring.
         for i, (az, imp_lon, imp_lat) in enumerate(ring):
-            if self._stop.is_set():
-                self.after(0, self._on_cancelled)
-                return
             if imp_lon is not None:
                 points.append((az, imp_lon, imp_lat))
             self.after(0, self._on_progress, i + 1, len(points))
+            if self._stop.is_set() and i + 1 < self._N_AZ:
+                self.after(0, self._on_cancelled)
+                return
 
         self.after(0, self._on_done, points, lat, lon)
 
@@ -7064,10 +7068,10 @@ class ParametricSweepDialog(tk.Toplevel):
             keep_trajectories=store_trajs,
             guidance=guidance, launch_elevation_deg=launch_elevation_deg)
         for i, sr in enumerate(sweep):
-            if self._stop_evt.is_set():
-                break
             traj = (sr.value, sr.result) if store_trajs and sr.result else None
             self.after(0, self._add_point, sr.as_tuple(), traj, i + 1, len(points))
+            if self._stop_evt.is_set():      # after the run in flight is posted
+                break
         self.after(0, self._sweep_done)
 
     # ------------------------------------------------------------------
@@ -7335,6 +7339,10 @@ class FootprintDialog(tk.Toplevel):
         try:
             (booster, guidance, lat, lon, az, cutoff, la,
              gt_start, gt_stop, orb, yaw, el) = self._app._get_inputs()
+            # Read here, on the Tk thread: a Tk variable must not be read from
+            # the worker, and a bad value is an input error to show, not an
+            # exception that silently ends the worker with Run left disabled.
+            settings = self._run_settings()
         except Exception as exc:
             messagebox.showerror("Input error", str(exc), parent=self)
             return
@@ -7353,35 +7361,40 @@ class FootprintDialog(tk.Toplevel):
         threading.Thread(
             target=self._worker,
             args=(booster, guidance, lat, lon, az, cutoff, la,
-                  gt_start, gt_stop, orb, yaw, el, bank_angles),
+                  gt_start, gt_stop, orb, yaw, el, bank_angles, settings),
             daemon=True,
         ).start()
+
+    def _run_settings(self):
+        """The run options the main window holds beyond _get_inputs."""
+        return dict(alpha_limit_deg=self._app._alpha_limit_value(),
+                    alpha_induced_drag=self._app._alpha_induced_value(),
+                    terrain_dem=self._app._terrain_dem_value(),
+                    launch_elev_m=self._app._launch_elev_value())
 
     def _cancel(self):
         self._stop_evt.set()
 
     def _worker(self, booster, guidance, lat, lon, az, cutoff, la,
-                gt_start, gt_stop, orb, yaw, el, bank_angles):
+                gt_start, gt_stop, orb, yaw, el, bank_angles, settings=None):
         results, errors = [], []
+        if settings is None:                 # direct callers (tests)
+            settings = self._run_settings()
         sweep = analysis.iter_bank_footprint(
             booster, lat, lon, bank_angles, max_time_s=3600.0, errors=errors,
             launch_azimuth_deg=az, guidance=guidance, burnout_angle_deg=la,
             cutoff_time_s=cutoff, gt_turn_start_s=gt_start,
             gt_turn_stop_s=gt_stop, yaw_maneuvers=yaw,
-            launch_elevation_deg=el,
-            alpha_limit_deg=self._app._alpha_limit_value(),
-            alpha_induced_drag=self._app._alpha_induced_value(),
-            terrain_dem=self._app._terrain_dem_value(),
-            launch_elev_m=self._app._launch_elev_value())
+            launch_elevation_deg=el, **settings)
         for i, (bk, r) in enumerate(sweep):
-            if self._stop_evt.is_set():
-                break
             results.append((bk, r))
             done = i + 1
             self.after(0, lambda d=done, tot=len(bank_angles): (
                 self._prog_lbl.set(f"{d} / {tot}"),
                 self._progressbar.__setitem__("value", d),
             ))
+            if self._stop_evt.is_set():      # after the run in flight is kept
+                break
 
         self._results = results
         self._errors = errors

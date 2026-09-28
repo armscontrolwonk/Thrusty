@@ -396,3 +396,92 @@ def test_footprint_dialog_worker_records_each_bank(app, monkeypatch):
         assert dlg._errors == []
     finally:
         dlg.destroy()
+
+
+# ── Cancel keeps the run that was in flight (as before the generators) ──────
+# The sweep drivers compute a run when asked for it.  The dialogs checked
+# Cancel on receiving a finished run and threw it away; before the refactor
+# they checked it before STARTING a run, so the run in flight was kept.
+
+def test_footprint_cancel_keeps_the_bank_in_flight(app, monkeypatch):
+    import thrusty, trajectory
+    from booster_models import get_booster
+    dlg = thrusty.FootprintDialog(app)
+    calls = []
+    def fake(booster, lat, lon, **kw):
+        _bind("integrate_trajectory", booster, lat, lon, **kw)
+        calls.append(mm.effective_ro(booster).glider_bank_schedule[0][2])
+        if len(calls) == 2:
+            dlg._stop_evt.set()                 # Cancel pressed mid-run 2
+        return _result(impact_t=250.0)
+    monkeypatch.setattr(trajectory, "integrate_trajectory", fake)
+    monkeypatch.setattr(thrusty.FootprintDialog, "_on_done", lambda self: None)
+    try:
+        dlg._worker(get_booster("AUR"), "pitch_program", 0.0, 0.0, 90.0, None,
+                    45.0, 5.0, None, None, None, 90.0, [-20.0, 0.0, 20.0])
+        _pump(dlg)
+        assert calls == [-20.0, 0.0]            # run 3 never started
+        assert [b for b, _ in dlg._results] == [-20.0, 0.0]   # run 2 kept
+    finally:
+        dlg.destroy()
+
+
+def test_parametric_cancel_keeps_the_run_in_flight(app, monkeypatch):
+    import thrusty, trajectory
+    from booster_models import get_booster
+    dlg = thrusty.ParametricSweepDialog(app)
+    stub = _Stub()
+    def integrate(*a, **kw):
+        r = stub.integrate(*a, **kw)
+        dlg._stop_evt.set()                     # Cancel pressed mid-run 1
+        return r
+    monkeypatch.setattr(trajectory, "integrate_trajectory", integrate)
+    try:
+        dlg._results, dlg._traj_store = [], []
+        dlg._sweep_worker(get_booster("AUR"), "pitch_program", 0.0, 0.0, 90.0,
+                          45.0, 60.0, "burnout_angle", [20.0, 30.0, 40.0], False)
+        _pump(dlg)
+        assert len(stub.calls) == 1
+        assert [r[0] for r in dlg._results] == [20.0]
+        assert "Cancelled after 1 point" in dlg._prog_lbl.get()
+    finally:
+        dlg.destroy()
+
+
+def test_range_ring_stop_during_the_last_azimuth_keeps_the_ring(app,
+                                                                monkeypatch):
+    import thrusty, trajectory
+    from booster_models import get_booster
+    dlg = thrusty.RangeRingDialog(app)
+    stub = _Stub()
+    def maximize(*a, **kw):
+        r = stub.maximize(*a, **kw)
+        if len(stub.calls) == dlg._N_AZ:
+            dlg._stop.set()                     # Stop pressed mid-last-azimuth
+        return r
+    monkeypatch.setattr(trajectory, "maximize_range", maximize)
+    try:
+        dlg._N_AZ = 4
+        dlg._worker(get_booster("AUR"), "pitch_program", 10.0, 20.0, 45.0,
+                    5.0, None, 90.0)
+        _pump(dlg)
+        assert dlg._ring is not None and len(dlg._ring) == 4
+    finally:
+        dlg.destroy()
+    dlg = thrusty.RangeRingDialog(app)
+    stub = _Stub()
+    def maximize2(*a, **kw):
+        r = stub.maximize(*a, **kw)
+        if len(stub.calls) == 2:
+            dlg._stop.set()                     # Stop pressed mid-azimuth 2
+        return r
+    monkeypatch.setattr(trajectory, "maximize_range", maximize2)
+    try:
+        dlg._N_AZ = 4
+        dlg._worker(get_booster("AUR"), "pitch_program", 10.0, 20.0, 45.0,
+                    5.0, None, 90.0)
+        _pump(dlg)
+        assert len(stub.calls) == 2             # azimuth 3 never started
+        assert dlg._prog_var.get() == "Cancelled."
+    finally:
+        dlg.destroy()
