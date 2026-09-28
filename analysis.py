@@ -322,10 +322,13 @@ def with_bank_schedule(booster, bank_deg: float, t_end_s: float):
 def iter_bank_footprint(booster, lat_deg: float, lon_deg: float,
                         banks_deg: Sequence[float], *,
                         max_time_s: float = 3600.0,
+                        errors: Optional[list] = None,
                         **integrate_kwargs
                         ) -> Iterator[tuple[float, Optional[dict]]]:
     """Fly the stack once per bank angle, the glider holding that bank for
-    the whole flight.  Yields (bank_deg, result) with result None on failure.
+    the whole flight.  Yields (bank_deg, result) with result None on failure;
+    when `errors` is a list, each failure is also appended to it as
+    (bank_deg, exception), so a caller can say WHY rather than just "failed".
     Keyword arguments go to trajectory.integrate_trajectory."""
     from trajectory import integrate_trajectory
     for bk in banks_deg:
@@ -334,8 +337,10 @@ def iter_bank_footprint(booster, lat_deg: float, lon_deg: float,
         try:
             r = integrate_trajectory(m, lat_deg, lon_deg,
                                      max_time_s=max_time_s, **integrate_kwargs)
-        except Exception:
+        except Exception as exc:
             r = None
+            if errors is not None:
+                errors.append((bk, exc))
         yield bk, r
 
 

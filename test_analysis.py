@@ -7,6 +7,7 @@ parameter varies, how failures are reported, how impacts are read) is tested
 without flying anything.  The last block re-runs the GUI dialogs' worker
 methods on the same stubs to prove the Tk wiring still lands rows in the
 widgets (skips where Tk / a display is unavailable)."""
+import inspect
 import math
 import numpy as np
 import pytest
@@ -14,6 +15,21 @@ import pytest
 import analysis
 import coordinates as co
 import booster_models as mm
+import trajectory as _trajectory
+
+# The real callees, captured at import, before any test patches them.  Every
+# stub below binds its arguments against the real signature FIRST, so a caller
+# passing a keyword the real function does not take fails here.  Permissive
+# `**kw` stubs let the footprint sweep call integrate_trajectory(azimuth_deg=…)
+# — a name it has never had — while every run failed silently in the GUI, and
+# the test even asserted the wrong name.
+_REAL = {"integrate_trajectory": _trajectory.integrate_trajectory,
+         "maximize_range": _trajectory.maximize_range}
+
+
+def _bind(name, *a, **kw):
+    """Raise TypeError exactly where the real `name` would."""
+    inspect.signature(_REAL[name]).bind(*a, **kw)
 
 
 # ── synthetic results ───────────────────────────────────────────────────────
@@ -122,6 +138,7 @@ class _Stub:
         self.fail_on = fail_on
 
     def integrate(self, booster, lat, lon, az, **kw):
+        _bind("integrate_trajectory", booster, lat, lon, az, **kw)
         self.calls.append((az, kw))
         if self.fail_on is not None and self.fail_on(az, kw):
             raise RuntimeError("boom")
@@ -132,6 +149,7 @@ class _Stub:
         return r
 
     def maximize(self, booster, lat, lon, az, **kw):
+        _bind("maximize_range", booster, lat, lon, az, **kw)
         self.calls.append((az, kw))
         if self.fail_on is not None and self.fail_on(az, kw):
             raise RuntimeError("boom")
@@ -202,16 +220,34 @@ def test_iter_bank_footprint_flies_each_bank(monkeypatch):
     load_booster_library()
     seen = []
     def fake(booster, lat, lon, **kw):
-        seen.append((mm.effective_ro(booster).glider_bank_schedule[0][2], kw))
+        _bind("integrate_trajectory", booster, lat, lon, **kw)
+        bk = mm.effective_ro(booster).glider_bank_schedule[0][2]
+        if bk == 30.0:
+            raise RuntimeError("stalled")
+        seen.append((bk, kw))
         return _result(impact_t=250.0)
     monkeypatch.setattr(trajectory, "integrate_trajectory", fake)
+    errors = []
     out = list(analysis.iter_bank_footprint(get_booster("AUR"), 0.0, 0.0,
-                                            [-10.0, 10.0], azimuth_deg=45.0,
-                                            guidance="pitch_program"))
+                                            [-10.0, 10.0, 30.0],
+                                            launch_azimuth_deg=45.0,
+                                            guidance="pitch_program",
+                                            errors=errors))
     assert [b for b, _ in seen] == [-10.0, 10.0]
-    assert all(kw['azimuth_deg'] == 45.0 and kw['max_time_s'] == 3600.0
-               for _, kw in seen)
-    assert [b for b, r in out] == [-10.0, 10.0] and all(r is not None for _, r in out)
+    assert all(kw['launch_azimuth_deg'] == 45.0 and kw['max_time_s'] == 3600.0
+               and 'errors' not in kw for _, kw in seen)
+    assert [b for b, r in out] == [-10.0, 10.0, 30.0]
+    assert [r is not None for _, r in out] == [True, True, False]
+    # the failure is reported with its reason, not only as a None
+    assert [(b, str(e)) for b, e in errors] == [(30.0, "stalled")]
+
+
+def test_a_wrong_keyword_now_fails_the_stub():
+    """The guard itself: the keyword the footprint sweep used to pass is
+    rejected exactly as the real integrator rejects it."""
+    with pytest.raises(TypeError):
+        _bind("integrate_trajectory", object(), 0.0, 0.0, azimuth_deg=45.0)
+    _bind("integrate_trajectory", object(), 0.0, 0.0, launch_azimuth_deg=45.0)
 
 
 # ── geometry of results ─────────────────────────────────────────────────────
@@ -345,6 +381,7 @@ def test_footprint_dialog_worker_records_each_bank(app, monkeypatch):
     from booster_models import get_booster
     calls = []
     def fake(booster, lat, lon, **kw):
+        _bind("integrate_trajectory", booster, lat, lon, **kw)
         calls.append(mm.effective_ro(booster).glider_bank_schedule[0][2])
         return _result(impact_t=250.0)
     monkeypatch.setattr(trajectory, "integrate_trajectory", fake)
@@ -356,5 +393,6 @@ def test_footprint_dialog_worker_records_each_bank(app, monkeypatch):
         _pump(dlg)
         assert calls == [-20.0, 0.0, 20.0]
         assert [b for b, _ in dlg._results] == [-20.0, 0.0, 20.0]
+        assert dlg._errors == []
     finally:
         dlg.destroy()

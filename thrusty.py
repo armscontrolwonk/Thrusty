@@ -7228,6 +7228,7 @@ class FootprintDialog(tk.Toplevel):
         self._app      = parent_app
         self._stop_evt = threading.Event()
         self._results  = []   # list of (bank_deg, result_dict | None)
+        self._errors   = []   # (bank_deg, exception) for each failed run
         self._map_path = None
 
         pad = dict(padx=8, pady=4)
@@ -7282,6 +7283,7 @@ class FootprintDialog(tk.Toplevel):
             return
 
         self._results = []
+        self._errors = []
         self._map_path = None
         self._stop_evt.clear()
         self._run_btn.config(state=tk.DISABLED)
@@ -7303,10 +7305,10 @@ class FootprintDialog(tk.Toplevel):
 
     def _worker(self, booster, guidance, lat, lon, az, cutoff, la,
                 gt_start, gt_stop, orb, yaw, el, bank_angles):
-        results = []
+        results, errors = [], []
         sweep = analysis.iter_bank_footprint(
-            booster, lat, lon, bank_angles, max_time_s=3600.0,
-            azimuth_deg=az, guidance=guidance, burnout_angle_deg=la,
+            booster, lat, lon, bank_angles, max_time_s=3600.0, errors=errors,
+            launch_azimuth_deg=az, guidance=guidance, burnout_angle_deg=la,
             cutoff_time_s=cutoff, gt_turn_start_s=gt_start,
             gt_turn_stop_s=gt_stop, yaw_maneuvers=yaw,
             launch_elevation_deg=el,
@@ -7325,6 +7327,7 @@ class FootprintDialog(tk.Toplevel):
             ))
 
         self._results = results
+        self._errors = errors
         self.after(0, self._on_done)
 
     def _on_done(self):
@@ -7349,7 +7352,14 @@ class FootprintDialog(tk.Toplevel):
                  if r is not None and r.get('lat') is not None
                  and len(r.get('lat', [])) > 0]
         if not valid:
-            messagebox.showinfo("No results", "All trajectories failed.", parent=self)
+            # Say why: a bare "failed" once hid a wrong keyword name that
+            # failed every run before it flew.
+            msg = "All trajectories failed."
+            if self._errors:
+                bk, exc = self._errors[0]
+                msg += (f"\n\nFirst failure (bank {bk:+g}°):\n"
+                        f"{type(exc).__name__}: {exc}")
+            messagebox.showinfo("No results", msg, parent=self)
             return
 
         all_lats = [launch_lat] + [r['lat'][-1] for _, r in valid]
