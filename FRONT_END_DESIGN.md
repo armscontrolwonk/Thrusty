@@ -486,3 +486,178 @@ flag only drives the editor lock. Default off → existing boosters unchanged.
   range; compose is idempotent; `mass_kg` never added for a body. ✓ (9 tests)
 - `body_reenters` round-trips and is a physics no-op. ✓
 - Suite 479 → 503.
+
+---
+
+# Part IV — One handoff at separation
+
+Status: **approved 2026-09-30; Phase 0 done, Phase 1 next.** Parts I–III made the body
+honest in what it shows and what it owns. Part IV makes the moment of
+separation a single, explicit step, in both kinds of vehicle.
+
+## 16. The principle
+
+A run is composed from two hardware files, a booster and a reentry object, and
+there is **always a handoff from one to the other at separation**:
+
+- **Separating:** the object as stored is what flies on.
+- **Non-separating (`body_reenters`):** the object is populated with the shape
+  of what actually reenters — the last stage (for a single-stage missile, the
+  whole booster), **fins included** — and that is what flies on.
+
+Either way the handoff produces **the object as flown**, and every
+reentry-phase consumer reads only that: drag, lift, trim, heating, reports.
+None reads the booster to rebuild the body's shape for itself. The same
+handoff hands each spent piece — empty stage, fairing, strap-on casings — to
+the ground.
+
+The work is writing in two directions, both **in the run, never in the files**:
+
+- **forward**, booster → object as flown, at separation;
+- **back**, the reentry results → the run record and report, and the editor's
+  read-only "from booster" fields, which show the same handed-off values.
+
+## 17. Why
+
+The failures this part closes are one disease: each reentry-phase consumer
+decided for itself where the body's shape came from, and several chose wrong.
+
+| Symptom | Where |
+|---|---|
+| The whole booster flown as an object on top of itself (574 → 137 km) | `compose_loadout`, fixed in Part III |
+| Stored copies of the booster's numbers in body files (Scud-B, Al Hussein: 1198/1334 kg, 0.84 m, 11.25/12.0 m), silently overridden | editor Save; two run paths that write the flown object back into `node.ro` (`analysis.py`, `trajectory.py`); an old migration; `_export_ro` falling back to the flown object |
+| Whole-stage length taken as the nose length | `heating_by_location` and the windward-flank screen (fixed 381e2c0); still in `_boost_front_geometry` during boost |
+| Multi-stage body CG summed over every stage | `grid_fin_sizing.estimate_cg` |
+| A body object flown from an entry condition as if it separated | `entry_carrier` |
+| A body object on a separating booster: 15.5 km, no warning (β = 0 "derive" becomes infinite drag) | no pairing check exists |
+| Body and spent stage flown by different code (different drag, ground, precision) | main `_eom` vs `integrate_debris` |
+
+## 18. Decisions (user, 2026-09-30)
+
+1. **Files store only what the body adds.** A body's object file keeps nose
+   shape, `body_nose_length_m`, nose radius, `payload_kg`, heat protection,
+   heating locations, any entered β / L/D (0 = derive) and provenance.
+   `mass_kg`, `diameter_m` and `length_m` are stored as **0 = from booster**
+   (`mass_kg` stays in the file: it is a required key). Nothing about the
+   booster is stored twice; the record of what flew belongs to the run.
+2. **Pairing rule.** An object that takes its size from the booster (mass 0,
+   or β 0 = derive) on a booster that **separates** is **refused**, naming the
+   field. An object that stores its own size on a booster whose last stage
+   **reenters** flies, and the run **reports** that the stored size is
+   ignored — visible, not silent.
+3. **Fins remain** on the handed-off body: the last stage's own fin and
+   grid-fin fields (every fin, for a single stage). A flight-plan option to
+   drop them comes later (timing is plan data; the fins stay booster hardware).
+4. **Spent stages** go through the same handoff and the same flight code as the
+   body. Where a tumbling stage lands matters more, for now, than its heating.
+5. **Fins and tumbling drag.** Fins travel with a spent stage. How much drag
+   the stage has depends on its attitude, which is set by the stage itself —
+   see §18a. Nothing is added for fins without a cited method.
+6. **Benchmark** for a stage's impact point: the user is sourcing it.
+
+## 18a. How a spent stage falls (user's note, 2026-09-30)
+
+The user's note *Do spent rocket stages tumble randomly?* (19 references)
+sets the physics for Phase 3. In short:
+
+- **A spent stage does not tumble randomly.** Outside the atmosphere it
+  rotates in a plane, end over end (Shuttle external tank, Ariane 5 core
+  stage, Ares I-X first stage; a free long body goes to flat spin). Once
+  dynamic pressure builds the tumble is normally arrested and the stage
+  oscillates about a **trim attitude set by its centre of gravity relative to
+  its centre of pressure** (Tobak & Peterson, NASA TR R-203; Ares I-X
+  pre-flight Monte Carlo and flight, Tartabini & Starr 2011; the AFGL reentry
+  handbook, AFGL-TR-78-0019, which tabulates trim angle and drag for cylinders
+  at Mach 2–8 against CG offset). Arrest is usual, not guaranteed.
+- **Random tumbling is a convention**, used by range safety (FAA AC
+  450.115-1A) and debris codes, not something an intact stage has been seen
+  to do. It stays the nominal case, with a **two-sided band**: about 1.6×
+  (broadside: CG near mid-length, flat spin, or a tumble across the flight
+  path) down to about 0.3× (markedly tail-heavy) and 0.17× (end-on, L/D 10).
+  The in-plane tumble, 0.76×, lies inside the band, not at its edge.
+- **Fins decide the mode.** If the separated stage is still statically
+  stable nose-first, it does not tumble: it flies end-on. If not, fins still
+  shift the trim angle. Thrusty already computes CG, CP and static margin
+  with fins (`grid_fin_sizing`, `trim_gate`); Phase 3 applies them to the
+  spent stage.
+- **Intact stage and fragments are separate cases.** The trim argument is for
+  the intact stage; random tumbling is what the tables were written for
+  after breakup. Lift of a trimmed, non-rolling stage (lift-to-drag of order
+  1 near 135°) and breakup are carried as stated uncertainties, not modelled.
+
+**Checked here.** Klett's (Sandia SC-RR-64-2141) random and in-plane averages
+— 0.393 + 0.178·D/L and 0.283 + 0.303·D/L, on area L·D — are exactly the
+orientation averages of his fixed-angle formula 0.667 sin³θ + 0.714 (D/L)
+|cos θ|³ (integrated here to three decimals), and the note's ratios for L/D
+5–12 reproduce. Hoerner's fixed-orientation pieces give the same fixed-angle
+law (eq. 44 ⅔ broadside; the cross-flow law sin³α, eqs. 23 and 48). So the
+averaging is arithmetic on cited formulas, not a new model.
+
+**Hoerner, read 2026-09-30** (*Fluid-Dynamic Drag*, 1965; Thrusty's Drive
+archive): the constants in `tumbling_cylinder_beta` are transcribed and
+assigned correctly (eq. 41 1.84 − 0.76/M², above M ≈ 3; eq. 44 ⅔ broadside;
+0.89 end face, above M ≈ 5). Not from Hoerner: the ½ average of the two
+orientations and the 1.2 floor below M 3 (which steps to 1.756 at M 3). He has
+no tumbling-cylinder, tumbling-fin or tumbling-plate data. His one
+orientation-averaged measurement is rotating cubes in a ballistic range (Fig.
+17, p. 16-14): C_D ≈ 0.75 subsonic rising to 1.11 above M ≈ 1.2, on 1.5 l²,
+which he says represents "average conditions between all positions
+statistically possible". That is a validation case for the averaging.
+
+**Still to read from primary before any coefficient is coded** (derive, don't
+invent): Klett 1964 and the AFGL handbook (the fixed-angle formula; trim
+angle and drag against CG offset, and its cross-check that the formula runs
+10–17% low at 118° and 138°), and Tartabini & Starr for the Ares I-X case. The
+Mach range needs care: Klett is Mach 10–30, the handbook Mach 2–8, and a first
+stage falls mostly slower; Hoerner supplies the subsonic and transonic
+fixed-orientation pieces.
+
+## 19. Phases
+
+**Phase 0 — the invariants, as tests (`test_handoff.py`).** A body flies
+identically with its stored size zeroed (true today, pinned). Mass after
+separation is what the handoff says: a body carries the last stage's burnout
+mass plus `payload_kg`; a separating object carries its own `mass_kg`. The
+pairing rule of §18.2, marked expected-to-fail until Phase 2.
+
+**Phase 1 — one handoff.** A core function builds the object as flown at
+separation: mass, diameter, length, nose length, the last stage's fins, CG
+from the last stage only, the β(Mach) and L/D(Mach) tables, and the trim
+result (angle of attack or tumbling). `effective_ro` becomes a view of it.
+Every reentry-phase consumer reads only it; the write-backs into stored
+objects stop; `_boost_front_geometry`, `estimate_cg` and `entry_carrier` are
+corrected. The run result gains `handoff`: what was handed off, from where,
+and any notices. Trajectories do not move, except a multi-stage body's (its
+CG).
+
+**Phase 2 — files store only what the body adds.** The pairing rule is
+enforced. The editor shows the booster's numbers and saves 0; export writes
+the stored object. The three shipped body files (Scud-B, Al Hussein, generic
+body missile warheads) are cleaned once and their recorded load results
+regenerated on purpose. `upgrade_ro_dict` cannot do this — a file does not
+know it is a body — so user files are handled by the pairing report instead.
+
+**Phase 3 — spent pieces through the same handoff and flight code.** Each
+empty stage, the fairing and the strap-on casings fly with their own mass,
+dimensions and fins, the terrain model and the main flight's integration
+tolerance. The debris release clock starts at `booster_core_delay_s`, as
+every other stage clock does. Drag follows §18a: the stage's own CG and CP
+(fins included) decide whether it flies end-on (stable), trims at an angle,
+or is taken as tumbling; the nominal is random tumbling, and the impact
+points at the two ends of the band are reported with it, so each stage lands
+as a stretch of ground, not a point. The fixed-angle law is averaged over
+orientation from cited formulas, with Mach dependence from Hoerner below the
+hypersonic range, and the averaging is tested against Hoerner's rotating
+cubes. **Every debris impact point moves, on purpose**; before-and-after
+impact points are reported for each shipped vehicle.
+
+**Phase 4 — later.** A flight-plan option to drop the fins.
+
+## 20. Acceptance (Part IV)
+
+- No reentry-phase consumer reads the booster for the body's shape; a test
+  enumerates them.
+- No path writes booster numbers into a stored object.
+- A body flies identically before and after Phase 2's file cleaning.
+- The pairing rule holds in both directions, with its message and report.
+- Spent pieces and the reentering object share one flight code path.

@@ -2529,8 +2529,13 @@ Ch. XVIII (hypersonic bluff bodies):
 | end-on (blunt cylinder face) | `C_D = 0.89·C_p•` | ≈ **1.6** | Fig. 22 |
 
 Below M ≈ 3 the hypersonic form is invalid; `C_p•` is floored at the
-incompressible bluff-body level (~1.2). Continuum anchors from the same source
-(§3-5/§3-6, Figs. 12/28) — 2-D cross-flow cylinder `C_D ≈ 1.17–1.2` subcritical,
+incompressible bluff-body level (~1.2). The floor is Thrusty's, not Hoerner's,
+and it steps to 1.756 at M = 3. So is the ½ average of the two orientations:
+Hoerner gives no orientation average for a cylinder (checked against the book,
+2026-09-30; FRONT_END_DESIGN.md §18.5). His tested broadside value is
+`0.69·C_p•` (Fig. 24), slightly above eq. 44's ⅔. Continuum anchors from the
+same source (pp. 3-8/3-9 Fig. 12, and p. 3-16 Fig. 28) — 2-D cross-flow
+cylinder `C_D ≈ 1.17–1.2` subcritical,
 normal disc 1.17 (3-D) — bracket the low-Mach floor. This is the **same**
 function that computes spent-casing debris arcs (§14.3), which keep the legacy
 single-`C_D = 1.0` mean-area form; the two-term Hoerner form is selected
@@ -5489,7 +5494,8 @@ optimisation) should use higher-fidelity tools.
   tumbling β (Section 8.11): impact-pressure coefficient
   `C_p• = 1.84 − 0.76/M²` (eq. 41), cross-flow cylinder `C_D = ⅔·C_p•`
   (eq. 44, Fig. 24), and blunt cylinder face `C_D = 0.89·C_p•` (Fig. 22),
-  with continuum cross-flow anchors from §3-5/§3-6 (Figs. 12/28).
+  with continuum cross-flow anchors from pp. 3-8/3-9 (Fig. 12) and p. 3-16
+  (Fig. 28).
 
 ### Atmosphere
 
