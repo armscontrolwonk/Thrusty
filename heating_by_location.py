@@ -14,6 +14,13 @@ An entry carries only what no other field of the object holds; this module
   evaluate_locations(...) runs the relations of heating_locations.py over a
                           flown arc and turns flux into temperature according
                           to how the part is built.
+  run_attitude(result)    the attitude a run actually flew (its trimmed angle
+                          of attack, or tumbling), to pass as ``attitude=``.
+
+Pass the object AS FLOWN: booster_models.effective_ro(params), not params.ro.
+For a non-separating body (separation_mode 'body') that object carries the
+last stage's diameter and length, and the body is a nose taper of
+``body_nose_length_m`` on a cylinder, not one cone from tip to base.
 
 NOTHING IS SUPPLIED THAT THE FILE DOES NOT GIVE.  A place with a missing
 number comes back as "cannot be evaluated", naming the number.  In particular
@@ -80,11 +87,14 @@ def _material(key):
 
 
 def _body_segments(ro, missing, taken):
-    """The body's flank as [(x_start_m, x_end_m, half_angle_deg)], measured
-    along the axis from the nose."""
+    """The body's flank as [(x_start_m, x_end_m, angle_deg, surface)],
+    measured along the axis from the nose.  surface is 'cone' (a nose or a
+    separating object's body) or 'cylinder' (a non-separating body aft of its
+    nose taper); angle_deg is the surface's angle to the axis."""
     d = float(getattr(ro, 'diameter_m', 0.0) or 0.0)
     L = float(getattr(ro, 'length_m', 0.0) or 0.0)
     shape = str(getattr(ro, 'shape', '') or '')
+    body = getattr(ro, 'separation_mode', 'separating_ro') == 'body'
     if d <= 0.0:
         missing.append("diameter_m is not given")
     if L <= 0.0:
@@ -93,11 +103,25 @@ def _body_segments(ro, missing, taken):
         missing.append(
             f"the flank angle: the body shape is {shape or 'not given'!r}, "
             f"not a cone, so diameter and length do not define one")
+    Ln, Ln_from = L, 'length_m'
+    if body:
+        # A non-separating body is the last stage: a nose taper carved from
+        # the front of it, then a cylinder (booster_models, body_nose_length_m)
+        Ln = float(getattr(ro, 'body_nose_length_m', 0.0) or 0.0)
+        Ln_from = 'body_nose_length_m'
+        if Ln <= 0.0:
+            missing.append(
+                "body_nose_length_m is not given: the body is a nose taper on "
+                "a cylinder, and the schematic's default nose length is a "
+                "drawing default, not a measurement")
+        elif L > 0.0 and Ln > L:
+            missing.append(f"body_nose_length_m ({Ln:g} m) is longer than the "
+                           f"body ({L:g} m)")
     if missing:
         return []
     form = str(getattr(ro, 'body_form', '') or 'axisymmetric')
     if bool(getattr(ro, 'biconic', False)) and form == 'axisymmetric':
-        b = biconic_angles(d, L, getattr(ro, 'fore_length_m', 0.0),
+        b = biconic_angles(d, Ln, getattr(ro, 'fore_length_m', 0.0),
                            getattr(ro, 'break_diameter_m', 0.0),
                            getattr(ro, 'nose_radius_m', 0.0))
         if b is None:
@@ -105,34 +129,70 @@ def _body_segments(ro, missing, taken):
                            "break_diameter_m do not describe one")
             return []
         Lf = float(ro.fore_length_m)
-        taken['half_angle_deg'] = ("derived: two cones, from diameter_m, "
-                                   "length_m, fore_length_m, break_diameter_m")
-        return [(0.0, Lf, float(b[0])), (Lf, L, float(b[1]))]
-    taken['half_angle_deg'] = "derived: atan((diameter_m / 2) / length_m)"
-    return [(0.0, L, math.degrees(math.atan2(d / 2.0, L)))]
+        taken['half_angle_deg'] = (f"derived: two cones, from diameter_m, "
+                                   f"{Ln_from}, fore_length_m, "
+                                   f"break_diameter_m")
+        segs = [(0.0, Lf, float(b[0]), 'cone'), (Lf, Ln, float(b[1]), 'cone')]
+    else:
+        taken['half_angle_deg'] = (f"derived: atan((diameter_m / 2) / "
+                                   f"{Ln_from})")
+        segs = [(0.0, Ln, math.degrees(math.atan2(d / 2.0, Ln)), 'cone')]
+    if body and Ln < L:
+        segs.append((Ln, L, 0.0, 'cylinder'))
+        taken['cylinder'] = "length_m less body_nose_length_m"
+    return segs
 
 
-def _attitude(ro):
-    """(alpha_deg, where it came from, what is missing or '').
+def _attitude(ro, attitude=None):
+    """(alpha_deg, where it came from, what is missing or '', tumbling).
 
-    trim_alpha_deg is 0 when absent.  A body of revolution with no lift
-    capability flies ballistically at zero angle of attack, as the
-    integrator flies it; any lifting body needs its trim angle stated."""
+    ``attitude`` is what the run flew (run_attitude); when given it wins,
+    because a non-separating body's trimmed angle is found by the run's trim
+    gate, not stored.  Otherwise the reentry plan's reentry_attitude says
+    whether the body tumbles, and trim_alpha_deg, 0 when absent, gives the
+    angle.  A body of revolution with no lift capability flies ballistically
+    at zero angle of attack, as the integrator flies it; any lifting body
+    needs its trim angle stated."""
+    if attitude is not None:
+        if attitude.get('tumbling'):
+            return None, attitude.get('source', 'the run'), '', True
+        if attitude.get('alpha_deg') is not None:
+            return (float(attitude['alpha_deg']),
+                    attitude.get('source', 'the run'), '', False)
+    if getattr(ro, 'reentry_attitude', 'trim') == 'tumbling':
+        return None, "reentry_attitude 'tumbling'", '', True
     a = float(getattr(ro, 'trim_alpha_deg', 0.0) or 0.0)
     if a > 0.0:
-        return a, 'trim_alpha_deg', ''
+        return a, 'trim_alpha_deg', '', False
     form = str(getattr(ro, 'body_form', '') or 'axisymmetric')
     lifting = (form != 'axisymmetric'
                or bool(getattr(ro, 'maneuvering', False))
                or float(getattr(ro, 'glider_LD', 0.0) or 0.0) > 0.0)
     if not lifting:
         return 0.0, ("ballistic body of revolution with no lift capability: "
-                     "zero angle of attack"), ''
+                     "zero angle of attack"), '', False
     return None, '', ("trim_alpha_deg is not given: a lifting body flies at "
-                      "an angle of attack the file does not state")
+                      "an angle of attack the file does not state"), False
 
 
-def resolve_locations(ro) -> list:
+def run_attitude(result):
+    """The attitude a run flew, from its result dict, for ``attitude=``;
+    None when the run records none (use the object's own fields).
+
+    A non-separating body with a geometry-derived glide passes the run's trim
+    gate (trajectory.py, result['reentry_trim']): it either tumbles (statically
+    unstable) or trims at the glide angle of attack it reports."""
+    trim = (result or {}).get('reentry_trim') or {}
+    if trim.get('tumbles'):
+        return dict(tumbling=True,
+                    source="the run's trim gate: statically unstable, tumbles")
+    if trim.get('alpha_glide_deg') is not None:
+        return dict(alpha_deg=float(trim['alpha_glide_deg']),
+                    source="the run's trim gate: glide angle of attack")
+    return None
+
+
+def resolve_locations(ro, attitude=None) -> list:
     """Every listed place, with the numbers its heating relations need.
 
     Returns a list of dicts, one per entry of ``ro.heating_locations``:
@@ -147,10 +207,20 @@ def resolve_locations(ro) -> list:
                               'entry', or how it was derived
       missing                 what the file does not give; empty when the
                               place can be evaluated
+      not_defined             why the place has no meaning on this flight
+                              (a tumbling body has no fixed nose cap,
+                              windward face or leading edge), or ''
+
+    attitude : what the run flew (run_attitude), or None for the object's own
+               fields.
     """
     out = []
     eps = float(getattr(ro, 'emissivity', 0.0) or 0.0)
-    alpha, alpha_from, alpha_missing = _attitude(ro)
+    alpha, alpha_from, alpha_missing, tumbling = _attitude(ro, attitude)
+    not_defined = (f"the body tumbles ({alpha_from}), so it has no fixed "
+                   f"stagnation point, windward face or leading edge; no "
+                   f"cited relation for a tumbling body's heating is in hand"
+                   if tumbling else '')
     for e in clean_heating_locations(getattr(ro, 'heating_locations', [])):
         kind = e['kind']
         geo, taken, missing = {}, {}, []
@@ -195,7 +265,7 @@ def resolve_locations(ro) -> list:
                 # so the windward face is a flat surface along the body at
                 # the angle of attack alone.
                 L = float(getattr(ro, 'length_m', 0.0) or 0.0)
-                segs = [(0.0, L, 0.0)] if L > 0.0 else []
+                segs = [(0.0, L, 0.0, 'flat')] if L > 0.0 else []
                 if not segs:
                     missing.append("length_m is not given")
                 taken['surface_angle_deg'] = (
@@ -205,20 +275,22 @@ def resolve_locations(ro) -> list:
             geo['segments'] = segs
             if alpha_missing:
                 missing.append(alpha_missing)
-            else:
+            elif not tumbling:
                 geo['alpha_deg'] = alpha
                 taken['alpha_deg'] = alpha_from
-            if segs and not alpha_missing:
+            if segs and not alpha_missing and not tumbling:
                 L = float(ro.length_m)
                 geo['stations'] = []
                 for f in FACE_STATIONS:
                     x = f * L
-                    ang = next(a for x0, x1, a in segs if x0 <= x <= x1)
+                    ang, surf = next((a, sf) for x0, x1, a, sf in segs
+                                     if x0 <= x <= x1)
                     # distance along the surface: each segment's slant length
                     run = sum((min(x, x1) - x0) / math.cos(math.radians(a))
-                              for x0, x1, a in segs if x0 < x)
+                              for x0, x1, a, _ in segs if x0 < x)
                     geo['stations'].append(
-                        dict(x_over_L=f, angle_deg=ang, run_m=run))
+                        dict(x_over_L=f, angle_deg=ang, run_m=run,
+                             surface=surf))
         else:                                           # leading_edge
             key = e.get('material', '')
             taken['material'] = 'entry'
@@ -251,7 +323,8 @@ def resolve_locations(ro) -> list:
                         source=e.get('source', ''),
                         construction=e.get('construction', ''),
                         material=key, is_ablator=abl, emissivity=eps,
-                        geometry=geo, taken_from=taken, missing=missing))
+                        geometry=geo, taken_from=taken, missing=missing,
+                        not_defined=not_defined))
     return out
 
 
@@ -294,21 +367,30 @@ def _thermal(loc, t, flux_of_T, extra=None):
     return _summary(t, q + extra, T), basis
 
 
-def evaluate_locations(ro, t, rho, V, alt, *, T_inf=None) -> list:
+def evaluate_locations(ro, t, rho, V, alt, *, T_inf=None,
+                       attitude=None) -> list:
     """Heating at each listed place over a flown arc.
 
     t, rho, V, alt : arrays over the arc (s, kg/m^3, m/s, m).
     T_inf          : free-stream temperature (K); from the atmosphere model
                      at ``alt`` when not given.
+    attitude       : what the run flew (run_attitude); None for the object's
+                     own fields.
 
     Returns one dict per listed place:
-      kind, name, status ('evaluated' | 'cannot be evaluated'), missing,
+      kind, name, status ('evaluated' | 'cannot be evaluated' |
+      'not defined' | 'not covered'), missing, not_defined,
       material, construction, temperature_basis,
       results : by flow state, each with q_peak_W_m2, t_peak_s,
                 heat_load_J_m2 and, where the part radiates, T_wall_peak_K;
                 a leading edge and a flat-bottomed face carry a low and a
                 high value from two relations
       notes, accuracy (heating_locations.ACCURACY for that kind of place)
+      stations : a windward face's x/L stations, each with its surface
+                ('cone', 'cylinder', 'flat'), angle and results, or
+                'not_covered' where the surface lies along the flow
+    'not covered' means every station of a windward face lies along the
+    flow (a body's cylinder at zero angle of attack).
     """
     t = np.asarray(t, float); rho = np.asarray(rho, float)
     V = np.asarray(V, float); alt = np.asarray(alt, float)
@@ -316,11 +398,16 @@ def evaluate_locations(ro, t, rho, V, alt, *, T_inf=None) -> list:
         T_inf = np.asarray(atmosphere(np.maximum(alt, 0.0))[0], float)
     T_inf = np.broadcast_to(np.asarray(T_inf, float), t.shape)
     out = []
-    for loc in resolve_locations(ro):
+    for loc in resolve_locations(ro, attitude):
         r = dict(kind=loc['kind'], name=loc['name'], material=loc['material'],
                  construction=loc['construction'], missing=loc['missing'],
+                 not_defined=loc['not_defined'],
                  results={}, notes=[], temperature_basis='',
                  accuracy=hl.ACCURACY[loc['kind']])
+        if loc['not_defined']:
+            r['status'] = 'not defined'
+            out.append(r)
+            continue
         if loc['missing'] or t.size < 2:
             r['status'] = 'cannot be evaluated'
             if t.size < 2 and not loc['missing']:
@@ -378,33 +465,68 @@ def evaluate_locations(ro, t, rho, V, alt, *, T_inf=None) -> list:
                     "radiating-wall value, an upper bound")
         else:                                           # windward_face
             r['stations'] = []
+            basis = ''
             for s in g['stations']:
                 ang = s['angle_deg'] + g['alpha_deg']
+                st = dict(x_over_L=s['x_over_L'], angle_deg=ang,
+                          surface=s['surface'], results={})
+                r['stations'].append(st)
+                if ang <= 0.0:
+                    # Tauber's windward relations go as the sine of the
+                    # surface angle: at zero they give nothing, which is not
+                    # the heating of a surface lying along the flow.
+                    st['not_covered'] = (
+                        f"a {s['surface']} surface along the flow (0 deg to "
+                        f"it): the windward relations vanish at zero "
+                        f"incidence, and no relation for it is in hand")
+                    continue
                 x = s['run_m']
-                cone = lambda Tw, c=True: hl.laminar_surface_flux(
-                    rho, V, x, ang, Tw, T_inf, cone=c)
+                cone = lambda Tw, c=True, x=x, ang=ang: \
+                    hl.laminar_surface_flux(rho, V, x, ang, Tw, T_inf, cone=c)
                 hi, basis = _thermal(loc, t, cone)
-                res = {}
-                if g['flat_bottom']:
+                # A cone is judged by the cone relation.  A flat bottom or a
+                # cylinder at incidence lies between the flat-plate and cone
+                # values (the STS-3 finding, ACCURACY['windward_face']).
+                band = s['surface'] != 'cone'
+                if band:
                     lo, _ = _thermal(loc, t, lambda Tw: cone(Tw, False))
-                    res['laminar'] = _band(lo, hi, "flat plate", "cone")
+                    st['results']['laminar'] = _band(lo, hi, "flat plate",
+                                                     "cone")
                 else:
-                    res['laminar'] = hi
-                turb = lambda Tw: np.nan_to_num(hl.turbulent_surface_flux(
-                    rho, V, x, ang, np.maximum(Tw, 1.0), T_inf,
-                    cone=not g['flat_bottom']))
-                res['turbulent'], _ = _thermal(loc, t, turb)
-                r['stations'].append(dict(x_over_L=s['x_over_L'],
-                                          angle_deg=ang, results=res))
+                    st['results']['laminar'] = hi
+                turb = lambda Tw, x=x, ang=ang: np.nan_to_num(
+                    hl.turbulent_surface_flux(
+                        rho, V, x, ang, np.maximum(Tw, 1.0), T_inf,
+                        cone=not band))
+                st['results']['turbulent'], _ = _thermal(loc, t, turb)
             r['temperature_basis'] = basis
-            hot = max(r['stations'], key=lambda st: _peak_q(
+            covered = [st for st in r['stations'] if st['results']]
+            src = loc['taken_from']['alpha_deg']
+            if not covered:
+                r['status'] = 'not covered'
+                r['notes'].append(
+                    f"at an angle of attack of {g['alpha_deg']:g} deg "
+                    f"({src}) every station lies on a surface along the "
+                    f"flow, which these relations do not cover")
+                out.append(r)
+                continue
+            hot = max(covered, key=lambda st: _peak_q(
                 st['results']['laminar']))
             r['results'] = hot['results']
             r['notes'].append(
                 f"evaluated at an angle of attack of {g['alpha_deg']:g} deg "
-                f"({loc['taken_from']['alpha_deg']}) at x/L of "
+                f"({src}) at x/L of "
                 + ", ".join(f"{f:g}" for f in FACE_STATIONS)
                 + f"; 'results' repeats the hottest, x/L {hot['x_over_L']:g}")
+            if any(st['surface'] == 'cylinder' and st['results']
+                   for st in r['stations']):
+                r['notes'].append(
+                    "a cylinder at incidence is reported as the flat-plate "
+                    "to cone band; no test case covers a cylinder")
+            if len(covered) < len(r['stations']):
+                r['notes'].append(
+                    "stations on a surface along the flow are not covered "
+                    "(see each station's 'not_covered')")
             r['notes'].append(
                 "the turbulent relation is stated for speeds above 1500 m/s "
                 "and counts nothing below that")

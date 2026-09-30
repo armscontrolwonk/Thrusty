@@ -8,6 +8,7 @@ behaviour it must reproduce, not a threshold.
 """
 
 import numpy as np
+import pytest
 import heating
 
 
@@ -113,3 +114,30 @@ def test_verdict_gate_off_by_default():
     wc = r["criteria"]["windward_surface"]
     assert wc["T_lo_K"] > wc["limit_continuous_K"]        # clearly exceeds
     assert "exceeds the body continuous limit" in r["verdict"]
+
+
+
+def test_a_gliding_body_s_forebody_is_its_nose_taper_not_the_whole_stage():
+    """A non-separating body's length_m is the whole last stage.  Its flank
+    angle is set by the nose taper, body_nose_length_m; unset, the screen's
+    flagged 8 deg default applies.  (Before: atan(0.42 / 11.25) = 2.1 deg.)"""
+    import copy
+    import dataclasses as dc
+    import json
+    import booster_models as bm
+    import trajectory as tr
+    p0 = bm.booster_from_dict(json.load(open(
+        'booster_library/Scud-B_-R-17-.booster.json')))
+    ro = bm.ro_from_dict(json.load(open('ro_library/Scud-B_warhead.ro.json')))
+    for nose_len, delta, flagged in ((2.0, np.degrees(np.arctan2(0.42, 2.0)),
+                                      False), (0.0, 8.0, True)):
+        r_ = dc.replace(ro, maneuvering=True, glider_enabled=True,
+                        glider_LD=1.5, body_nose_length_m=nose_len)
+        p = copy.deepcopy(p0)
+        p.ro = r_
+        res = tr.integrate_trajectory(bm.compose_loadout(p, r_, 1),
+                                      33.0, 44.0, 90.0)
+        w = res['heating_fom']['windward']
+        assert w['delta_deg'] == pytest.approx(delta)
+        assert any('Forebody geometry unset' in m
+                   for m in w['warnings']) is flagged

@@ -4366,7 +4366,11 @@ A lifting reentry vehicle flies its glide at angle of attack, so the
 flux (the cited `BODY_FLUX_FRACTION = 0.13 × body-stagnation` from §13.5's
 two-location screen) times a **modified-Newtonian windward amplification**
 `A(α) = sin(δ+α)/sin(δ)`, where δ is the forebody half-angle and α the trim
-AoA.  The amplification is the surface-pressure ratio `Cp ∝ sin²θ` fed through
+AoA.  The forebody is what tapers: δ = atan((D/2)/L_fore) with L_fore the
+object's `length_m` for a separating RV, and `body_nose_length_m` for a
+non-separating body, whose `length_m` is the whole last stage (a cylinder
+behind the nose taper; using it gave δ ≈ 2° for a Scud-class body).  An unset
+forebody takes the flagged 8° default.  The amplification is the surface-pressure ratio `Cp ∝ sin²θ` fed through
 the reference-enthalpy laminar scaling `q̇ ∝ √ρ_e ∝ √p_e` (`CP_MAX` cancels, so
 it is purely geometric); the method family (Van Driest + Eckert–Tewfik) and
 the windward-vs-leeward ordering it reproduces are cited (AGARD-R-754; Tracy
@@ -5092,6 +5096,29 @@ side down (the wedge's flat bottom, the half cone's diametral plane), so their
 face is the flat bottom, inclined at the angle of attack alone, with the body
 length as its run. Leading edges are evaluated at zero incidence: the
 relation that includes it (Tauber Eq. 49) has no test case.
+
+**The attitude the run flew wins.** `run_attitude(result)` reads the run's
+trim gate (`result['reentry_trim']`) and is passed as `attitude=`: a
+non-separating body's glide angle of attack is found there, not stored (the
+editor clears `trim_alpha_deg` for a body of revolution). Without it the
+object's own fields apply, including the reentry plan's `reentry_attitude`.
+A body that tumbles, by the plan or by the trim gate (statically unstable),
+has no fixed stagnation point, windward face or leading edge: every place
+reports "not defined", since no cited relation for a tumbling body's heating
+is in hand.
+
+**A non-separating body** (separation mode `body`: the booster's last stage
+reenters) must be passed as flown, `booster_models.effective_ro(params)`, which
+carries the stage's diameter and length. Its flank is a nose taper over
+`body_nose_length_m` (a cone, or the biconic over that length) followed by a
+cylinder to the base, not one cone from tip to base. A nose length left at 0
+is "not given". A cylinder station is judged at the angle of attack alone,
+as the flat-plate to cone band (no test case covers a cylinder at incidence);
+at zero angle of attack it lies along the flow, where Tauber's windward
+relations vanish, and it is reported "not covered" rather than as zero. A
+face whose every station is so placed reports "not covered" as a whole: a
+ballistic body whose nose taper is shorter than a quarter of its length has
+only its nose cap judged.
 
 **Flux to temperature**, by how the part is built:
 

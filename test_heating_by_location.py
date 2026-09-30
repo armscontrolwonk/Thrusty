@@ -286,7 +286,7 @@ def test_the_running_length_follows_both_cones_of_a_biconic():
                  fore_length_m=1.0, break_diameter_m=0.6, nose_radius_m=0.0,
                  heating_locations=[{'kind': 'windward_face'}])
     (loc,) = hb.resolve_locations(ro)
-    (_, _, a1), (_, _, a2) = loc['geometry']['segments']
+    (_, _, a1, _), (_, _, a2, _) = loc['geometry']['segments']
     c = lambda a: np.cos(np.radians(a))
     for st in loc['geometry']['stations']:
         x = st['x_over_L'] * 4.0
@@ -319,3 +319,105 @@ def test_a_number_that_is_not_a_finite_number_is_refused(value):
     with pytest.raises(ValueError, match=r"heating_locations\[0\]"):
         bm.clean_heating_locations(
             [{'kind': 'leading_edge', 'sweep_deg': value}])
+
+
+# ── a non-separating body: the booster's last stage reenters ──────────────
+def _body(nose_len=0.0, **kw):
+    """The Scud-B stack with its warhead object, as a run composes it; the
+    object passed on is effective_ro, the object AS FLOWN, which carries the
+    last stage's diameter and length."""
+    import copy
+    import dataclasses as dc
+    p = bm.booster_from_dict(json.load(open(
+        'booster_library/Scud-B_-R-17-.booster.json')))
+    ro = bm.ro_from_dict(json.load(open('ro_library/Scud-B_warhead.ro.json')))
+    ro = dc.replace(ro, body_nose_length_m=nose_len, nose_radius_m=0.05,
+                    heating_locations=[{'kind': 'nose_cap'},
+                                       {'kind': 'windward_face'}], **kw)
+    p = copy.deepcopy(p)
+    p.ro = ro
+    flown = bm.effective_ro(bm.compose_loadout(p, ro, 1))
+    assert flown.separation_mode == 'body'
+    return flown
+
+
+def test_a_body_is_a_nose_taper_on_a_cylinder_not_one_long_cone():
+    ro = _body(nose_len=2.5)
+    (_, face) = hb.resolve_locations(ro)
+    (x0, x1, a, s1), (y0, y1, b, s2) = face['geometry']['segments']
+    assert (x0, x1, s1) == (0.0, 2.5, 'cone')
+    assert a == pytest.approx(np.degrees(np.arctan2(ro.diameter_m / 2, 2.5)))
+    assert (y0, y1, b, s2) == (2.5, ro.length_m, 0.0, 'cylinder')
+    assert [st['surface'] for st in face['geometry']['stations']] == \
+        ['cylinder'] * 3                        # 2.8, 5.6 and 8.4 m aft
+
+
+def test_a_body_without_a_nose_length_is_not_given():
+    (_, face) = hb.resolve_locations(_body(nose_len=0.0))
+    assert any(m.startswith('body_nose_length_m is not given')
+               for m in face['missing'])
+
+
+def test_a_ballistic_body_s_cylinder_along_the_flow_is_not_covered():
+    ro = _body(nose_len=2.5)
+    (_, face) = hb.evaluate_locations(ro, *_arc())
+    assert face['status'] == 'not covered'
+    assert all('not_covered' in st for st in face['stations'])
+    # a longer nose puts the first station on the cone, which is evaluated
+    (_, face) = hb.evaluate_locations(_body(nose_len=4.0), *_arc())
+    assert face['status'] == 'evaluated'
+    assert [bool(st['results']) for st in face['stations']] == \
+        [True, False, False]
+
+
+def test_a_body_at_incidence_takes_the_run_s_angle_and_bands_the_cylinder():
+    att = dict(alpha_deg=10.0, source="the run's trim gate")
+    (_, face) = hb.evaluate_locations(_body(nose_len=2.5), *_arc(),
+                                      attitude=att)
+    assert face['status'] == 'evaluated'
+    for st in face['stations']:
+        assert st['angle_deg'] == 10.0
+        lam = st['results']['laminar']
+        assert (lam['low_is'], lam['high_is']) == ('flat plate', 'cone')
+    assert any("the run's trim gate" in n for n in face['notes'])
+
+
+def test_the_run_s_attitude_wins_over_the_object_s_own_fields():
+    ro = _object(trim_alpha_deg=5.0, heating_locations=[
+        {'kind': 'windward_face'}])
+    (loc,) = hb.resolve_locations(ro, dict(alpha_deg=12.0, source='run'))
+    assert (loc['geometry']['alpha_deg'], loc['taken_from']['alpha_deg']) \
+        == (12.0, 'run')
+
+
+@pytest.mark.parametrize('how', ['plan', 'run'])
+def test_a_tumbling_body_has_no_fixed_places_to_judge(how):
+    import dataclasses as dc
+    ro = _body(nose_len=3.0)
+    att = None
+    if how == 'plan':
+        ro = dc.replace(ro, reentry_attitude='tumbling')
+    else:
+        att = hb.run_attitude({'reentry_trim': {'tumbles': True}})
+    for r in hb.evaluate_locations(ro, *_arc(), attitude=att):
+        assert r['status'] == 'not defined'
+        assert r['not_defined'].startswith('the body tumbles')
+        assert r['results'] == {}
+
+
+def test_run_attitude_reads_the_trim_gate():
+    assert hb.run_attitude({}) is None
+    assert hb.run_attitude({'reentry_trim': None}) is None
+    assert hb.run_attitude({'reentry_trim': {'alpha_glide_deg': 7.5}}) == \
+        dict(alpha_deg=7.5,
+             source="the run's trim gate: glide angle of attack")
+    assert hb.run_attitude({'reentry_trim': {'tumbles': True,
+                                              'alpha_glide_deg': 7.5}}
+                           )['tumbling'] is True
+
+
+def test_a_separating_object_is_still_one_cone_from_tip_to_base():
+    (loc,) = hb.resolve_locations(_object(
+        body_nose_length_m=0.3, heating_locations=[{'kind': 'windward_face'}]))
+    assert [sf for *_, sf in loc['geometry']['segments']] == ['cone']
+    assert loc['geometry']['segments'][0][1] == 1.6

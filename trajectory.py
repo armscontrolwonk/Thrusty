@@ -3734,7 +3734,14 @@ def integrate_trajectory(params: BoosterParams,
                 if (isinstance(_heating_fom, dict) and _diam > 0
                         and getattr(_ero_ms, 'glider_enabled', False)
                         and float(getattr(_ero_ms, 'glider_LD', 0.0)) > 0.0):
-                    _L_fore = float(getattr(_ero_ms, 'length_m', 0.0) or 0.0)
+                    # The forebody is what tapers.  A non-separating body's
+                    # length_m is the whole last stage, a cylinder aft of its
+                    # nose taper, so its forebody is body_nose_length_m; left
+                    # at 0 it is unset, and the flagged default applies.
+                    _L_fore = float(
+                        (getattr(_ero_ms, 'body_nose_length_m', 0.0)
+                         if getattr(_ero_ms, 'separation_mode', '') == 'body'
+                         else getattr(_ero_ms, 'length_m', 0.0)) or 0.0)
                     _delta_defaulted = not (_L_fore > 0.0)
                     _delta_deg = (float(np.degrees(np.arctan((_diam / 2.0) / _L_fore)))
                                   if _L_fore > 0.0 else 8.0)
