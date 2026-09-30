@@ -4719,6 +4719,292 @@ campaigns under the historical "Form A/B/C" headings.  Those are the names the
 citation campaigns were run under and are left intact as a provenance record —
 Form A ↦ ballistic, Form B ↦ glide, Form C ↦ the maneuver/AoA source pack.
 
+### 13.15 Location-based heating, engineering tier (`heating_locations.py`)
+
+Sections 13.1–13.14 scale every heating number from one quantity, the
+cold-wall stagnation flux at the nose. That is adequate for a blunt nose and
+wrong elsewhere: the SHEFEX II sharp tip came out at 4,394 K, hotter than the
+air heating it. `heating_locations.py` replaces that with one closed-form
+relation per *location* and a wall energy balance. **It is not yet wired into
+the verdicts; nothing in 13.1–13.14 has changed.**
+
+A vehicle is a list of locations, not a shape category. A capsule has a nose
+cap; a cone has a nose cap and a flank; a glider or space plane has a nose
+cap, leading edges and a windward face.
+
+All relations are from Tauber, NASA TP-2914 (1989), read from primary, in SI
+(kg/m³, m/s, m, K) giving W/m². Each carries its own hot-wall term.
+
+| Location | Relation | Tauber |
+|---|---|---|
+| Nose cap | q = 1.83×10⁻⁴ (ρ/r_n)^½ V³ (1 − h_w/H_s) | Eq. 40 |
+| Swept cylinder | q = 1.29×10⁻⁴ (ρ/r)^½ (1 − 0.18 sin²Λ) V³ (1 − h_w/h_aw) cos Λ | Eq. 41 |
+| Wing leading edge | q = (q_cyl² + q_FP² sin²Λ)^½ cos α | Eq. 49 |
+| Windward face, laminar | q = C (ρ cos δ / x)^½ V^3.2 sin δ (1 − h_w/h_aw); C = 2.42×10⁻⁵ plate, 4.03×10⁻⁵ cone | Eqs. 48, 46 |
+| Windward face, turbulent, V ≤ 3960 m/s | q = 3.72×10⁻⁴ (ρ sin²δ cos^2.22 δ)^0.8 (x − x_bt)^−0.2 (T_w/555)^−¼ V^3.37 (0.9 − h_w/H_e) | Eq. 56a |
+| Windward face, turbulent, V > 3960 m/s | q = 2.45×10⁻⁵ (ρ sin²δ cos^2.62 δ)^0.8 (x − x_bt)^−0.2 V^3.7 (0.9 − h_w/H_e) | Eq. 56b |
+| Turbulent cone | 1.15 × the plate value | Eq. 59 |
+
+H_s = H_e = h_∞ + V²/2. For the laminar face h_aw = h_∞ + 0.40 V²; for the
+swept cylinder h_aw = h_∞ + 0.5 V² (1 − 0.18 sin²Λ). Λ is sweepback, δ the
+angle between surface and free stream, x the distance back along the surface,
+x_bt where transition begins. Tauber states ±15% for Eq. 56 above 1500 m/s.
+The nose-cap constant becomes 1.90 if the measured rather than the Newtonian
+velocity gradient is used (Tauber p. 7); the code keeps 1.83 and offers 1.90
+as the upper edge of a band.
+
+**Wall energy balance.** For a thin, insulated, radiating skin the wall
+temperature solves q(T_w) + q_extra = ε σ T_w⁴, where q_extra is any heating
+independent of wall temperature (hot-gas radiation, §13.13). Because the
+hot-wall term drives q to zero as h_w approaches the recovery enthalpy, the
+wall cannot come out hotter than the gas.
+
+**Wall enthalpy.** h_w = c_p T_w with c_p = γR/(γ−1) = 1004.7 J/(kg K), from
+the constants `atmosphere.py` already uses. Real air stores more energy once
+vibration and dissociation set in, so this understates h_w and overstates
+flux and temperature. A cited gas model can be substituted through the
+`wall_enthalpy` argument.
+
+**Accuracy against named cases.** Recorded in `heating_locations.ACCURACY` and
+recomputed by `test_heating_locations.py`. Figures are computed ÷ reference − 1.
+
+| Location | Case | Flux | Temperature |
+|---|---|---|---|
+| Nose cap | FIRE II 1636 s, flight total | +22% | +5% |
+| Nose cap | FIRE II 1643 s, flight total | +18% | +4% |
+| Nose cap | FIRE II 1651 s, flight total | −2% | −1% |
+| Nose cap | Stardust 51 s, detailed computation | −29% | −8% |
+| Sharp solid tip | SHEFEX II arc-jet | — | +69% |
+| Windward face, laminar, flat-plate value | STS-3 belly, flight | −25% | −7% |
+| Windward face, laminar, cone value | STS-3 belly, flight | +26% | +6% |
+| Windward face, turbulent, flat-plate value | STS-3 belly, flight | +18% | +4% |
+| Swept cylinder, laminar | 15 wind-tunnel cases, sweep 60° and 66.5° | +6% | +1% |
+| Unswept cylinder | 3 wind-tunnel cases | −2% | 0% |
+| Swept cylinder, laminar | 6 CUBRC runs, tunnel density tabulated | +10% | +2% |
+| Attachment line, laminar (Poll) | same 6 runs | −7% | −2% |
+| Attachment line, turbulent (Poll) | 6 tripped CUBRC runs | −26% | −7% |
+| Attachment line, laminar (Poll) | Bushnell, Mach 8, 4 runs | −1% | 0% |
+| Attachment line, turbulent (Poll) | Bushnell, Mach 8, 9 runs | −14% | −4% |
+| Swept cylinder, laminar | Bushnell, Mach 8, 4 runs | +14% | +3% |
+| Nose cap | 8 wind-tunnel spheres | +3% | +1% |
+| Nose cap | DLR H2K sphere, two runs | −4%, −5% | −1% |
+| Wing leading edge (Eq. 49) | none yet | | |
+
+The STS-3 figures are means over mid-body stations (x/L 0.194–0.592 at five
+laminar flight points from 7.40 to 3.44 km/s; x/L 0.255–0.795 at one turbulent
+point, 2.21 km/s), with the surface angle taken as the angle of attack and the
+measured wall temperature in the hot-wall term, so no emissivity is assumed.
+**Flight lies between the flat-plate and cone values at 28 of 30 laminar
+stations.** A flat plate is two-dimensional; a cone sheds its boundary layer
+all round; a body of finite width does something in between. The windward
+face is therefore reported as the pair, not as the flat-plate value alone.
+
+The wind-tunnel cases are from Zhou et al. 2023, Table 1: measured Stanton
+numbers in cold air at 1.0–2.7 km/s, stated uncertainty 5–10%. They test the
+swept-cylinder relation, Eq. 41, the main term of the leading-edge relation;
+14 of the 15 swept cases are within 20%. Eq. 49 itself, with its flat-plate
+term and angle of attack, has no test case. The table gives unit Reynolds
+number, not density; density is recovered with Sutherland's law. The power law
+printed in that paper (its Eq. 4) must not be used for this: at the 46–142 K
+of these tunnels it overstates viscosity by up to half, and with it every case
+reads about 15% low. Sutherland's law is within 4% of the viscosity implied by
+the DLR tunnel's own pressure, temperature and Reynolds number.
+
+Six of those swept-cylinder cases are Holden & Kolly's (AIAA 95-2279), whose
+Tables 5 and 7 tabulate the tunnel density for every run. With that density
+and no viscosity law, Eq. 41 is +3% to +20% on the six laminar runs, and
+Sutherland's law recovers the tabulated density to within 8%.
+
+**Attachment line of a swept edge, laminar and turbulent
+(`attachment_line_flux`, Poll 1981).** Tauber gives no relation for a
+turbulent edge, and on six tripped, turbulent runs of Holden & Kolly the
+measured heating is 1.5 to 2.3 times what the laminar Eq. 41 gives. Poll's
+relations cover both states. The free stream is split into a component normal
+to the edge, which is brought to rest, and one along it, V_e = V sin Λ, which
+passes the bow shock unchanged:
+
+| Quantity | Relation | Poll |
+|---|---|---|
+| Edge temperature | T_e = T_∞ (1 + (γ−1)/2 · M_n²), M_n = M cos Λ | Eq. 18c |
+| Edge pressure | pitot pressure at M_n | Eq. 18c |
+| Velocity gradient | dU/dx = (2/D) [2 (p_e/ρ_e)(1 − p_∞/p_e)]^½ | Eq. 18b |
+| Length scale, Reynolds number | η = (ν_e / (dU/dx))^½, R̄ = V_e η / ν_e | Eqs. 1, 2 |
+| Laminar | St_e = 0.571 / (Pr^⅔ R̄) | Eq. 11 |
+| Turbulent | St_e = 0.0345 Pr^−⅔ (T_e/T*)^0.79 (μ(T*)/μ(T_e))^0.21 R̄^−0.42 | Eq. 14 |
+| Reference temperature | T* = T_e + 0.10 (T_w − T_e) + 0.60 (T_r − T_e) | Eq. 15 |
+| Viscosity | μ = 1.488×10⁻⁶ T^1.5 / (T + 122.1 × 10^(−5/T)) (Keyes) | p. 307 |
+
+with St_e = h / (c_p ρ_e V_e), γ = 1.4, Pr = 0.7. Poll found that for
+*laminar* flow the edge temperature is itself the best reference temperature,
+so the laminar relation carries no T*. (Holden & Kolly apply a reference
+temperature to the laminar relation too; evaluated that way it reads 24% low
+on their own smooth runs, against +1% to −7% evaluated Poll's way.)
+
+The paper was transcribed by three independent readers using different
+methods and the results reconciled; every equation above was read identically
+by all three, and the implementation reproduces the limits Poll prints
+(velocity-gradient parameter 1.07, density ratio 6.44, T*/T_e = 0.90 +
+0.53 tan²Λ). Three things Poll leaves to the reader are settled as follows:
+
+- *Heat flux.* q = h (T_r − T_w). Poll never writes it, but plots his data
+  against (T_r − T_w).
+- *Recovery factor.* 0.89 for turbulent flow (Poll, p. 307). Poll gives none
+  for laminar flow; 0.82 is used, from Tauber's Eq. 41.
+- *Edge conditions.* Eqs. 18b and 18c are printed for the hypersonic case and
+  are used here at any Mach number; where the normal Mach number is below one
+  the pressure rise is isentropic.
+
+Stated accuracy: laminar, within +7% / −14% of exact similar solutions in skin
+friction, sweep 0–70°; turbulent, fitted to 84 measurements at Mach 2.4–8,
+sweep 10–78°, wall at 0.4–1 of stagnation temperature, RMS error 7.1%, maximum
+19%. Measured against the Holden & Kolly runs, which lie outside that range
+(Mach 10–12, wall at about 0.25):
+
+| Runs | Relation | Flux | Temperature |
+|---|---|---|---|
+| 6 smooth, laminar | Poll laminar | −7% (−12% to −2%) | −2% |
+| 6 smooth, laminar | Tauber Eq. 41 | +10% (+3% to +20%) | +2% |
+| 6 tripped, turbulent | Poll turbulent | −26% (−38% to −20%) | −7% |
+| 6 tripped, turbulent | Tauber Eq. 41 (laminar) | −52% (−67% to −42%) | — |
+
+Inside the fitted range, Bushnell's Mach 8 runs (NASA TN D-3094; a 1 in.
+cylinder alone at 45° and 60° sweep, wall at 0.42 of stagnation temperature;
+values read from his Figs. 16(b) and 17(b), stated accuracy 15%):
+
+| Runs | Relation | Flux | Temperature |
+|---|---|---|---|
+| 4 laminar | Poll laminar | −1% (−4% to 0%) | 0% |
+| 4 laminar | Tauber Eq. 41 | +14% (+10% to +19%) | +3% |
+| 9 turbulent | Poll turbulent | −14% (−22% to −5%) | −4% |
+
+So the CUBRC shortfall belongs to running the relation outside its range,
+not to its transcription. Laminar runs lie below Poll's critical R̄* of about
+245 and turbulent runs above it. Caveats: the free-stream density is
+recovered from Bushnell's diameter Reynolds number with Sutherland's law (with
+Keyes' law every figure rises by 4–6 points); the static temperature is taken
+as isentropic from the stagnation temperature; and whether Bushnell's runs
+are among the 84 Poll fitted has not been checked.
+
+Holden & Kolly say of the same comparison that their turbulent measurements
+are "greater than the predicted levels, particularly for the boundary layers
+tripped by the 0.030-inch roughness", and attribute it to a heating overshoot
+downstream of the trips. At zero sweep Poll's laminar relation and Tauber's
+Eq. 41 agree within 5% from 3 to 6 km/s.
+
+Poll's relations are perfect-gas ones. At flight speeds the edge temperature
+they compute is far above what real air reaches; the heat flux depends on the
+enthalpy difference and is much less affected, but no flight case tests it.
+
+**When the edge turns turbulent.** `attachment_line_state` returns R̄ and
+R̄* (R̄ with properties at T*). Holden & Kolly report turbulence at R̄* above
+300–500 where a wing root or roughness disturbs the flow (Poll's earlier
+figure: 245) and above 600–800 on a smooth edge, equivalent to a free-stream
+Reynolds number of about 8×10⁵ on edge diameter (their conclusions print
+8×10⁶; the abstract and §3.4.3 say 8×10⁵). Poll's paper gives no number. The
+six tripped runs have R̄* of 279–490 as computed here. No gate is applied in
+the code: the caller chooses the state.
+
+The H2K runs are from Park et al. 2021, which gives the tunnel's static
+pressure directly and evaluates Tauber's relation itself: 9.2 and 9.6 W/cm²,
+which `stagnation_point_flux` reproduces. **In cold air the relations are
+within a few percent. The shortfalls below are confined to high-enthalpy
+flight.**
+
+The FIRE II totals add Tauber-Sutton radiative heating. FIRE II measured flux,
+not wall temperature, so its temperature column is the fourth-root equivalent
+of the flux error. Convective heating alone is 18–24% below fully catalytic
+computation at all three FIRE II points and 29% below it for Stardust; the
+targets (temperature within 3–5%, flux within 15–20%) are therefore met on
+FIRE II, met on the STS-3 turbulent point, and not yet met on Stardust or on
+the STS-3 laminar face, where either edge of the band is 6–7% out in
+temperature.
+
+**Not modelled.**
+
+- *Conduction into solid parts.* A sharp solid tip is not a radiating skin;
+  the wall balance overstates its temperature by about two-thirds. §13.16
+  covers solid conical tips.
+- *Low-density flow.* Tauber Fig. 8: neglecting wall slip overpredicts
+  stagnation heating by 130% at a Knudsen number of 0.1.
+- *Surface chemistry.* The relations assume a fully catalytic wall.
+- *Blunt-nose entropy layer.* Close behind a blunt nose the windward heating
+  is higher than these relations give (Tauber & Adelman 1987).
+- *Shock interaction, gaps, steps, roughness.*
+
+**Two Tauber papers, two leading-edge forms.** Tauber & Adelman 1987
+(AIAA-87-1514, Eq. 15) print q_LE = ½ (q₀² cos²Λ + q_FP² sin²Λ)^½ cos α, built
+on the sphere stagnation value q₀; TP-2914 Eq. 49 builds on the swept cylinder
+of Eq. 41. They differ by up to about 40% on the cylinder term. The code
+follows TP-2914, whose cylinder-to-sphere ratio (1.29/1.83 = 0.705) matches the
+theoretical 1/√2. The 1987 appendix also prints the laminar plate constant as
+2.53×10⁻⁵ where TP-2914 has 2.42×10⁻⁵; the turbulent relations agree.
+
+Sources: Tauber 1989 (NASA TP-2914); Tauber & Adelman 1987 (AIAA-87-1514);
+Throckmorton, Hamilton & Zoby 1982 (NASA TM 84500); Zhou et al. 2023 (AIAA
+Journal 61(3)); Holden & Kolly 1995 (AIAA 95-2279); Poll 1981 (Aeronautical
+Quarterly 32); Park et al. 2021 (Acta Astronautica 187); Hash et al. 2007 (AIAA 2007-605); Liu et
+al. 2008 (AIAA 2008-1213); Trumble et al. 2010 (JSR 47(5)); Böhrk et al. 2012
+(AIAA 2012-5919). See `data/REFERENCES.md`.
+
+### 13.16 Conduction in a solid conical tip (`heating_solid.py`)
+
+A sharp, solid tip sheds the heat arriving at its point by conducting it back
+into the body, where the much larger flank radiates it away. The radiating-wall
+balance of §13.15 has no such path and overstates the tip temperature badly.
+For solid parts only, `heating_solid.cone_tip_response` solves transient
+conduction along the axis of the cone:
+
+    ρ c A(s) ∂T/∂t = ∂/∂s ( k A(s) ∂T/∂s ) + P(s) [ q_conv(s, T) − ε σ T⁴ ]
+
+with s the distance along the axis from the virtual apex, A = π (s tan δ)² the
+cross-section, P = 2π s tan δ / cos δ the lateral surface per unit axial
+length, and δ the half angle. Temperature is uniform over each cross-section.
+**Not yet wired into the verdicts.**
+
+| Term | Source |
+|---|---|
+| Tip cap heating | Tauber Eq. 40 × the cap's projected area: a flux falling as the cosine of the body angle (TP-2914 §2.5) integrates over a spherical cap to the stagnation flux times π (r_n cos δ)² |
+| Flank heating | Tauber Eq. 46, laminar sharp cone, capped at the stagnation value |
+| Hot-wall terms | as in §13.15 |
+| Base | adiabatic; over tens of seconds heat diffuses √(αt) ≈ 2–3 cm and does not reach it |
+
+Finite volumes along the axis, fine at the tip and growing geometrically;
+conduction implicit, surface terms linearised. The scheme conserves energy to
+rounding error, and the result at the SHEFEX II thermocouple station changes by
+under 0.1% when the mesh or the time step is refined.
+
+**Accuracy against named cases** (`heating_solid.ACCURACY`, recomputed by
+`test_heating_solid.py`; absolute temperature, computed ÷ measured − 1):
+
+| Case | Model | Measured | Error |
+|---|---|---|---|
+| SHEFEX II flight, thermocouple 20 mm behind the tip | 1178 K | 848 °C = 1121 K | +5% |
+| SHEFEX II arc-jet, same thermocouple | 1487 K | 1179 °C = 1452 K | +2% |
+| Radiating-wall balance at the tip, for comparison | 3100–3200 K | — | — |
+
+The tip itself was not measured. In the arc-jet this model gives 2110 K there,
+against 1908 K from the authors' own two-dimensional heat-balance code.
+
+Caveats on those figures:
+
+- *Flight path.* The paper states the two ends of the 52 s experiment window;
+  the path between them is rebuilt with speed linear in time and a constant
+  flight-path angle, on the US Standard Atmosphere 1976.
+- *Geometry.* The half angle, 16.1°, is that of the cone with the stated mass
+  (680 g), density and length (160 mm). SHEFEX II's tip is an octagonal pyramid.
+- *Conductivity.* Table 1 prints 17 and 8 beside an exponent that is unreadable
+  in the copy read; 17 and 8 W/(m K) is the physically possible reading. The
+  axial value, 17, is used; using 8 moves the thermocouple by under 3%.
+- *Arc-jet enthalpy.* The case is treated as the paper's authors treated it, as
+  flight at the tunnel's density, speed and static temperature. With the
+  tunnel's full 11.9 MJ/kg the thermocouple comes out about 24% high; the
+  difference is chemical energy in the dissociated stream that a ceramic wall
+  does not recover.
+- *Low-density flow* at the top of the flight window is not corrected for
+  (§13.15).
+
+Source: Böhrk et al. 2012 (AIAA 2012-5919).
+
 ---
 
 ## 14. Outputs, events, and milestones

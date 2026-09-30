@@ -43,9 +43,16 @@ improve this."
   than fabricate a source.
 - **Usage-neutral physics.** The same integrator serves sounding rockets,
   space launch vehicles, and ballistic reentry bodies. Keep it that way.
-- **Screening tier, not design tier.** Heating and survivability outputs
-  are qualitative consequence bands anchored to flight experience. Do not
-  add design-fidelity thermal, structural, or guidance models.
+- **Engineering tier, not design tier.** Heating is computed from published
+  closed-form correlations applied per location (nose cap, leading edges,
+  windward face), followed by a wall energy balance. Targets: surface
+  temperature of radiating surfaces within 3–5%, heat flux and heat load
+  within 15–20%. A one-dimensional or lumped conduction estimate is allowed
+  for solid parts. Not allowed: flow-field computation, ablation chemistry,
+  multi-dimensional thermal or structural models, or any correction factor
+  without a cited source. Every heating output states its accuracy against
+  the named test cases. Survivability verdicts remain consequence bands
+  anchored to flight experience, and guidance stays at its present fidelity.
 - **The GUI computes nothing.** `thrusty.py` is widgets, threads and
   plotting only. A formula or sweep loop belongs in a core module
   (`analysis.py`, `coordinates.py`, `booster_models.py`, …) with a test;
@@ -100,6 +107,8 @@ observed test-flight impact zones for analytic comparison.
 | `field_registry.py` | Which of the four files owns each dataclass field. Pure data; the key tuples and the split tests derive from it |
 | `analysis.py` | Sweep drivers (range ring, parametric sweep, footprint) and result post-processing; the GUI orchestrates these, never computes |
 | `heating.py`, `tps_ladder.py`, `survivability_report.py` | Reentry aerothermal screening |
+| `heating_locations.py` | Engineering-tier convective heating per location (Tauber, NASA TP-2914) with a radiating-wall energy balance. Not yet wired into the verdicts |
+| `heating_solid.py` | One-dimensional conduction estimate for a solid conical tip. Not yet wired into the verdicts |
 | `slv_performance.py` | Schilling payload-to-orbit estimator |
 | `METHODS.md` | Governing equations and citations for every model |
 | `BENCHMARKING.md` | Validation against published figures |
