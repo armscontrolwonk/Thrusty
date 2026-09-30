@@ -604,13 +604,31 @@ orientation-averaged measurement is rotating cubes in a ballistic range (Fig.
 which he says represents "average conditions between all positions
 statistically possible". That is a validation case for the averaging.
 
-**Still to read from primary before any coefficient is coded** (derive, don't
-invent): Klett 1964 and the AFGL handbook (the fixed-angle formula; trim
-angle and drag against CG offset, and its cross-check that the formula runs
-10–17% low at 118° and 138°), and Tartabini & Starr for the Ares I-X case. The
-Mach range needs care: Klett is Mach 10–30, the handbook Mach 2–8, and a first
-stage falls mostly slower; Hoerner supplies the subsonic and transonic
-fixed-orientation pieces.
+**Klett, read from primary 2026-09-30** (Sandia SC-RR-64-2141, December 1964;
+the user's copy, OSTI 4630398). Reference area L·D throughout. Continuum
+flow, modified Newtonian with local pressure p∞ + q∞(2 − K) cos²φ, K the
+density ratio across a normal shock: side-on C_D = ⅔(2 − K) (eq. 21); end-on
+0.714 (D/L)(2 − K) (eq. 23, from a face pressure of 0.909 of stagnation, after
+Stoney & Swanson); at angle θ, C_D = C_D,side sin³θ + C_D,end cos³θ (eq. 28,
+the axial and transverse drags added as vectors); end-over-end tumbling
+(0.283 + 0.303 D/L)(2 − K) (eq. 32); random tumbling (0.393 + 0.178 D/L)(2 − K)
+(eq. 36). Free-molecular: side-on 2, end-on 1.57 D/L, random 1.57 + 0.785 D/L
+(eq. 12). A tumble in a plane perpendicular to the trajectory takes the
+side-on value (p. 9). Stated range: Mach 10–30, laminar continuum above
+roughly 70,000 ft; Klett gives no drag for the transition regime, only its
+limits. (2 − K) for air at high Mach is ≈ 1.83, Hoerner's C_p• = 1.84 − 0.76/M²
+in the limit; and Klett's 0.909 end face sits beside Hoerner's 0.89. The two
+sources agree.
+
+**Not verified; do not use.** The AFGL reentry handbook the note cites
+(AFGL-TR-78-0019) may not be a real document (user, 2026-09-30). Everything
+in the note that rests on it is withdrawn until a real source is found: the
+table of trim angle and drag against CG offset, and the cross-check that
+Klett's fixed-angle formula runs 10–17% low at 118° and 138°. The note's
+other references are unread. One consequence: in Klett's own modified
+Newtonian model a plain cylinder's cross-flow force acts at mid-length at
+every angle, so it predicts no trim between end-on and broadside; any
+intermediate trim needs a source that models it.
 
 ## 19. Phases
 
