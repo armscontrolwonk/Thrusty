@@ -1124,6 +1124,104 @@ def effective_ro(params: 'BoosterParams') -> Optional[ROParams]:
     return None
 
 
+# Fields of the last stage that travel with a non-separating body at the
+# handoff: its fins and grid fins (FRONT_END_DESIGN.md §18.3).
+_HANDOFF_FIN_KEYS = ('has_fins', 'n_fins', 'fin_span_m', 'fin_root_chord_m',
+                     'fin_tip_chord_m', 'fin_thickness_m', 'fin_sweep_deg',
+                     'has_grid_fins', 'n_grid_fins', 'grid_fin_width_m',
+                     'grid_fin_height_m', 'grid_fin_chord_m')
+_HANDOFF_SIZE_KEYS = ('mass_kg', 'diameter_m', 'length_m')
+
+
+def reentering_airframe(params: 'BoosterParams') -> Optional['BoosterParams']:
+    """The stage that reenters, standing alone, for a non-separating body;
+    None when the object separates.
+
+    A single-stage missile IS its airframe, and is returned as it is.  For a
+    multi-stage one the stages below the last are gone at the handoff, so the
+    airframe is a copy of the last stage alone, carrying the run's object,
+    its payload bookkeeping and ``body_reenters``: its CG, its centre of
+    pressure and its fins are then that stage's, not the whole stack's."""
+    if params is None or run_separation_mode(params) != 'body':
+        return None
+    last = params
+    while last.stage2 is not None:
+        last = last.stage2
+    if last is params:
+        return params
+    import copy as _copy
+    a = _copy.copy(last)
+    a.__dict__.pop('_ero_memo', None)
+    a.stage2 = None
+    a.ro = params.ro
+    a.body_reenters = True
+    a.num_ros = 1
+    for k in ('payload_kg', 'body_payload_kg', 'ro_mass_kg'):
+        if hasattr(params, k):
+            setattr(a, k, getattr(params, k))
+    return a
+
+
+def hand_off(params: 'BoosterParams', stored=None) -> Optional[dict]:
+    """The handoff at separation, as a record (FRONT_END_DESIGN.md Part IV).
+
+    At separation the booster hands off to the reentry object.  Separating,
+    the object as stored flies on.  Non-separating (``body_reenters``), the
+    object is populated with what reenters: the last stage, whose burnout mass
+    (with the object's ``payload_kg``), diameter, length and fins it carries.
+    ``effective_ro`` is the per-step fast path that builds the object as
+    flown; this wraps it with where each number came from.
+
+    stored : the object as the run received it, before any run-time
+        derivation; defaults to ``params.ro``.  Compared with the object as
+        flown so that a size a body ignores is REPORTED, not silently dropped.
+
+    Returns None when the run carries no object, else a dict:
+      mode        'separating_ro' | 'body'
+      object      the object as flown (ROParams)
+      airframe    the stage that reenters, for a body (its fins, its length);
+                  None when the object separates
+      taken_from  for mass_kg, diameter_m, length_m: 'object' or 'last stage'
+      fins        the airframe's fin and grid-fin fields ({} when separating)
+      notices     plain sentences for the run record and report
+    """
+    ro = effective_ro(params)
+    if ro is None:
+        return None
+    stored = params.ro if stored is None else stored
+    mode = run_separation_mode(params)
+    out = dict(mode=mode, object=ro, airframe=None, taken_from={},
+               fins={}, notices=[])
+    if mode != 'body':
+        out['taken_from'] = {k: 'object' for k in _HANDOFF_SIZE_KEYS}
+        return out
+    last = reentering_airframe(params)
+    out['airframe'] = last
+    out['fins'] = {k: getattr(last, k) for k in _HANDOFF_FIN_KEYS
+                   if hasattr(last, k)}
+    # effective_ro's rule: the last stage's value when it has one, else the
+    # object's own (a stage with no stated size falls back to the object).
+    body_mass = (last.mass_initial - last.mass_propellant
+                 if last.mass_propellant > 0 else last.mass_final)
+    from_stage = dict(mass_kg=body_mass, diameter_m=last.diameter_m,
+                      length_m=last.length_m)
+    for k in _HANDOFF_SIZE_KEYS:
+        if not float(from_stage[k] or 0.0) > 0.0:
+            out['taken_from'][k] = 'object'
+            continue
+        out['taken_from'][k] = 'last stage'
+        s = float(getattr(stored, k, 0.0) or 0.0)
+        f = float(getattr(ro, k, 0.0) or 0.0)
+        if s > 0.0:
+            out['notices'].append(
+                f"{k} {s:g} stored in the reentry object is ignored: the body "
+                f"is the booster's last stage, which gives {f:g}"
+                + (" (its burnout mass plus the object's payload_kg)"
+                   if k == 'mass_kg' and (ro.payload_kg or 0.0) > 0.0 else "")
+                + (" (the same number, stored twice)" if s == f else ""))
+    return out
+
+
 def entry_carrier(ro) -> 'BoosterParams':
     """A stack with no propulsion and no mass, carrying ``ro``.
 

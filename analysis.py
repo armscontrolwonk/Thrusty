@@ -302,18 +302,16 @@ def with_bank_schedule(booster, bank_deg: float, t_end_s: float):
     glider is active, so the full window safely covers the glide phase
     whenever it begins.  Returns the copy unchanged if the stack carries no
     reentry object."""
-    from booster_models import effective_ro
     m = copy.deepcopy(booster)
-    ero = effective_ro(m)
-    if ero is None:
-        return m
-    new_ro = dataclasses.replace(
-        ero, glider_enabled=True,
-        glider_bank_schedule=[(0.0, float(t_end_s), float(bank_deg))])
+    # The bank is plan data: set it on the object the stack holds, not on the
+    # object as flown, which effective_ro builds from it at separation
+    # (FRONT_END_DESIGN.md Part IV).
     node = m
     while node is not None:
         if node.ro is not None:
-            node.ro = new_ro
+            node.ro = dataclasses.replace(
+                node.ro, glider_enabled=True,
+                glider_bank_schedule=[(0.0, float(t_end_s), float(bank_deg))])
             break
         node = node.stage2
     return m

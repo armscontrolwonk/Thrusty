@@ -5179,6 +5179,7 @@ The canonical return structure (`trajectory.py`):
 | `time_of_flight_s`, `impact_speed_ms` | scalars | Mission summary |
 | `milestones` | list of dicts | Chronological flight events (Section 14.2) |
 | `debris_trajectories` | list | Spent-stage and shroud debris arcs (Section 14.3) |
+| `handoff` | dict or None | What the booster handed to the reentry object at separation (`booster_models.hand_off`; FRONT_END_DESIGN.md Part IV): `mode` ('separating_ro' or 'body'), the flown `mass_kg`, `diameter_m`, `length_m`, `body_nose_length_m`, `taken_from` ('object' or 'last stage' for each size), the `fins` that went with a body, and `notices` (a size stored in a body's object file that the run ignores, said in plain words) |
 | `orbital_elements` | dict | Six-element Keplerian set, if orbital |
 | `pitch_cmd_deg`, `az_cmd_deg` | arrays | Commanded guidance time histories |
 

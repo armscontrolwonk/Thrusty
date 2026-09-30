@@ -491,7 +491,7 @@ flag only drives the editor lock. Default off → existing boosters unchanged.
 
 # Part IV — One handoff at separation
 
-Status: **approved 2026-09-30; Phase 0 done, Phase 1 next.** Parts I–III made the body
+Status: **approved 2026-09-30; Phase 0 done; Phase 1 built, less the boost nose (§19a).** Parts I–III made the body
 honest in what it shows and what it owns. Part IV makes the moment of
 separation a single, explicit step, in both kinds of vehicle.
 
@@ -652,6 +652,39 @@ cubes. **Every debris impact point moves, on purpose**; before-and-after
 impact points are reported for each shipped vehicle.
 
 **Phase 4 — later.** A flight-plan option to drop the fins.
+
+## 19a. Phase 1 as built (2026-09-30)
+
+- `booster_models.hand_off(params, stored)` is the record of the handoff: the
+  object as flown (still built by `effective_ro`, the per-step fast path),
+  the airframe, where each size came from, the fins, and notices. The run
+  result carries it as `result['handoff']`, and a size stored in a body's
+  object file that the run ignores is reported there.
+- `booster_models.reentering_airframe(params)`: the stage that reenters,
+  standing alone. A single-stage missile is its own airframe (returned as
+  is, so every shipped vehicle is byte-identical); for a multi-stage body it
+  is the last stage alone, with the run's object and payload bookkeeping. The
+  trim gate judges it, so a multi-stage body's CG, centre of pressure and
+  fins are its last stage's. `grid_fin_sizing.estimate_cg` places a body's
+  reentry CG within the last stage too (the fuelled, liftoff CG keeps the
+  whole stack).
+- The equilibrium-glide switch (`trajectory.py`) and
+  `analysis.with_bank_schedule` change plan data on the object the stack
+  holds; they used to install the object as flown in its place. Both worked
+  on run-local copies, so no file was ever written, and results are
+  unchanged.
+- Moved to Phase 2, where the pairing rule lives: `entry_carrier` refusing an
+  object sized by the booster.
+- **Held for the user's decision: the boost nose.** During boost,
+  `_boost_front_geometry` takes a body's nose length to be the object as
+  flown's `length_m` — the whole last stage (11.25 m for Scud-B, a nose of
+  fineness 13, clamped to 10). Using `body_nose_length_m` (0 = unset takes the
+  function's existing fineness-3 default) moves shipped ranges: Scud-B 250.6
+  → 241.1 km (−3.8%), Al Hussein 597.8 → 583.9 km (−2.3%), generic body
+  missile 223.7 → 221.3 km (−1.1%) (launch 33° N 44° E, azimuth 45°).
+
+Checked: all 13 shipped vehicles fly byte-identical to the previous commit
+(position and mass histories, range, every debris impact point).
 
 ## 20. Acceptance (Part IV)
 

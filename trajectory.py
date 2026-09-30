@@ -92,7 +92,8 @@ from booster_models import (
     BoosterParams, booster_mass, drag_force_vector, thrust_force,
     active_stage, active_stage_and_t, total_burn_time, tumbling_cylinder_beta,
     _eff_burn,
-    booster_drag_vector, effective_ro, booster_separation_time,
+    booster_drag_vector, effective_ro, hand_off, reentering_airframe,
+    booster_separation_time,
     run_separation_mode, bind_ro_separation, compose_loadout,
     booster_area,
     wing_geometry, wedge_planform_area,
@@ -2037,6 +2038,21 @@ def integrate_debris(pos_ecef: np.ndarray, vel_ecef: np.ndarray,
 # Public integration interface
 # ---------------------------------------------------------------------------
 
+def _handoff_record(params, stored_ro):
+    """booster_models.hand_off as plain data for the run result: what was
+    handed off at separation, where each size came from, the fins that went
+    with a body, and any notices.  None when the run carries no object."""
+    h = hand_off(params, stored=stored_ro)
+    if h is None:
+        return None
+    ro = h['object']
+    return dict(mode=h['mode'], mass_kg=float(ro.mass_kg),
+                diameter_m=float(ro.diameter_m), length_m=float(ro.length_m),
+                body_nose_length_m=float(ro.body_nose_length_m or 0.0),
+                taken_from=dict(h['taken_from']), fins=dict(h['fins']),
+                notices=list(h['notices']))
+
+
 def integrate_trajectory(params: BoosterParams,
                          launch_lat_deg: float,
                          launch_lon_deg: float,
@@ -2126,6 +2142,10 @@ def integrate_trajectory(params: BoosterParams,
     # reentry object up front so every reader of ro.separation_mode below
     # agrees with the booster.  Copies only when a change is needed.
     params = bind_ro_separation(params)
+    # The object as the run received it, before any run-time derivation: the
+    # handoff record compares it with the object as flown (FRONT_END_DESIGN.md
+    # Part IV), so that a size a body ignores is reported, not dropped.
+    _stored_ro = params.ro
     # A chain flown with a reentry object carries that object's mass.  Booster
     # files are stack-only, so a caller that set params.ro without composing
     # (compose_loadout) would fly the boost without the front end and coast
@@ -2207,7 +2227,10 @@ def integrate_trajectory(params: BoosterParams,
             import trim_gate as _tg
             import dataclasses as _dc
             _cg_ovr = float(getattr(_ro, 'reentry_cg_m', 0.0) or 0.0)
-            _g = _tg.trim_gate(params, mach=glider_ld.GLIDE_MACH_REF,
+            # The gate judges the body that reenters: the last stage alone
+            # (the handoff's airframe), so CG, CP and fins are that stage's.
+            _g = _tg.trim_gate(reentering_airframe(params) or params,
+                               mach=glider_ld.GLIDE_MACH_REF,
                                x_cg_m=(_cg_ovr if _cg_ovr > 0.0 else None))
             if not _g.get("error"):
                 _reentry_trim = {
@@ -2973,16 +2996,17 @@ def integrate_trajectory(params: BoosterParams,
             if _t_handoff is not None:
                 import dataclasses as _dc_ste
                 _params_eq = copy.deepcopy(params)
-                _ero_eq_obj = effective_ro(_params_eq)
-                if _ero_eq_obj is not None:
-                    _ero_eq_new = _dc_ste.replace(_ero_eq_obj,
-                                                  glider_guidance="equilibrium_glide")
-                    _neq = _params_eq
-                    while _neq is not None:
-                        if _neq.ro is not None:
-                            _neq.ro = _ero_eq_new
-                            break
-                        _neq = getattr(_neq, 'stage2', None)
+                # Change the glide law on the object the run holds, not on
+                # the object as flown: effective_ro builds the flown one from
+                # it (FRONT_END_DESIGN.md Part IV), so installing the flown
+                # object here would feed the handoff its own output.
+                _neq = _params_eq
+                while _neq is not None:
+                    if _neq.ro is not None:
+                        _neq.ro = _dc_ste.replace(
+                            _neq.ro, glider_guidance="equilibrium_glide")
+                        break
+                    _neq = getattr(_neq, 'stage2', None)
                 _eom_args_eq = (_params_eq, cutoff_time_s, az,
                                 gt_turn_start_s, gt_turn_stop_s,
                                 _target_orbit_alt_m, _t_final_ignition,
@@ -4096,6 +4120,7 @@ def integrate_trajectory(params: BoosterParams,
 
     return {
         'reentry_trim':       _reentry_trim,   # static-margin / trim-gate verdict, or None
+        'handoff':            _handoff_record(params, _stored_ro),
         'derived_beta_kg_m2': _derived_beta_ref,  # β derived from body geometry (ref Mach), or None
         't':                  t_arr,
         'lat':                lats,

@@ -184,7 +184,14 @@ def estimate_cg(params: BoosterParams, fuelled: bool = False):
         # backward-compatible); ROParams.reentry_cg_m still overrides either at
         # the trim gate.  (Full-tank vs burnout is a no-op here — the spent
         # airframe + warhead is the same body either way.)
-        total = body_top
+        # The fuelled (liftoff) CG is the whole stack's; the reentry CG is the
+        # body's alone, and the body is the LAST stage: the stages below it
+        # are gone.  Measuring it over the whole stack put a multi-stage
+        # body's CG in the wrong place (FRONT_END_DESIGN.md §17).
+        _lastst = chain[-1]
+        total = (body_top if fuelled else
+                 (_lastst.length_m if _lastst.length_m > 0
+                  else max(1.0, 2.0 * _lastst.diameter_m)))
         _x_air = 0.5 * total
         _pay = float(getattr(ro, 'payload_kg', 0.0) or 0.0)
         _body_mass = float(getattr(ro, 'mass_kg', 0.0) or 0.0)
