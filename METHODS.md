@@ -726,8 +726,9 @@ that branches on `ro.separation_mode` agrees with the booster. Neither the
 reentry-object file nor the reentry plan stores a separation choice: the key is
 omitted by `ro_to_dict` and is not a reentry-plan key, and a legacy plan file
 that still carries it is ignored on apply. The sidebar **Separation** box is a
-read-only indicator of the booster flag. Any object can be flown on any
-booster; the reentry mode still defaults to ballistic and stays switchable.
+read-only indicator of the booster flag. An object may fly on any booster,
+with one exception (the pairing rule below); the reentry mode still defaults
+to ballistic and stays switchable.
 `test_input_split.py` holds this, and the wider four-inputs rule (hardware
 files carry no plan key, plan files carry no hardware key), over the shipped
 files and the serialisers. Where a plan value meets a hardware limit the plan
@@ -757,6 +758,28 @@ than its hardware allows, never better.
   reentry mass is airframe-burnout + payload. The object's own `mass_kg` is
   never added for a body (that was a range-halving double-count); default
   `payload_kg = 0` leaves existing files byte-identical. `test_body_payload.py`.
+
+**The handoff** (FRONT_END_DESIGN.md Part IV). At separation the booster
+always hands off to the object, and `booster_models.hand_off` records it
+(`result['handoff']`): what flew on, and whether each of mass, diameter and
+length came from the object or the last stage. A body's object file stores
+only what the body adds — nose shape and taper, nose radius, `payload_kg`,
+heat protection, heating locations, an entered β or L/D (0 = derive) — and
+**0 = "from booster"** for `mass_kg`, `diameter_m` and `length_m`, which the
+handoff fills in at every run; nothing about the booster is stored twice. The
+object editor shows the booster's numbers in those fields and saves 0. A body
+is judged as the stage that reenters, alone (`reentering_airframe`): its CG,
+centre of pressure and fins are that stage's, not the whole stack's.
+
+**Pairing rule** (`booster_models.check_pairing`, run at the start of every
+integration). An object with `mass_kg` 0 or `beta_kg_m2` 0 takes that
+quantity from a booster whose last stage reenters; on a booster that
+separates it, or from a stated entry condition, there is nothing to take it
+from, and the run is **refused**, naming the field. (Before, mass 0 flew with
+no drag and β 0 with infinite drag — Scud-B's body object, separated: 15.5 km
+— without a word.) The other direction is not an error: a size stored in a
+body's file is ignored, and the run **reports** it (`result['handoff']
+['notices']`). `test_handoff.py`.
 
 Old files are converted before they are read: `upgrade_booster_dict` and
 `upgrade_ro_dict` (booster_models.py) hold every compatibility rule Thrusty

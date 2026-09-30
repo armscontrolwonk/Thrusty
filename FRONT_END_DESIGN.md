@@ -491,7 +491,7 @@ flag only drives the editor lock. Default off → existing boosters unchanged.
 
 # Part IV — One handoff at separation
 
-Status: **approved 2026-09-30; Phase 0 done; Phase 1 built, less the boost nose (§19a).** Parts I–III made the body
+Status: **approved 2026-09-30; Phases 0–2 built (boost nose held, §19a); Phase 3 next.** Parts I–III made the body
 honest in what it shows and what it owns. Part IV makes the moment of
 separation a single, explicit step, in both kinds of vehicle.
 
@@ -685,6 +685,37 @@ impact points are reported for each shipped vehicle.
 
 Checked: all 13 shipped vehicles fly byte-identical to the previous commit
 (position and mass histories, range, every debris impact point).
+
+## 19b. Phase 2 as built (2026-09-30)
+
+- `booster_models.check_pairing`, at the start of every integration: an
+  object with `mass_kg` 0 or `beta_kg_m2` 0 on a booster that separates it, or
+  flown from a stated entry condition (`entry_carrier` separates), is refused
+  with a message naming the field. `test_body_beta_derive`'s separating β 0
+  case, which used to fly with infinite drag, is now that refusal.
+- The three shipped body object files (Scud-B, Al Hussein, generic body
+  missile) store 0 for mass, diameter and length; their notes record the
+  copies removed (1198/1334/988 kg, 0.84/0.84/1.1 m, 11.25/12.0/9.18 m). Their
+  recorded load results were regenerated for exactly those fields and the
+  provenance text, nothing else (asserted when regenerating). A test holds
+  every shipped body object to it.
+- The object editor saves 0 for a body's mass, diameter and length (it shows
+  the booster's). An automatic nose radius, shown as the screening default,
+  is saved as 0 (not given) unless the user changes it, so a bluntness
+  heuristic never becomes a stored measurement; shown, it follows the
+  diameter that flies. A body's biconic is checked against its nose taper,
+  not the whole stage, and saves without a booster to show.
+- A new booster-default body object is seeded with zeros; export and the
+  one-time migration write the object as stored, never as flown. The 3-D
+  export no longer draws a body's object beside the stack (the 2-D schematic
+  never did).
+
+Checked: all 13 shipped vehicles fly byte-identical to Phase 1.
+
+Not done here, noted: `ro_xlsx` still writes and reads the derived
+`separation_mode` (a four-inputs slip outside this part), and CLAUDE.md's
+"the reentry object owns its mass" does not yet say that a body's object
+stores 0 for it.
 
 ## 20. Acceptance (Part IV)
 

@@ -93,6 +93,7 @@ from booster_models import (
     active_stage, active_stage_and_t, total_burn_time, tumbling_cylinder_beta,
     _eff_burn,
     booster_drag_vector, effective_ro, hand_off, reentering_airframe,
+    check_pairing,
     booster_separation_time,
     run_separation_mode, bind_ro_separation, compose_loadout,
     booster_area,
@@ -2146,6 +2147,8 @@ def integrate_trajectory(params: BoosterParams,
     # handoff record compares it with the object as flown (FRONT_END_DESIGN.md
     # Part IV), so that a size a body ignores is reported, not dropped.
     _stored_ro = params.ro
+    # An object sized by the booster cannot fly on its own (Part IV §18.2).
+    check_pairing(params)
     # A chain flown with a reentry object carries that object's mass.  Booster
     # files are stack-only, so a caller that set params.ro without composing
     # (compose_loadout) would fly the boost without the front end and coast

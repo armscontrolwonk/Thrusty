@@ -438,3 +438,86 @@ def test_saving_the_editor_keeps_the_heating_locations(root):
     out = dlg._build_ro()
     assert out.heating_locations == locs
     assert out.heating_locations is not ro.heating_locations
+
+
+# ── a body's file stores only what the body adds (Part IV §18.1) ────────────
+
+def test_saving_a_body_stores_zero_for_what_the_booster_gives(root):
+    """The fields show the booster's mass, diameter and length; the file
+    stores 0 = "from booster", so the booster's numbers are not stored twice
+    and cannot go stale.  The run flies the same either way."""
+    from booster_models import compose_loadout, effective_ro
+    p, ro = _body_pair()
+    dlg = thrusty.ROEditorDialog(root, ro=ro, booster=p, plan_sep='body')
+    try:
+        dlg.withdraw()
+        assert float(dlg._len_var.get()) == pytest.approx(7.5, abs=5e-3)
+        out = dlg._build_ro()
+        assert (out.mass_kg, out.diameter_m, out.length_m) == (0.0, 0.0, 0.0)
+        assert out.payload_kg == ro.payload_kg              # what it adds
+        assert out.body_nose_length_m == ro.body_nose_length_m
+        c0 = compose_loadout(p, ro, 1); c0.ro = ro
+        c1 = compose_loadout(p, out, 1); c1.ro = out
+        a, b = effective_ro(c0), effective_ro(c1)
+        assert (a.mass_kg, a.diameter_m, a.length_m) == \
+            (b.mass_kg, b.diameter_m, b.length_m)
+    finally:
+        dlg.destroy()
+
+
+def test_saving_a_separating_object_keeps_its_own_size(root):
+    p, ro = _body_pair()
+    p.body_reenters = False
+    dlg = thrusty.ROEditorDialog(root, ro=ro, booster=p,
+                                 plan_sep='separating_ro')
+    try:
+        dlg.withdraw()
+        out = dlg._build_ro()
+        assert (out.mass_kg, out.diameter_m, out.length_m) == \
+            (ro.mass_kg, ro.diameter_m, ro.length_m)
+    finally:
+        dlg.destroy()
+
+
+def test_an_automatic_nose_radius_is_saved_as_not_given(root):
+    """The field shows the screening default when no radius is stated; saved
+    unchanged it stays 0, so a bluntness heuristic never becomes a stored
+    measurement.  A typed radius is kept."""
+    p, ro = _body_pair()
+    assert ro.nose_radius_m == 0.0
+    dlg = thrusty.ROEditorDialog(root, ro=ro, booster=p, plan_sep='body')
+    try:
+        dlg.withdraw()
+        assert float(dlg._nose_var.get()) > 0.0
+        assert dlg._build_ro().nose_radius_m == 0.0
+        dlg._nose_var.set("0.031")
+        assert dlg._build_ro().nose_radius_m == pytest.approx(0.031)
+    finally:
+        dlg.destroy()
+
+
+def test_a_body_biconic_saves_without_its_booster(root, monkeypatch):
+    """With no booster to show, a body's size fields are 0 (from booster).
+    The biconic is checked against the nose taper it sits in, not against a
+    stored whole-body length that no longer exists; an error box would mean
+    the save was refused."""
+    import dataclasses
+    shown = []
+    monkeypatch.setattr(thrusty.messagebox, "showerror",
+                        lambda *a, **k: shown.append(a))
+    _p, ro = _body_pair()
+    ro = dataclasses.replace(ro, mass_kg=0.0, diameter_m=0.0, length_m=0.0,
+                             shape="cone")
+    dlg = thrusty.ROEditorDialog(root, ro=ro, plan_sep='body')
+    try:
+        dlg.withdraw()
+        dlg._biconic_var.set(True)
+        dlg._fore_len_var.set("1.0")
+        dlg._break_dia_var.set("0.4")
+        out = dlg._build_ro()
+        assert shown == [] and out is not None
+        assert out.biconic and out.fore_length_m == 1.0
+        dlg._fore_len_var.set("2.5")               # beyond the 2.0 m nose
+        assert dlg._build_ro() is None and shown
+    finally:
+        dlg.destroy()

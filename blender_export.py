@@ -384,7 +384,11 @@ def vehicle_elements(p):
     total = z
     ro = getattr(p, "ro", None)
     ro_x_off = ro_dia = 0.0
-    if ro is not None and _f(getattr(ro, "diameter_m", 0.0)) > 0:
+    # A body is not drawn beside the stack: it IS the stack's last stage
+    # (as in the 2-D schematic), and its object file stores 0 for the size
+    # it takes from the booster (FRONT_END_DESIGN.md §18.1).
+    if (ro is not None and _f(getattr(ro, "diameter_m", 0.0)) > 0
+            and not getattr(p, "body_reenters", False)):
         max_r = max((max(r for r, _ in prof) for _n, prof, _p, _s
                      in revolves), default=1.0)
         ro_dia = _f(ro.diameter_m)

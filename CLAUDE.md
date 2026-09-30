@@ -78,7 +78,10 @@ improve this."
   reentry plan). Hardware files carry no plan key and plan files carry no
   hardware key; nothing is stored twice. Booster files are stack-only: the
   reentry object owns its mass, and a flight plan may name the object it
-  flies. Timings are plan data even when
+  flies. The exception is a body (`body_reenters`): its object stores only
+  what the body adds and 0 = "from booster" for mass, diameter and length,
+  which the handoff at separation fills in from the last stage at every run
+  (`FRONT_END_DESIGN.md` Part IV). Timings are plan data even when
   the thing that moves is hardware (grid fins are hardware, when they
   deploy is flight plan). The only link between a booster and a reentry
   object is the booster's `body_reenters` flag; neither the object nor the

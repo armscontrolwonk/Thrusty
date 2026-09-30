@@ -1,10 +1,10 @@
 {
   "name": "Scud-B warhead",
-  "mass_kg": 1198.0,
+  "mass_kg": 0.0,
   "beta_kg_m2": 0.0,
   "shape": "cone",
-  "diameter_m": 0.84,
-  "length_m": 11.25,
+  "diameter_m": 0.0,
+  "length_m": 0.0,
   "nose_radius_m": 0.0,
   "biconic": false,
   "fore_length_m": 0.0,
@@ -48,6 +48,6 @@
       "name": "body"
     }
   ],
-  "source": "1000 kg warhead, carried as payload_kg in the 'Scud-B (R-17)' booster file until 2026-09-03, when the booster library became stack-only; the number's own source is not recorded there. The vehicle does not separate its warhead (booster body_reenters = true): at run time the airframe mass and geometry are inherited from the last stage and the warhead rides as this object's added payload_kg. beta_kg_m2 = 0 means DERIVE from the airframe geometry at the reference Mach. mass_kg here is only the stage dry-mass placeholder (ignored for a body).",
-  "notes": "[2026-09-03] Created by the payload migration. RECONSTRUCTION: geometry is the stage's; no warhead-specific dimensions are recorded. Ballistic (no lift)."
+  "source": "1000 kg warhead, carried as payload_kg in the 'Scud-B (R-17)' booster file until 2026-09-03, when the booster library became stack-only; the number's own source is not recorded there. The vehicle does not separate its warhead (booster body_reenters = true): at run time the airframe mass and geometry are inherited from the last stage and the warhead rides as this object's added payload_kg. beta_kg_m2 = 0 means DERIVE from the airframe geometry at the reference Mach. mass_kg, diameter_m and length_m are 0 = from booster: the handoff at separation fills them in from the last stage at every run (FRONT_END_DESIGN.md Part IV).",
+  "notes": "[2026-09-03] Created by the payload migration. RECONSTRUCTION: geometry is the stage's; no warhead-specific dimensions are recorded. Ballistic (no lift). [2026-09-30] Removed the stored copies of the last stage's mass, diameter and length (1198 kg, 0.84 m, 11.25 m), which the run ignored; 0 = from booster."
 }

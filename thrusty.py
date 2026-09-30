@@ -412,7 +412,10 @@ def _extract_ros_from_boosters():
             p = BOOSTER_DB[name]()
         except Exception:
             continue
-        ero = effective_ro(p)
+        # The object as stored, not as flown: for a body the flown object
+        # carries the booster's own numbers, which must not be written into
+        # an object file (FRONT_END_DESIGN.md §18.1).
+        ero = getattr(p, 'ro', None)
         if ero is None or not ero.name or ero.name in RO_DB:
             continue
         try:
@@ -4080,6 +4083,12 @@ class ROEditorDialog(tk.Toplevel):
         _lbl(4, "Nose radius (m):", parent=geo)
         self._nose_var = tk.StringVar(
             value=f"{ro.effective_nose_radius_m():.3f}" if ro else "0.050")
+        # The screening default shown for an object with no stated radius.
+        # Saved back as 0 ("not given") unless the user changes it: a
+        # bluntness heuristic must not become a stored measurement.
+        self._nose_auto = (self._nose_var.get()
+                           if ro is None or not (ro.nose_radius_m or 0) > 0
+                           else None)
         self._nose_entry = _entry(4, self._nose_var, width=10, parent=geo)
 
         # Body nose length — the forward taper of a NON-SEPARATING body, carved
@@ -5069,6 +5078,9 @@ class ROEditorDialog(tk.Toplevel):
             dia     = float(self._dia_var.get())
             length  = float(self._len_var.get())
             nose_rn = float(self._nose_var.get())
+            if (getattr(self, '_nose_auto', None) is not None
+                    and self._nose_var.get().strip() == self._nose_auto):
+                nose_rn = 0.0          # still the automatic value: not given
         except ValueError:
             messagebox.showerror(
                 "Invalid input",
@@ -5091,11 +5103,27 @@ class ROEditorDialog(tk.Toplevel):
                     "Biconic fore-cone length and break diameter must be numbers.",
                     parent=self)
                 return None
-            if not (0.0 < fore_len_m < length and 0.0 < break_dia_m < dia):
+            # A body's biconic occupies its nose taper (body_nose_length_m),
+            # not the whole stage; and a body edited without its booster has
+            # no diameter to show, so that bound is checked at run time
+            # (biconic_nose_geometry) instead.
+            _body = (self._plan_sep == 'body')
+            try:
+                _nose_bound = (float(self._body_nose_var.get() or 0.0)
+                               if _body else length)
+            except ValueError:
+                _nose_bound = 0.0
+            _len_ok = (0.0 < fore_len_m < _nose_bound if _nose_bound > 0.0
+                       else fore_len_m > 0.0)
+            _dia_ok = (0.0 < break_dia_m < dia if dia > 0.0
+                       else break_dia_m > 0.0)
+            if not (_len_ok and _dia_ok):
                 messagebox.showerror(
                     "Invalid biconic",
-                    "Fore-cone length must be less than total length, and break "
-                    "diameter less than the base diameter.",
+                    ("Fore-cone length must be less than the body nose length, "
+                     if _body else
+                     "Fore-cone length must be less than total length, ")
+                    + "and break diameter less than the base diameter.",
                     parent=self)
                 return None
 
@@ -5204,6 +5232,12 @@ class ROEditorDialog(tk.Toplevel):
                 parent=self)
             return None
 
+        # A body's mass, diameter and length are the booster's: the fields
+        # show them, and the file stores 0 = "from booster", so nothing about
+        # the booster is stored twice (FRONT_END_DESIGN.md §18.1).  The
+        # handoff fills them in at every run.
+        if self._plan_sep == 'body':
+            mass_kg = dia = length = 0.0
         ro_new = ROParams(
             name=name, mass_kg=mass_kg, beta_kg_m2=beta,
             shape=shape, diameter_m=dia, length_m=length,
@@ -5786,6 +5820,13 @@ class ROEditorDialog(tk.Toplevel):
                 (getattr(self, '_len_var', None), last.length_m, "{:.2f}")):
             if var is not None and value > 0:
                 var.set(fmt.format(value))
+        # An automatic nose radius follows the diameter that flies.
+        if getattr(self, '_nose_auto', None) is not None and last.diameter_m > 0:
+            from booster_models import nose_tip_radius
+            auto = f"{nose_tip_radius(self._shape_key(), last.diameter_m):.3f}"
+            if self._nose_var.get().strip() == self._nose_auto:
+                self._nose_var.set(auto)
+            self._nose_auto = auto
 
     def _refresh_payload_total(self):
         """Live total-reentry-mass line for a body: airframe burnout (the
@@ -10672,15 +10713,13 @@ class BoosterFlyoutApp(tk.Tk):
         except Exception:
             bp = None
         if _sep == 'body' and bp is not None:
-            _last = bp
-            while getattr(_last, 'stage2', None) is not None:
-                _last = _last.stage2
+            # Mass, diameter and length are the booster's: 0 = "from
+            # booster", filled in by the handoff at every run and shown by the
+            # editor's "(from booster)" fields (FRONT_END_DESIGN.md §18.1).
             return mm.ROParams(
                 name=f"{self._booster_var.get()} front end",
-                mass_kg=max(float(getattr(_last, 'mass_final', 0.0) or 0.0), 1.0),
-                beta_kg_m2=0.0, shape="cone",
-                diameter_m=float(getattr(_last, 'diameter_m', 0.0) or 0.5),
-                length_m=float(getattr(_last, 'length_m', 0.0) or 2.0),
+                mass_kg=0.0, beta_kg_m2=0.0, shape="cone",
+                diameter_m=0.0, length_m=0.0,
                 separation_mode='body', maneuvering=True, glider_enabled=True, glider_LD=0.0)
         return mm.ROParams(name="New RV", mass_kg=500.0, beta_kg_m2=10000.0,
                            shape="cone", diameter_m=0.5, length_m=2.0,
@@ -15999,10 +16038,21 @@ class BoosterFlyoutApp(tk.Tk):
         self._refresh_ro_list(select_name=name)
         self._status_var.set(f"Reentry object '{name}' loaded from {Path(path).name}")
 
+    def _stored_ro_for_export(self):
+        """The object as STORED, for export when no library object is
+        selected.  self._ro can be the object as flown, which for a body
+        carries the booster's mass, diameter and length; exporting that would
+        write them into an object file (FRONT_END_DESIGN.md §18.1)."""
+        try:
+            ro = getattr(get_booster(self._booster_var.get()), 'ro', None)
+        except Exception:
+            ro = None
+        return ro if ro is not None else getattr(self, '_ro', None)
+
     def _export_ro(self):
         """Export the selected RV (or the booster's RV) to a .ro.json file."""
         sel = self._ro_main_var.get()
-        ro = RO_DB[sel]() if sel in RO_DB else getattr(self, '_ro', None)
+        ro = RO_DB[sel]() if sel in RO_DB else self._stored_ro_for_export()
         if ro is None or not getattr(ro, 'name', ''):
             messagebox.showinfo("No Reentry Object", "Select a reentry object first.", parent=self)
             return
@@ -16034,7 +16084,7 @@ class BoosterFlyoutApp(tk.Tk):
     def _export_ro_xlsx(self):
         """Export the selected RV to a fillable XLSX spreadsheet."""
         sel = self._ro_main_var.get()
-        ro = RO_DB[sel]() if sel in RO_DB else getattr(self, '_ro', None)
+        ro = RO_DB[sel]() if sel in RO_DB else self._stored_ro_for_export()
         if ro is None or not getattr(ro, 'name', ''):
             messagebox.showinfo("No Reentry Object", "Select a reentry object first.", parent=self)
             return

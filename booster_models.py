@@ -1162,6 +1162,35 @@ def reentering_airframe(params: 'BoosterParams') -> Optional['BoosterParams']:
     return a
 
 
+def check_pairing(params: 'BoosterParams') -> None:
+    """Refuse a reentry object that cannot fly on this booster.
+
+    FRONT_END_DESIGN.md §18.2.  A body's object file stores 0 for what it
+    takes from the booster: ``mass_kg`` 0 is "from booster" and ``beta_kg_m2``
+    0 is "derive from the airframe".  Both have a source only when the
+    booster's last stage reenters with it.  On a booster that separates its
+    object (or a flight started from a stated entry condition, which flies the
+    object alone) there is nothing to take them from: mass 0 flew with no drag
+    and beta 0 with infinite drag (Scud-B's body object, separated: 15.5 km),
+    without a word.  Raises ValueError naming the field; returns None when
+    the pairing is sound.  The other direction, a size stored in a body's
+    file, is not an error: the run reports it (hand_off notices).
+    """
+    ro = getattr(params, 'ro', None)
+    if ro is None or run_separation_mode(params) == 'body':
+        return
+    for field, meaning in (('mass_kg', 'its mass'),
+                           ('beta_kg_m2', 'its ballistic coefficient')):
+        if not float(getattr(ro, field, 0.0) or 0.0) > 0.0:
+            raise ValueError(
+                f"The reentry object {ro.name!r} has {field} = 0, which means "
+                f"it takes {meaning} from a booster whose last stage "
+                f"reenters with it (body_reenters).  Here the object flies "
+                f"on its own, so there is nothing to take it from.  Fly it "
+                f"on a booster whose last stage reenters, or give the object "
+                f"its own {field}.")
+
+
 def hand_off(params: 'BoosterParams', stored=None) -> Optional[dict]:
     """The handoff at separation, as a record (FRONT_END_DESIGN.md Part IV).
 

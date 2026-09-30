@@ -90,7 +90,13 @@ def test_body_with_entered_beta_does_not_derive():
 
 
 def test_separating_rv_never_derives():
-    r, _ = _fly(0.0, sep="separating_ro", glider=False)
+    """A separating object has no airframe to derive a beta from: beta 0 on
+    one is refused (FRONT_END_DESIGN.md §18.2).  It used to fly with infinite
+    drag and report no derived beta."""
+    import pytest
+    with pytest.raises(ValueError, match="beta_kg_m2"):
+        _fly(0.0, sep="separating_ro", glider=False)
+    r, _ = _fly(3000.0, sep="separating_ro", glider=False)
     assert r["derived_beta_kg_m2"] is None
 
 

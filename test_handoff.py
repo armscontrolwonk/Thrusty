@@ -22,6 +22,9 @@ import trajectory as tr
 SCUD = 'booster_library/Scud-B_-R-17-.booster.json'
 SCUD_RO = 'ro_library/Scud-B_warhead.ro.json'
 NODONG_RO = 'ro_library/No-dong_warhead.ro.json'
+# What the shipped Scud-B object file stored before Phase 2: copies of the
+# last stage's burnout mass, diameter and length, which the run ignored.
+OLD_COPIES = dict(mass_kg=1198.0, diameter_m=0.84, length_m=11.25)
 
 
 def _booster(path=SCUD, **kw):
@@ -61,8 +64,8 @@ def _after_separation(res, p):
 def test_a_body_flies_identically_with_its_stored_size_zeroed():
     """The handoff, not the file, supplies a body's mass, diameter and
     length: zeroing the stored copies changes nothing that flies."""
-    a = _fly(_booster(), _object())
-    b = _fly(_booster(), _object(mass_kg=0.0, diameter_m=0.0, length_m=0.0))
+    a = _fly(_booster(), _object(**OLD_COPIES))
+    b = _fly(_booster(), _object())                 # as shipped: zeros
     for k in ('t', 'pos_ecef', 'mass'):
         assert np.array_equal(a[k], b[k]), k
     assert a['range_km'] == b['range_km']
@@ -93,14 +96,13 @@ def test_a_separating_object_carries_its_own_mass():
 
 
 # ── the pairing rule (Part IV §18.2): Phase 2 ──────────────────────────────
-@pytest.mark.xfail(strict=True, reason="Part IV Phase 2: pairing rule")
 @pytest.mark.parametrize('field, value', [('beta_kg_m2', 0.0),
                                           ('mass_kg', 0.0)])
 def test_an_object_sized_by_the_booster_cannot_separate(field, value):
     """β 0 means "derive from the booster" and mass 0 means "from booster":
     on a booster that separates there is nothing to derive from.  Today this
     flies (β 0 is infinite drag: 15.5 km) without a word."""
-    ro = _object(**{'beta_kg_m2': 5000.0, **{field: value}})
+    ro = _object(**{**OLD_COPIES, 'beta_kg_m2': 5000.0, field: value})
     with pytest.raises(ValueError, match=field):
         _fly(_booster(body_reenters=False), ro)
 
@@ -113,15 +115,15 @@ def test_a_stored_size_ignored_by_a_body_is_reported():
 
 # ── Phase 1: the handoff record and the airframe ───────────────────────────
 def test_the_run_records_what_was_handed_off():
-    res = _fly(_booster(), _object())
+    res = _fly(_booster(), _object(**OLD_COPIES))
     h = res['handoff']
     assert h['mode'] == 'body'
     assert (h['diameter_m'], h['length_m']) == (0.84, 11.25)
     assert h['mass_kg'] == pytest.approx(2198.0)        # 1198 + 1000 payload
     assert set(h['taken_from'].values()) == {'last stage'}
     assert h['fins']['has_fins'] and h['fins']['n_fins'] == 4
-    # the shipped file still stores copies of the stage's numbers (Phase 2
-    # removes them); each is reported, the equal ones as stored twice
+    # a file that still stores copies of the stage's numbers has each one
+    # reported, the equal ones as stored twice
     assert len(h['notices']) == 3
     assert sum('stored twice' in n for n in h['notices']) == 2
     assert 'payload_kg' in next(n for n in h['notices']
@@ -129,8 +131,7 @@ def test_the_run_records_what_was_handed_off():
 
 
 def test_a_body_whose_file_stores_no_size_has_nothing_to_report():
-    res = _fly(_booster(), _object(mass_kg=0.0, diameter_m=0.0,
-                                   length_m=0.0))
+    res = _fly(_booster(), _object())               # as shipped
     assert res['handoff']['notices'] == []
 
 
@@ -204,3 +205,43 @@ def test_a_bank_schedule_is_set_on_the_object_held_not_the_one_flown():
     assert (m.ro.mass_kg, m.ro.diameter_m, m.ro.length_m) == (0.0, 0.0, 0.0)
     assert m.ro.glider_bank_schedule == [(0.0, 600.0, 10.0)]
     assert bm.effective_ro(m).mass_kg == pytest.approx(2198.0)
+
+
+def test_an_object_sized_by_the_booster_cannot_fly_from_an_entry_state():
+    """A flight from a stated entry condition flies the object alone
+    (entry_carrier), so the same rule applies."""
+    with pytest.raises(ValueError, match='mass_kg'):
+        tr.integrate_entry(_object(mass_kg=0.0, beta_kg_m2=5000.0),
+                           7000.0, -5.0, 100e3, 90.0, 33.0, 44.0)
+
+
+def test_an_object_with_its_own_size_may_fly_either_way():
+    ro = _object(beta_kg_m2=5000.0, **OLD_COPIES)   # its own size and beta
+    for body in (True, False):
+        res = _fly(_booster(body_reenters=body), ro)
+        assert res['range_km'] > 0.0
+
+
+def test_every_shipped_body_object_stores_only_what_the_body_adds():
+    """Part IV §18.1: the object a body-reentering booster's flight plan names
+    stores 0 = "from booster" for mass, diameter and length."""
+    import glob
+    import os
+    bodies = []
+    for fp in glob.glob('flight_plans/*.flightplan.json'):
+        plan = json.load(open(fp))
+        name = plan.get('reentry_object')
+        if not name:
+            continue
+        bfile = 'booster_library/' + os.path.basename(fp).replace(
+            '.flightplan.json', '.booster.json')
+        if not os.path.exists(bfile) or not json.load(open(bfile)).get(
+                'body_reenters'):
+            continue
+        ro = next(r for r in (bm.ro_from_dict(json.load(open(f)))
+                              for f in glob.glob('ro_library/*.ro.json'))
+                  if r.name == name)
+        bodies.append(ro.name)
+        assert (ro.mass_kg, ro.diameter_m, ro.length_m) == (0.0, 0.0, 0.0), \
+            ro.name
+    assert sorted(bodies) == ['Al Hussein warhead', 'Scud-B warhead']
