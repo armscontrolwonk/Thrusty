@@ -38,6 +38,16 @@
   "structure_limit_K": 0.0,
   "nose_tps_custom": null,
   "body_tps_custom": null,
+  "heating_locations": [
+    {
+      "kind": "nose_cap",
+      "name": "nose"
+    },
+    {
+      "kind": "windward_face",
+      "name": "body"
+    }
+  ],
   "source": "191 kg warhead, carried as payload_kg in the 'Al Hussein' booster file until 2026-09-03, when the booster library became stack-only; the number's own source is not recorded there. The vehicle does not separate its warhead (booster body_reenters = true): at run time the airframe mass and geometry are inherited from the last stage and the warhead rides as this object's added payload_kg. beta_kg_m2 = 0 means DERIVE from the airframe geometry at the reference Mach. mass_kg here is only the stage dry-mass placeholder (ignored for a body).",
   "notes": "[2026-09-03] Created by the payload migration. RECONSTRUCTION: geometry is the stage's; no warhead-specific dimensions are recorded. Ballistic (no lift)."
 }

@@ -18,6 +18,16 @@
   "structure_limit_K": 0.0,
   "nose_tps_custom": null,
   "body_tps_custom": null,
+  "heating_locations": [
+    {
+      "kind": "nose_cap",
+      "name": "nose"
+    },
+    {
+      "kind": "windward_face",
+      "name": "body"
+    }
+  ],
   "source": "Advanced Hypersonic Weapon (U.S. Army/Sandia) - conical glide body of the SWERVE lineage (SWERVE with improved thermal protection). Entry model per Acton, Science & Global Security 23 (2015): 191-219. Distinct from the C-HGB, which is a separate biconic reentry vehicle.",
   "notes": "Conical glide body, SWERVE heritage (AHW = SWERVE with better TPS and higher glide L/D). This is NOT the C-HGB - they are different systems; the C-HGB is a biconic RV (see C-HGB.ro.json). MASS ~450 kg (same class as SWERVE; AHW reuses the SWERVE airframe with a new heat shield). L/D 1.8 is the expected glide value for this conical glide body -- higher than SWERVE's 0.6 small-wing airframe value and below the HTV-2 waverider (2.6). beta=9,000 kg/m2 = m/(Cd*A) holding Cd*A=0.050 m2 (Cd~0.18 on the 0.283 m2 base); scales with mass, so rescale if mass is revised. These aero numbers are REPRESENTATIVE estimates for a conical glide body, not a published fit (Acton fit only the HTV-2; no comparable public AHW aero fit). NOTE on range: at L/D 1.8 a max-range equilibrium glide from a STARS-class apogee reaches ~6,000 km, well beyond the ~4,023 km (2,500 mi) AHW flight-1 range to Illeginni -- so the documented test range is a WITHIN-ENVELOPE mission target, flown via the pitch program at run time, not a max-glide aerodynamic limit. Do not back L/D out of the test range. glider_beta_entry_kg_m2 = 20 is an Acton-style entry beta_S placeholder (Acton, Science & Global Security 23 (2015): 191-219) affecting only the equilibrium_glide_acton path. Guidance is damped_glide (damped-phugoid, zeta 0.7); under glider_aero_model=polar the glider_LD sets the polar max-L/D (k back-solved in _aero_polar) and the phugoid trims near that alpha*, so the 1.8 is honored. glider_beta_entry_kg_m2 then only matters if switched to equilibrium_glide_acton.\n\nReentry mode: this object was characterised flying damped_glide; the shipped default is the neutral equilibrium_glide. Select the intended reentry mode in the Reentry-mode dropdown (the glide law is a flight-plan choice, not object hardware).",
   "glider_beta_entry_kg_m2": 20.0,

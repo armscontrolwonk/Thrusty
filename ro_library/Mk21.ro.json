@@ -18,6 +18,16 @@
   "structure_limit_K": 0.0,
   "nose_tps_custom": null,
   "body_tps_custom": null,
+  "heating_locations": [
+    {
+      "kind": "nose_cap",
+      "name": "nose"
+    },
+    {
+      "kind": "windward_face",
+      "name": "body"
+    }
+  ],
   "source": "",
   "notes": "",
   "maneuvering": false

@@ -18,6 +18,16 @@
   "structure_limit_K": 0.0,
   "nose_tps_custom": null,
   "body_tps_custom": null,
+  "heating_locations": [
+    {
+      "kind": "nose_cap",
+      "name": "nose"
+    },
+    {
+      "kind": "windward_face",
+      "name": "body"
+    }
+  ],
   "source": "MASS 450 kg: adopted from U.S. environmental documentation for the C-HGB flight tests. (1) U.S. Navy, Strategic Systems Programs, Final EA/OEA, Navy Flight Experiment-2 (FE-2), December 2019, sec. 2.5.6: 'a quantity of up to 454 kg (1,000 lb) of tungsten alloy is used for the environmental impact analysis' of the FE-2 payload (Table 2-2 lists the payload's structural materials, tungsten among them). (2) U.S. Army RCCTO/SMDC, Biological Assessment for Hypersonic Flight Test-3 Activities, 22 September 2020, sec. 2.2.1 Launch Vehicle Description: the FT-3 payload 'would weigh approximately 350 kg (750 lb) and would be similar to the recently tested FE-2 payload (U.S. Navy 2019), except that the payload would contain approximately 10% of the tungsten contained on the FE-2 payload (which was 454 kg, or 1,000 lbs).' Maintainer's reading: FE-2 payload 454 kg, FT-3 payload 350 kg, the difference being 90% of the tungsten (about 115 kg); the 450 kg here is the FE-2 (full-tungsten) configuration. GEOMETRY (length 1.5 m, base diameter 0.58 m, nose radius 0.02 m): dimensional draft from image, measured by the maintainer with Thrusty's mensuration tool (image_measure.py) on open-source imagery, May 2026. The image, scale anchor and pixel quantum are not recorded (the tool's provenance stamp did not survive the save). Angles are anchor-free; length and diameter depend on the scale anchor. The image's labelled dimensions were mutually inconsistent; the half-angles plus base diameter were trusted over the labelled total length. beta_kg_m2 = 15000 is a PLACEHOLDER with no public source; glider_LD 2.0 is a representative estimate, not a published fit. Google Drive folder LRHW/CPS/EIS (maintainer's library).",
   "notes": "Reentry mode: this object was characterised flying damped_glide, which is now its shipped default reentry plan. The glide law is a reentry-plan choice (still switchable on the sidebar strip), not object hardware.",
   "maneuvering": true

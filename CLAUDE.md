@@ -109,6 +109,7 @@ observed test-flight impact zones for analytic comparison.
 | `heating.py`, `tps_ladder.py`, `survivability_report.py` | Reentry aerothermal screening |
 | `heating_locations.py` | Engineering-tier convective heating per location (Tauber, NASA TP-2914) with a radiating-wall energy balance. Not yet wired into the verdicts |
 | `heating_solid.py` | One-dimensional conduction estimate for a solid conical tip. Not yet wired into the verdicts |
+| `heating_by_location.py` | Heating at each place an object's `heating_locations` list names; supplies no number the file does not give. Not yet wired into the verdicts |
 | `slv_performance.py` | Schilling payload-to-orbit estimator |
 | `METHODS.md` | Governing equations and citations for every model |
 | `BENCHMARKING.md` | Validation against published figures |

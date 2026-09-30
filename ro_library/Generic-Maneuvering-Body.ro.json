@@ -18,6 +18,16 @@
   "structure_limit_K": 0.0,
   "nose_tps_custom": null,
   "body_tps_custom": null,
+  "heating_locations": [
+    {
+      "kind": "nose_cap",
+      "name": "nose"
+    },
+    {
+      "kind": "windward_face",
+      "name": "body"
+    }
+  ],
   "source": "GENERIC FIXTURE - not a specific vehicle.  Represents the quasi-ballistic maneuvering-body class: a non-separating unitary airframe flying a depressed trajectory (~50 km apogee, ~450-690 km range) that pulls up aerodynamically in the terminal phase at roughly Mach 6-7.  The numbers are open-source order-of-magnitude estimates for that class, not a fit to any published vehicle, and there is no measured aero or thermal data behind them.  Use it to exercise the non-separating glide path, not to characterise a real system.",
   "notes": "Reentry mode: this object was characterised flying damped_glide, which is now its shipped default reentry plan. The glide law is a reentry-plan choice (still switchable on the sidebar strip), not object hardware.",
   "pullup_g_limit": 15.0,

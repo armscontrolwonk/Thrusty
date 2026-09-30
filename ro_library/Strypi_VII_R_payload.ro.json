@@ -38,6 +38,16 @@
   "structure_limit_K": 0.0,
   "nose_tps_custom": null,
   "body_tps_custom": null,
+  "heating_locations": [
+    {
+      "kind": "nose_cap",
+      "name": "nose"
+    },
+    {
+      "kind": "windward_face",
+      "name": "body"
+    }
+  ],
   "source": "45.36 kg payload, carried as payload_kg in the 'Strypi VII R' booster file until 2026-09-03, when the booster library became stack-only; the number's own source is not recorded there. Separating. beta_kg_m2 = 2651.7 kg/m2 is DERIVED, not documented: m / (Cd * pi D^2/4) with Cd = 0.200 read from the booster's own stored drag table at the reference Mach 5 (the codebase's GLIDE_MACH_REF convention) and D = 0.330 m, the last stage's diameter \u2014 i.e. it reproduces the pre-migration behaviour of flying the payload with the stage's drag. length_m 0 = not recorded.",
   "notes": "[2026-09-03] Created by the payload migration. RECONSTRUCTION: no payload-specific geometry is recorded; replace beta/shape/length when a source is found. Ballistic (no lift)."
 }

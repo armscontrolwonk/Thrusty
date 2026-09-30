@@ -129,6 +129,7 @@ variant per object is remembered in
 | `heating.py` | ~610 | Reentry aerothermal screening (Sutton-Graves flux, radiative-equilibrium wall temp) + TPS material catalog |
 | `heating_locations.py` | ~300 | Engineering-tier convective heating per location (nose cap, leading edge, windward face; Tauber NASA TP-2914) with a radiating-wall energy balance. Not yet wired into the verdicts |
 | `heating_solid.py` | ~190 | One-dimensional transient conduction in a solid conical tip, for sharp solid parts where a radiating-wall balance is invalid. Not yet wired into the verdicts |
+| `heating_by_location.py` | ~410 | Heating at the places a reentry object's file lists (`heating_locations`): resolves each place's numbers from the object's own fields, names any that are missing, and evaluates the relations above. Not yet wired into the verdicts |
 | `glider_ld.py` | ~275 | Geometry-derived L/D for non-separating reentry objects (Missile-DATCOM-style build-up) |
 | `grid_fin_sizing.py` | ~350 | Barrowman static-margin / centre-of-pressure sizing for finned boosters |
 | `trim_gate.py` | ~160 | Trim/control gate — is a derived L/D actually achievable? |

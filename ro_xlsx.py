@@ -18,6 +18,9 @@ Sheet layout
 ------------
   Sheet 1 "RO"        — every ROParams field, fields-as-rows, values in col D
   Sheet 2 "Reference" — read-only TPS material catalog + emissivity guidance
+  Sheet 3 "Heating locations" — the object's heating_locations list, one row
+                        per place, one column per key an entry may carry.
+                        Absent in older workbooks, which import with none.
 
 Public API
 ----------
@@ -332,6 +335,83 @@ def _build_ro_reference_sheet(ws) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Heating locations sheet
+# ---------------------------------------------------------------------------
+_LOC_SHEET = 'Heating locations'
+_LOC_HEAD_ROW = 3                # column headers; entries start on the row below
+_LOC_ROWS = 12                   # blank, formatted rows offered for new entries
+_ZWSP = '\u200b'                # keeps a leading '=' a string (booster_xlsx._label)
+
+
+def _loc_columns():
+    """Every key an entry of any kind may carry, in registry order."""
+    import field_registry as fr
+    cols = []
+    for kind in fr.RO_LOCATION_KINDS:
+        for k in fr.RO_LOCATION_KEYS[kind]:
+            if k not in cols:
+                cols.append(k)
+    return cols
+
+
+def _build_locations_sheet(ws, ro) -> None:
+    """One row per listed place.  A cell a kind may not carry is left blank;
+    filling one is refused on import, naming the field that already holds
+    the number (booster_models.clean_heating_locations)."""
+    import field_registry as fr
+    from booster_xlsx import _col_headers
+    cols = _loc_columns()
+    ws.cell(row=1, column=1, value='Heating locations — where heating is '
+            'judged.  An entry carries only what no other field holds: a '
+            'nose cap takes its radius from Nose-tip radius, a wing edge '
+            '(of = wing) its sweep from LE sweep.  Leave unknown numbers '
+            'blank.')
+    _col_headers(ws, _LOC_HEAD_ROW,
+                 [(j, k) for j, k in enumerate(cols, start=1)])
+    for j, k in enumerate(cols, start=1):
+        ws.column_dimensions[ws.cell(row=1, column=j).column_letter].width = (
+            30 if k == 'source' else 16)
+    entries = list(getattr(ro, 'heating_locations', []) or [])
+    for i in range(max(len(entries), 0) + _LOC_ROWS):
+        row = _LOC_HEAD_ROW + 1 + i
+        e = entries[i] if i < len(entries) else {}
+        # a leading '=' would be written as a formula and lost on import
+        _inputs(ws, row, list(range(1, len(cols) + 1)),
+                [(_ZWSP + v if isinstance(v, str) and v.startswith('=')
+                  else v) for v in (e.get(k) for k in cols)])
+        _dropdown(ws, row, cols.index('kind') + 1, list(fr.RO_LOCATION_KINDS))
+        _dropdown(ws, row, cols.index('construction') + 1,
+                  [''] + list(fr.RO_LOCATION_CONSTRUCTIONS))
+        _dropdown(ws, row, cols.index('of') + 1, ['', 'wing'])
+
+
+def _read_locations_sheet(wb) -> list:
+    """The heating_locations list from its sheet; [] when there is none.
+    Rows with no kind are skipped.  Checked by clean_heating_locations, so a
+    number stored twice is refused here exactly as in a .ro.json file."""
+    from booster_models import clean_heating_locations
+    if _LOC_SHEET not in wb.sheetnames:
+        return []
+    ws = wb[_LOC_SHEET]
+    heads = [str(ws.cell(row=_LOC_HEAD_ROW, column=j).value or '').strip()
+             for j in range(1, ws.max_column + 1)]
+    out = []
+    for row in range(_LOC_HEAD_ROW + 1, ws.max_row + 1):
+        e = {}
+        for j, k in enumerate(heads, start=1):
+            v = ws.cell(row=row, column=j).value
+            if isinstance(v, str):
+                v = v.lstrip(_ZWSP).strip()
+            if k and v is not None and v != '':
+                e[k] = v
+        if e.get('kind'):
+            out.append(e)
+        elif e:
+            raise ValueError(f"{_LOC_SHEET}, row {row}: a place with no kind")
+    return clean_heating_locations(out)
+
+
+# ---------------------------------------------------------------------------
 # Reader
 # ---------------------------------------------------------------------------
 def _read_material(ws, rk, prefix, sentinel):
@@ -359,7 +439,8 @@ def import_ro_xlsx(path: str):
     Backward compatible: workbooks written before the appended 'Body form &
     biconic' / 'Wings' sections have empty cells at those rows, which read as
     defaults (axisymmetric, no biconic, no wings) — a pre-upgrade file
-    imports exactly as it always did.
+    imports exactly as it always did.  One with no 'Heating locations' sheet
+    lists no places.
     """
     import heating
     from booster_models import ROParams, _norm_sep_mode, BODY_FORMS
@@ -423,6 +504,7 @@ def import_ro_xlsx(path: str):
         structure_limit_K=_rnum(ws, _R['struct_lim'], _VAL_COL),
         nose_tps_custom=nose_cust,
         body_tps_custom=body_cust,
+        heating_locations=_read_locations_sheet(wb),
         source=_rstr(ws, _R['source'], _VAL_COL),
         notes=_rstr(ws, _R['notes'], _VAL_COL),
     )
@@ -439,6 +521,7 @@ def export_ro_xlsx(path: str, ro) -> None:
     ws.title = 'RO'
     _build_ro_sheet(ws, ro)
     _build_ro_reference_sheet(wb.create_sheet('Reference'))
+    _build_locations_sheet(wb.create_sheet(_LOC_SHEET), ro)
     wb.save(path)
 
 

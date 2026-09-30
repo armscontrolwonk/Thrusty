@@ -5051,6 +5051,70 @@ Caveats on those figures:
 
 Source: Böhrk et al. 2012 (AIAA 2012-5919).
 
+### 13.17 Heating at the places an object lists (`heating_by_location.py`)
+
+A reentry object's file lists the places where its heating is judged, in the
+field `heating_locations`: a nose cap, leading edges, a windward face. Nothing
+is stored twice, so an entry carries only what no other field holds
+(`field_registry.RO_LOCATION_KEYS`):
+
+| Place | Taken from the object's other fields | Carried by the entry |
+|---|---|---|
+| `nose_cap` | radius `nose_radius_m`, material `nose_tps_material`; for a solid tip, half angle from `diameter_m` and `length_m` | `construction`, and `solid_length_m` for a solid tip |
+| `windward_face` | flank angle from `diameter_m`, `length_m` (and the biconic fields, on a body of revolution only); attitude `trim_alpha_deg`; material `body_tps_material`; flat-bottomed from `body_form` | `construction` |
+| `leading_edge` | sweep `wing_sweep_deg` when the entry says `of: wing` | edge radius, material, `construction`; sweep for any edge that is not the wing's |
+
+The loader (`booster_models.clean_heating_locations`) refuses an entry that
+restates a number held elsewhere and names the field that holds it. The field
+is written only when the list is non-empty, so an object listing no places
+saves exactly as before. The spreadsheet carries the list on its own sheet,
+checked by the same loader. **Not yet wired into the verdicts.**
+
+Every shipped object lists a nose cap and a windward face, which add no
+number of their own. None states how the part is built, so a non-ablating
+part's temperature is reported as an upper bound; none lists a leading edge,
+because no source in hand gives an edge radius. Where an object's file lacks
+a number (a nose radius, a length, a lifting body's trim angle) the place
+reports it as not given.
+
+**Nothing is supplied.** A place whose file lacks a number is reported as
+"cannot be evaluated", naming the number. A nose radius left at zero is "not
+given" here, although the screening verdicts (§13.1) fall back on a bluntness
+heuristic for it; so is an emissivity of zero.
+
+**Attitude and the windward face.** `trim_alpha_deg` is 0 when absent. A body
+of revolution with no lift capability (not `maneuvering`, no `glider_LD`) is
+taken at zero angle of attack, as the integrator flies it, and says so; any
+lifting body needs its trim angle stated. On a body of revolution the face is
+the flank, inclined at its half angle plus the angle of attack, and the
+running length follows each cone's slant length. Both lifting forms fly flat
+side down (the wedge's flat bottom, the half cone's diametral plane), so their
+face is the flat bottom, inclined at the angle of attack alone, with the body
+length as its run. Leading edges are evaluated at zero incidence: the
+relation that includes it (Tauber Eq. 49) has no test case.
+
+**Flux to temperature**, by how the part is built:
+
+| Part | Method | Reported |
+|---|---|---|
+| Ablator (from its material) | incident flux at a 300 K wall | peak flux and heat load; no wall temperature |
+| `construction: skin` | radiating-wall balance, §13.15 | wall temperature |
+| `construction: solid`, nose cap | conduction along the tip, §13.16 | tip temperature; needs the material's density, specific heat and conductivity from the catalog |
+| construction not given | radiating-wall balance | wall temperature, marked an UPPER BOUND |
+
+Where two relations bracket the answer, both are reported as a low and a high
+value: a leading edge between Poll's attachment-line relation and Tauber
+Eq. 41; a flat-bottomed face between Tauber's flat plate and cone (§13.15).
+The turbulent value is reported alongside the laminar one; which applies is
+not decided here, and the peak attachment-line Reynolds number is reported for
+a leading edge. The windward face is evaluated at x/L = 0.25, 0.50 and 0.75.
+Each result carries the `ACCURACY` record of the relation that produced it.
+
+Known gaps: the catalog carries a conductivity only for three ablators, and
+that value is through-thickness, so a solid non-ablating tip cannot yet be
+evaluated from the catalog; conduction in a solid leading edge is not
+modelled.
+
 ---
 
 ## 14. Outputs, events, and milestones

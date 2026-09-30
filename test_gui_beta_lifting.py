@@ -423,3 +423,18 @@ def test_a_reentry_plans_provenance_survives_a_run(root, tmp_path, monkeypatch):
         assert "glider_guidance" in back
     finally:
         app.destroy()
+
+
+def test_saving_the_editor_keeps_the_heating_locations(root):
+    """The dialog has no widgets for heating_locations; a save must carry
+    the list through, not erase it from the file."""
+    import dataclasses
+    locs = [{'kind': 'nose_cap', 'name': 'nose', 'construction': 'skin'}]
+    ro = dataclasses.replace(
+        ro_from_dict(json.load(open("ro_library/C-HGB.ro.json"))),
+        heating_locations=locs)
+    dlg = thrusty.ROEditorDialog(root, ro=ro)
+    dlg.withdraw()
+    out = dlg._build_ro()
+    assert out.heating_locations == locs
+    assert out.heating_locations is not ro.heating_locations

@@ -18,6 +18,16 @@
   "structure_limit_K": 0.0,
   "nose_tps_custom": null,
   "body_tps_custom": null,
+  "heating_locations": [
+    {
+      "kind": "nose_cap",
+      "name": "nose"
+    },
+    {
+      "kind": "windward_face",
+      "name": "body"
+    }
+  ],
   "source": "Acton, 'Hypersonic Boost-Glide Weapons', Science & Global Security 23 (2015): 191-219, Table 3 (A-flight fit).",
   "notes": "DARPA HTV-2 waverider. beta_kg_m2 = 26,000 kg/m^2 is the ZERO-LIFT ballistic coefficient (the canonical convention: the polar reads C_D0 = m/(beta*A)). RE-BASED 2026-07-25 from the previous 13,000 (see below). Acton's GLIDE-trim ballistic coefficient beta_L = 13,000 kg/m^2 (Acton Table 3, 'very similar to modern ICBM RVs') is now DERIVED, not stored: at the max-L/D trim C_D = 2*C_D0, so beta_L = beta_zerolift/2 = 26,000/2 = 13,000 -- reproducing Acton exactly (trajectory._aero_polar / analytic beta_L, METHODS 12.0.3). Before the re-base, the stored 13,000 was Acton's glide beta_L mis-read by the polar as zero-lift, giving an implausible C_D0=0.27 and operating C_L*=1.4 (past stall); the re-base gives C_D0=0.14, C_L*=0.71. Trajectory range changed <1% (equilibrium glide is L/D-dominated); this is a correctness/consistency fix, not a behaviour change. L/D = 2.6 (Acton Table 3). mass = 1000 kg (Wright, companion article). diameter_m is the FRONTAL (drag) diameter used for boost-phase reference area, NOT the planform width: Acton models the body as a flat isosceles triangle ~5 m long x ~2 m wide, but flying nose-first the frontal extent is small, so ~0.6 m is a representative frontal-equivalent. The 2 m planform / lifting behaviour is carried by glider_LD, not by this diameter. glider_beta_entry_kg_m2 = 7.0 is Acton's Table 3 fitted entry beta_S for the high-AoA broadside direct-reentry phase (used only by equilibrium_glide_acton); Acton explicitly flags his fitted beta_S (7-10) as physically unreliable (his Newtonian flat-plate estimate, Eq.22, gives >100). Default guidance here is damped_glide (damped-phugoid, zeta 0.7) per user direction; dynamic_equilibrium_glide (gentle smooth capture) and equilibrium_glide_acton (three-phase pull-up) remain available.\n\nReentry mode: this object was characterised flying damped_glide; the shipped default is the neutral equilibrium_glide. Select the intended reentry mode in the Reentry-mode dropdown (the glide law is a flight-plan choice, not object hardware).",
   "glider_beta_entry_kg_m2": 7.0,

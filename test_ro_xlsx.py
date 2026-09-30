@@ -100,3 +100,48 @@ def test_blank_template_still_builds_and_imports(tmp_path):
     make_blank_ro_template(str(p))
     back = import_ro_xlsx(str(p))
     assert back.body_form == "axisymmetric" and not back.biconic
+
+
+# ── heating locations: their own sheet, one row per place ───────────────────
+_LOCS = [{'kind': 'nose_cap', 'name': 'nose', 'construction': 'skin'},
+         {'kind': 'leading_edge', 'name': 'wing', 'of': 'wing',
+          'radius_m': 0.012, 'material': 'rcc', 'source': 'test'},
+         {'kind': 'windward_face', 'name': 'belly'}]
+
+
+def test_heating_locations_round_trip(tmp_path):
+    p = tmp_path / "ro.xlsx"
+    export_ro_xlsx(str(p), _ro(wing_sweep_deg=70.0, heating_locations=_LOCS))
+    assert import_ro_xlsx(str(p)).heating_locations == _LOCS
+
+
+def test_a_workbook_without_the_locations_sheet_lists_none(tmp_path):
+    import openpyxl
+    p = tmp_path / "ro.xlsx"
+    export_ro_xlsx(str(p), _ro(heating_locations=_LOCS))
+    wb = openpyxl.load_workbook(str(p))
+    del wb["Heating locations"]
+    wb.save(str(p))
+    assert import_ro_xlsx(str(p)).heating_locations == []
+
+
+def test_a_number_stored_twice_in_the_sheet_is_refused(tmp_path):
+    """A nose cap's radius typed into the locations sheet is refused, naming
+    the field that holds it, exactly as in a .ro.json file."""
+    import openpyxl
+    p = tmp_path / "ro.xlsx"
+    export_ro_xlsx(str(p), _ro(heating_locations=_LOCS[:1]))
+    wb = openpyxl.load_workbook(str(p))
+    ws = wb["Heating locations"]
+    col = next(c.column for c in ws[3] if c.value == 'radius_m')
+    ws.cell(row=4, column=col, value=0.05)
+    wb.save(str(p))
+    with pytest.raises(ValueError, match="nose_radius_m"):
+        import_ro_xlsx(str(p))
+
+
+def test_a_source_beginning_with_equals_survives_the_sheet(tmp_path):
+    p = tmp_path / "ro.xlsx"
+    locs = [{'kind': 'nose_cap', 'source': '=Tauber 1989, Eq. 40'}]
+    export_ro_xlsx(str(p), _ro(heating_locations=locs))
+    assert import_ro_xlsx(str(p)).heating_locations == locs

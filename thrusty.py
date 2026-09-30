@@ -5253,6 +5253,10 @@ class ROEditorDialog(tk.Toplevel):
             _carry = {k: (list(_v) if isinstance(_v := getattr(self._orig_ro, k),
                                                  list) else _v)
                       for k in mm._REENTRY_PLAN_KEYS}
+            # Hardware this dialog has no widgets for yet: carried through
+            # unchanged, or a save would erase it from the file.
+            _carry['heating_locations'] = [
+                dict(e) for e in self._orig_ro.heating_locations]
             ro_new = _dc.replace(ro_new, **_carry)
         return ro_new
 

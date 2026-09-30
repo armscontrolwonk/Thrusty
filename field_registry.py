@@ -228,6 +228,46 @@ RO_FIELD_OWNER = {
     'structure_limit_K':               HARDWARE,
     'nose_tps_custom':                 HARDWARE,
     'body_tps_custom':                 HARDWARE,
+    # The places on the airframe where heating is judged, as a list of
+    # entries.  The entries' own keys are declared in RO_LOCATION_KEYS below.
+    'heating_locations':               HARDWARE,
+}
+
+# ── the entries of an object's `heating_locations` list ─────────────────────
+# Each entry names ONE place on the airframe.  Nothing is stored twice, so an
+# entry carries only what no other field already holds:
+#
+#   nose_cap       the radius is `nose_radius_m` and the material is
+#                  `nose_tps_material`; the entry adds how the part is built
+#   windward_face  the shape is the body's own (`diameter_m`, `length_m`,
+#                  `biconic`, ...), the attitude `trim_alpha_deg`, the material
+#                  `body_tps_material`; the entry adds how the part is built
+#   leading_edge   an edge radius is held nowhere else, so the entry carries
+#                  it, with its material.  The sweep of the WING's edge is
+#                  `wing_sweep_deg`; an entry that says `of: wing` takes it
+#                  from there and may not restate it.  Any other edge (a
+#                  chine, a strake, a fin) carries its own sweep.
+#
+# All of it is hardware.  `construction` says how the part sheds heat: 'skin'
+# (a thin shell that radiates it away) or 'solid' (a solid piece that conducts
+# it inward).  An ablator is recognised from its material, not declared.
+RO_LOCATION_KINDS = ('nose_cap', 'leading_edge', 'windward_face')
+RO_LOCATION_CONSTRUCTIONS = ('skin', 'solid')
+RO_LOCATION_KEYS = {
+    'nose_cap':      ('kind', 'name', 'construction', 'solid_length_m',
+                      'source'),
+    'leading_edge':  ('kind', 'name', 'of', 'radius_m', 'sweep_deg',
+                      'material', 'construction', 'source'),
+    'windward_face': ('kind', 'name', 'construction', 'source'),
+}
+# Numbers an entry must NOT carry, and the field that already holds each.
+RO_LOCATION_HELD_ELSEWHERE = {
+    'nose_cap':      {'radius_m': 'nose_radius_m',
+                      'material': 'nose_tps_material'},
+    'windward_face': {'material': 'body_tps_material',
+                      'angle_deg': 'diameter_m and length_m',
+                      'alpha_deg': 'trim_alpha_deg'},
+    'leading_edge':  {},
 }
 
 # Keys a PLAN file may carry that are not fields of any dataclass: the plan's

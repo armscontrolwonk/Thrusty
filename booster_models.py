@@ -669,6 +669,13 @@ class ROParams:
     # runs.  Empty/None for the usual catalog-key case.
     nose_tps_custom:        Optional[dict] = None
     body_tps_custom:        Optional[dict] = None
+    # The places on the airframe where heating is judged: a list of entries,
+    # each {'kind': 'nose_cap' | 'leading_edge' | 'windward_face', ...}.  An
+    # entry carries only what no other field holds (field_registry.
+    # RO_LOCATION_KEYS says which keys each kind may carry and why); the rest
+    # is resolved from the fields above by heating_by_location.resolve_locations.
+    # Empty = the file lists none.  Hardware.
+    heating_locations:      list  = field(default_factory=list)
     # Provenance: where this vehicle's numbers came from and how firm they are.
     # `source` is a short citation; `notes` is free-form (e.g. "mass 300 kg is a
     # trajectory-fit value, no primary source").  Round-tripped by
@@ -744,6 +751,83 @@ def glide_family(guidance) -> str:
     return 'analytic' if g in GLIDE_FAMILY_ANALYTIC else 'numerical'
 
 
+def clean_heating_locations(entries) -> list:
+    """Check and normalise an object's ``heating_locations`` list.
+
+    Refuses, with a message that says what to do instead:
+      * a kind that is not one of field_registry.RO_LOCATION_KINDS;
+      * a key that kind may not carry - in particular a number another field
+        already holds (a nose cap's radius is ``nose_radius_m``);
+      * a wing's leading edge that restates the sweep (``wing_sweep_deg``);
+      * a radius that is not positive, a sweep outside 0 to 90 degrees, a
+        construction that is neither 'skin' nor 'solid'.
+    A number that is simply not known is left OUT of the entry; nothing here
+    supplies one.  Returns a new list of plain dicts, keys in registry order.
+    """
+    if not isinstance(entries, (list, tuple)):
+        raise ValueError("heating_locations must be a list of entries")
+    out = []
+    for i, e in enumerate(entries):
+        where = f"heating_locations[{i}]"
+        if not isinstance(e, dict):
+            raise ValueError(f"{where} must be an entry (a JSON object)")
+        kind = str(e.get('kind', '') or '')
+        if kind not in _fr.RO_LOCATION_KINDS:
+            raise ValueError(
+                f"{where}: kind {kind!r} is not one of "
+                f"{', '.join(_fr.RO_LOCATION_KINDS)}")
+        allowed = _fr.RO_LOCATION_KEYS[kind]
+        held = _fr.RO_LOCATION_HELD_ELSEWHERE[kind]
+        for k in e:
+            if k in held:
+                raise ValueError(
+                    f"{where} ({kind}) carries {k!r}, which is stored twice: "
+                    f"that number is {held[k]}")
+            if k not in allowed:
+                raise ValueError(
+                    f"{where} ({kind}) carries {k!r}; a {kind} entry may "
+                    f"carry only {', '.join(allowed)}")
+        c = {'kind': kind}
+        for k in allowed[1:]:
+            if k not in e or e[k] is None or e[k] == '':
+                continue
+            if k in ('radius_m', 'sweep_deg', 'solid_length_m'):
+                try:
+                    if isinstance(e[k], bool):
+                        raise ValueError
+                    v = float(e[k])
+                except (TypeError, ValueError):
+                    raise ValueError(f"{where}: {k} {e[k]!r} is not a number "
+                                     f"(give it in plain {k.rsplit('_', 1)[1]}"
+                                     f", without a unit)") from None
+                if not math.isfinite(v):
+                    raise ValueError(f"{where}: {k} {v!r} is not a finite "
+                                     f"number; leave it out if not known")
+                if k == 'sweep_deg' and not 0.0 <= v < 90.0:
+                    raise ValueError(f"{where}: sweep_deg {v:g} is outside "
+                                     f"0 to 90")
+                if k != 'sweep_deg' and v <= 0.0:
+                    raise ValueError(f"{where}: {k} must be positive; leave "
+                                     f"it out if it is not known")
+                c[k] = v
+            else:
+                c[k] = str(e[k])
+        if c.get('construction', 'skin') not in _fr.RO_LOCATION_CONSTRUCTIONS:
+            raise ValueError(
+                f"{where}: construction {c['construction']!r} is not one of "
+                f"{', '.join(_fr.RO_LOCATION_CONSTRUCTIONS)}")
+        if kind == 'leading_edge':
+            if c.get('of', '') not in ('', 'wing'):
+                raise ValueError(f"{where}: of {c['of']!r} is not 'wing'")
+            if c.get('of') == 'wing' and 'sweep_deg' in c:
+                raise ValueError(
+                    f"{where} is the wing's leading edge and restates its "
+                    f"sweep, which is stored twice: that number is "
+                    f"wing_sweep_deg")
+        out.append(c)
+    return out
+
+
 def ro_to_dict(ro: ROParams, include_reentry_plan: bool = True) -> dict:
     """Serialise an ROParams to a JSON-compatible dict.
 
@@ -814,6 +898,10 @@ def ro_to_dict(ro: ROParams, include_reentry_plan: bool = True) -> dict:
         'source':                ro.source,
         'notes':                 ro.notes,
     }
+    # Written only when the file lists a place, so an object that lists none
+    # saves exactly as it did before the field existed.
+    if ro.heating_locations:
+        d['heating_locations'] = [dict(e) for e in ro.heating_locations]
     if not include_reentry_plan:
         for _k in _REENTRY_PLAN_KEYS:
             d.pop(_k, None)
@@ -925,6 +1013,8 @@ def ro_from_dict(d: dict) -> ROParams:
         structure_limit_K=float(d.get('structure_limit_K', 0.0)),
         nose_tps_custom=(d.get('nose_tps_custom') or None),
         body_tps_custom=(d.get('body_tps_custom') or None),
+        heating_locations=clean_heating_locations(
+            d.get('heating_locations') or []),
         source=str(d.get('source', '')),
         notes=str(d.get('notes', '')),
     )
