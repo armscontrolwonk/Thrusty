@@ -678,12 +678,39 @@ shroud-jettison events.
 ### 6.3 Shroud jettison
 
 The payload shroud (or fairing) is treated as a top-level mass that
-contributes to drag area until it is jettisoned at the user-defined
-altitude `shroud_jettison_alt_km` (default 80 km). The jettison event
-fires on the first *upward* crossing of that altitude; after firing, the
-shroud's mass is subtracted from the missile total and the reference
-geometry for drag switches from the shroud envelope to the payload or
-re-entry vehicle (Section 8.2).
+contributes to drag area until it is jettisoned. The jettison rule is a
+flight-plan choice, selected by `shroud_jettison_alt_km`:
+
+- **Altitude** (`> 0`): the event fires on the first *upward* crossing of
+  that altitude.
+- **Heating criterion** (`<= 0`, a blank field in the GUI): the event fires
+  when the free-molecular heating flux q̇ = ½ρV³ falls below
+  `SHROUD_Q_FAIRING` = 1135 W/m², having first risen above it on the way
+  through max-q. This is the launch-vehicle convention for protecting a
+  spacecraft: the Falcon Payload User's Guide (SpaceX, May 2025, p. 42)
+  states that the fairing "will nominally be deployed when free molecular
+  aero-thermal heating is less than 1,135 W/m²". It is a payload-protection
+  rule for satellites, not a statement about any particular missile or
+  glide vehicle; where the actual jettison point of a vehicle is known from
+  open sources, enter it as an altitude.
+
+After firing, the shroud's mass is subtracted from the missile total and the
+reference geometry for drag switches from the shroud envelope to the payload
+or re-entry vehicle (Section 8.2).
+
+**The fairing cannot outlast separation.** A separating reentry object flies
+on its own mass and aerodynamics from final-stage burnout (Section 6.4), so a
+fairing whose rule has not fired by then leaves with the stage. On a
+depressed trajectory this is the normal case for the heating criterion: a
+flight at 5.5 km/s must be above roughly 125 km before ½ρV³ drops below
+1135 W/m², and a boost-glide profile may never get there. The Flight
+Timeline then reports `Fairing released at separation`, with the reason —
+the rule was met only later (`heating criterion not met until 249 s`), or
+never (`heating criterion never met: flight minimum 1594 W/m² > 1135 W/m²`)
+— and the fairing's debris arc starts from the separation point. When
+nothing separates and the rule never fires, the row reads `Fairing
+retained`. These rows are reporting only; they describe what the dynamics
+already do and do not change the trajectory.
 
 ### 6.4 Reentry vehicle separation
 
@@ -4745,7 +4772,7 @@ emitted:
 | Phase | Event |
 |---|---|
 | Boost | Stage `N` ignition / Stage `N` empty body — in orbit / Stage `N` empty impact |
-| Boost | Shroud jettison / Shroud impact |
+| Boost | Fairing jettison / Fairing released at separation / Fairing retained / Fairing impact |
 | Boost | Booster casing impact (strap-on, after separation) |
 | Boost / coast | Apogee (`{alt} km`) |
 | Coast | Perigee (`{alt} km`) — for orbital trajectories |
@@ -4806,7 +4833,7 @@ rather than double-counted. (Non-last stages always shed their full
 `mass_final`.)
 
 Spent bodies that re-enter compute their own impact point and add a
-"Stage N empty impact" or "Shroud impact" or "Booster casing impact"
+"Stage N empty impact" or "Fairing impact" or "Booster casing impact"
 event to the master milestone list. The full debris-arc time-series is
 also stored in `debris_trajectories` for plotting on the same map as
 the primary trajectory. Stages that reach orbit are flagged with

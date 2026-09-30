@@ -15062,6 +15062,7 @@ class BoosterFlyoutApp(tk.Tk):
                     'burnout'      in e or
                     ('ignition' in e and 'stage' in e) or
                     'jettison'     in e or
+                    'fairing released' in e or
                     'bank'         in e or
                     'pull-up start' in e or
                     'glide start'  in e or

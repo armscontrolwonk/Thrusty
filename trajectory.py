@@ -322,6 +322,25 @@ def _stage_event_times(params: BoosterParams):
     return events
 
 
+def _fairing_flux_note(alt_arr, speed_arr):
+    """Timeline wording for a flight on which the heating rule never released
+    the fairing, with the lowest flux the flight reached.
+
+    The rule is the one the _eom latch applies: free-molecular flux
+    1/2 rho V^3 below SHROUD_Q_FAIRING, above 40 km.
+    """
+    qd = np.array([0.5 * atmosphere(max(float(a), 0.0))[2] * float(v) ** 3
+                   for a, v in zip(alt_arr, speed_arr)])
+    high = qd[np.asarray(alt_arr) > 40_000.0]
+    if not high.size or high.min() < SHROUD_Q_FAIRING:
+        return "heating criterion never met above 40 km"
+    q = float(high.min())
+    q_txt = (f"{q / 1.0e6:.1f} MW/m²" if q >= 1.0e6 else
+             f"{q / 1.0e3:.0f} kW/m²" if q >= 1.0e4 else f"{q:.0f} W/m²")
+    return (f"heating criterion never met: flight minimum {q_txt} > "
+            f"{SHROUD_Q_FAIRING:.0f} W/m²")
+
+
 def _interp_milestone(t_event, t_arr, alt_arr, range_arr, speed_arr,
                       inertial_speed_arr, accel_arr, mass_arr):
     """
@@ -3176,15 +3195,46 @@ def integrate_trajectory(params: BoosterParams,
         milestones.append(row)
 
     # Shroud jettison — altitude crossing (override) or heating-latch time.
+    # A separating reentry object flies free from final burnout (_eom switches
+    # to the object's own mass and aero there), so the fairing cannot outlast
+    # separation: when the jettison rule has not fired by then the fairing
+    # leaves with the stage, and the timeline says so rather than staying
+    # silent or reporting a jettison the dynamics never honoured.  Reporting
+    # only — the trajectory is unchanged.
+    _t_fair = None          # release time, shared with the debris arc below
     if params.shroud_mass_kg > 0:
-        if params.shroud_jettison_alt_km > 0:
+        _heating = params.shroud_jettison_alt_km <= 0
+        if _heating:
+            t_ev = getattr(params, '_shroud_latch', [None, None, None])[2]
+        else:
             t_ev = _alt_crossing(params.shroud_jettison_alt_km * 1000.0,
                                  ascending=True)
+        _t_sep = total_burn_time(params)
+        _separates = (effective_ro(params) is not None
+                      and run_separation_mode(params) == 'separating_ro'
+                      and _t_sep <= t_arr[-1])
+        _label = "Fairing jettison"
+        _rule = ("heating criterion" if _heating else
+                 f"{params.shroud_jettison_alt_km:g} km jettison altitude")
+        if t_ev is None:
+            _why = (_fairing_flux_note(alts, speeds) if _heating
+                    else f"{_rule} never reached")
         else:
-            t_ev = getattr(params, '_shroud_latch', [None, None, None])[2]
+            _why = (f"{_rule} not {'met' if _heating else 'reached'} "
+                    f"until {t_ev:.0f} s")
+        if (t_ev is None or t_ev > _t_sep) and _separates:
+            t_ev = _t_sep
+            _label = f"Fairing released at separation ({_why})"
+        elif t_ev is None:
+            # Nothing separates and the rule never fired: the fairing rides
+            # the whole flight.  Report it at final burnout.
+            row = _milestone(min(_t_sep, t_arr[-1]))
+            row['event'] = f"Fairing retained ({_why})"
+            _insert_chrono(row)
         if t_ev is not None:
+            _t_fair = t_ev
             row = _milestone(t_ev)
-            row['event'] = "Fairing jettison"
+            row['event'] = _label
             _insert_chrono(row)
 
     # --- Debris impact arcs (tumbling empty stages + shroud) -----------------
@@ -3289,11 +3339,6 @@ def integrate_trajectory(params: BoosterParams,
     # Shroud debris arc.  If length is given use tumbling-cylinder β; otherwise
     # fall back to end-on disc area so the impact row is always shown.
     if params.shroud_mass_kg > 0:
-        if params.shroud_jettison_alt_km > 0:
-            _t_fair = _alt_crossing(params.shroud_jettison_alt_km * 1000.0,
-                                    ascending=True)
-        else:
-            _t_fair = getattr(params, '_shroud_latch', [None, None, None])[2]
         if _t_fair is not None and _t_fair <= t_arr[-1]:
             _sd = params.shroud_diameter_m if params.shroud_diameter_m > 0 else params.diameter_m
             if params.shroud_length_m > 0:

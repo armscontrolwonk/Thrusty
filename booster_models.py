@@ -3929,9 +3929,13 @@ def _booster_mass_addend(params: BoosterParams, t: float) -> float:
 
 
 # Free-molecular heating flux at which a payload shroud/fairing is jettisoned.
-# 1135 W/m^2 = 0.1 BTU/ft^2-s, the standard launch-vehicle fairing-jettison
-# thermal criterion (ULA Atlas V / Delta IV and SpaceX Falcon user's guides;
-# collated in Isakowitz, International Reference Guide to Space Launch Systems).
+# 1135 W/m^2 = 0.1 BTU/ft^2-s, the launch-vehicle fairing-jettison thermal
+# criterion.  Read from primary: Falcon Payload User's Guide (SpaceX, May
+# 2025), p. 42 -- the fairing "will nominally be deployed when free molecular
+# aero-thermal heating is less than 1,135 W/m2".  The Atlas V guide is
+# reported to give the same figure on a 3-sigma basis but has not been read
+# from primary; see data/REFERENCES.md.  It is a satellite payload-protection
+# rule, so a depressed trajectory may never meet it (METHODS.md 6.3).
 # q_dot = 1/2 rho V^3 is the free-molecular convective flux (accommodation ~1).
 SHROUD_Q_FAIRING = 1135.0   # W/m^2
 
