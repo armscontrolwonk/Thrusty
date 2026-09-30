@@ -2057,6 +2057,7 @@ def integrate_trajectory(params: BoosterParams,
                          terrain_dem: bool = False,
                          launch_elev_m: float = None,
                          stall_evals: int = STALL_EVAL_LIMIT,
+                         initial_state_ecef=None,
                          _search_mode: bool = False):
     """
     Integrate a booster trajectory from launch to impact.
@@ -2096,6 +2097,13 @@ def integrate_trajectory(params: BoosterParams,
                             the coarse-grid sample — e.g. the hi-res value
                             baked into launch_sites.json.  Only read when
                             terrain_dem is True; None = sample the grid.
+    initial_state_ecef    : start the integration from this Earth-fixed state
+                            [x, y, z, vx, vy, vz] (m, m/s) at t = 0 instead of
+                            from rest on the launch pad.  Range is then
+                            measured from the point beneath that state, and
+                            launch_lat_deg / launch_lon_deg are ignored.  Used
+                            by integrate_entry(); None = launch from the pad,
+                            byte-identical to before.
 
     Returns
     -------
@@ -2351,6 +2359,10 @@ def integrate_trajectory(params: BoosterParams,
     v0 = 10.0 * launch_dir
 
     state0 = np.concatenate([pos0, v0])
+    _from_state = initial_state_ecef is not None
+    if _from_state:
+        state0 = np.asarray(initial_state_ecef, float).reshape(6)
+        lat0, lon0, _ = ecef_to_geodetic(state0[:3])
 
     t_span    = (0.0, max_time_s)
     _target_orbit_alt_m = (target_orbit_alt_km * 1000.0
@@ -3186,8 +3198,15 @@ def integrate_trajectory(params: BoosterParams,
         return _interp_milestone(t_ev, t_arr, alts, ranges, speeds,
                                  inertial_speeds, accels, masses)
 
-    # Stage ignition / burnout events from the stage list
-    for label, t_ev in _stage_event_times(params):
+    # Stage ignition / burnout events from the stage list.  A run started
+    # from a state with no propulsion has none: it opens with the state itself.
+    _unpowered_start = _from_state and total_burn <= 0.0
+    if _unpowered_start:
+        row = _milestone(t_arr[0])
+        row['event'] = f"Entry interface ({row['alt_km']:.0f} km)"
+        milestones.append(row)
+    for label, t_ev in ([] if _unpowered_start
+                        else _stage_event_times(params)):
         if t_ev > t_arr[-1]:
             break          # vehicle hit ground before this event
         row = _milestone(t_ev)
@@ -3420,9 +3439,12 @@ def integrate_trajectory(params: BoosterParams,
                     })
 
     # Apogee
-    apo_row = _milestone(t_arr[apo_idx])
-    apo_row['event'] = f"Apogee ({apo_row['alt_km']:.0f} km)"
-    _insert_chrono(apo_row)
+    # A descending entry state is its own highest point; that is the entry
+    # interface row above, not an apogee.
+    if not (_unpowered_start and apo_idx == 0):
+        apo_row = _milestone(t_arr[apo_idx])
+        apo_row['event'] = f"Apogee ({apo_row['alt_km']:.0f} km)"
+        _insert_chrono(apo_row)
 
     # Perigee — first altitude minimum after powered flight ends (orbital only).
     # Scan for the first sign change from negative to positive in d(alt)/dt
@@ -3867,8 +3889,9 @@ def integrate_trajectory(params: BoosterParams,
         _s_bw   = _s_bw.stage2
 
     def _in_burn_window(t):
+        # A stage with no burn (integrate_entry's carrier) has no window.
         for _tb0, _tb1 in _burn_windows:
-            if _tb0 <= t <= _tb1:
+            if _tb1 > _tb0 and _tb0 <= t <= _tb1:
                 return True
         return False
 
@@ -4107,6 +4130,104 @@ def integrate_trajectory(params: BoosterParams,
         'alpha_induced_drag':    bool(getattr(params, '_alpha_induced_drag', False)),
         'glide_regime':          _glide_regime,
     }
+
+
+def entry_state_ecef(speed_ms: float, flight_path_angle_deg: float,
+                     altitude_m: float, heading_deg: float,
+                     lat_deg: float, lon_deg: float, *,
+                     speed_frame: str = "inertial",
+                     altitude_datum: str = "geodetic") -> np.ndarray:
+    """Earth-fixed state [x, y, z, vx, vy, vz] for a vehicle arriving at the
+    top of the atmosphere, as entry conditions are usually published.
+
+    speed_ms              : speed at the entry point (m/s)
+    flight_path_angle_deg : angle of the velocity above the local horizontal;
+                            NEGATIVE for a descending entry
+    altitude_m            : height of the entry point, per altitude_datum
+    heading_deg           : direction of travel, clockwise from north
+    lat_deg, lon_deg      : geodetic latitude and longitude of the entry point
+    speed_frame           : "inertial" - speed, angle and heading describe the
+                            velocity in the non-rotating frame, and the
+                            Earth's rotation is removed to get the Earth-fixed
+                            velocity; "relative" - they already describe the
+                            velocity relative to the rotating Earth (and so to
+                            the atmosphere)
+    altitude_datum        : "geodetic" - height above the WGS-84 ellipsoid;
+                            "equatorial_radius" - the entry point lies at
+                            geocentric radius RE + altitude_m, the convention
+                            of an entry interface defined as a sphere.  Away
+                            from the equator that is several km higher above
+                            the ground than the same number read as geodetic.
+
+    Which frame and which datum a published entry condition uses is for the
+    caller to establish from its source; nothing is assumed here.
+    """
+    if speed_frame not in ("inertial", "relative"):
+        raise ValueError("speed_frame must be 'inertial' or 'relative'")
+    if altitude_datum not in ("geodetic", "equatorial_radius"):
+        raise ValueError(
+            "altitude_datum must be 'geodetic' or 'equatorial_radius'")
+    lat, lon = np.radians(lat_deg), np.radians(lon_deg)
+    if altitude_datum == "geodetic":
+        pos = np.asarray(geodetic_to_ecef(lat, lon, float(altitude_m)), float)
+    else:
+        # Walk the point up the local vertical until its geocentric radius is
+        # RE + altitude.  Radius rises monotonically with height, so bisect.
+        r_target = RE + float(altitude_m)
+        lo, hi = float(altitude_m) - 1.0, float(altitude_m) + 30_000.0
+        for _ in range(60):
+            mid = 0.5 * (lo + hi)
+            r_mid = float(np.linalg.norm(geodetic_to_ecef(lat, lon, mid)))
+            if r_mid < r_target:
+                lo = mid
+            else:
+                hi = mid
+        pos = np.asarray(geodetic_to_ecef(lat, lon, 0.5 * (lo + hi)), float)
+    e_east, e_north, e_up = _enu_frame(lat, lon)
+    g, h = np.radians(flight_path_angle_deg), np.radians(heading_deg)
+    vel = float(speed_ms) * (np.cos(g) * (np.sin(h) * e_east
+                                          + np.cos(h) * e_north)
+                             + np.sin(g) * e_up)
+    if speed_frame == "inertial":
+        vel = vel - np.cross(np.array([0.0, 0.0, OMEGA_EARTH]), pos)
+    return np.concatenate([pos, vel])
+
+
+def integrate_entry(ro, speed_ms: float, flight_path_angle_deg: float,
+                    altitude_m: float, heading_deg: float,
+                    lat_deg: float, lon_deg: float, *,
+                    speed_frame: str = "inertial",
+                    altitude_datum: str = "geodetic",
+                    dt_output: float = 1.0, max_time_s: float = 3600.0,
+                    **kwargs):
+    """Fly a reentry object from a stated entry condition to the ground.
+
+    For a vehicle that arrives from space - a returning capsule, a space
+    plane, an object whose entry state is what the open record gives - rather
+    than one Thrusty has boosted itself.  The object is flown exactly as it is
+    after separation in integrate_trajectory(): same equations of motion, same
+    drag and lift, same glide law, same heating.  There is no booster: the
+    object is carried on a stack with no propulsion and no mass of its own.
+
+    ro is the reentry object (ROParams) with its reentry plan applied.  The
+    entry condition arguments are those of entry_state_ecef().  Remaining
+    keyword arguments pass to integrate_trajectory() (terrain_dem,
+    reentry_query_alt_km, ...).
+
+    Returns the integrate_trajectory() result dict.  Time runs from the entry
+    point and range is measured from the point beneath it.  Not modelled:
+    parachutes or any other deployed decelerator, so the flight below a
+    capsule's drogue deployment is not the capsule's.
+    """
+    from booster_models import entry_carrier
+    state = entry_state_ecef(speed_ms, flight_path_angle_deg, altitude_m,
+                             heading_deg, lat_deg, lon_deg,
+                             speed_frame=speed_frame,
+                             altitude_datum=altitude_datum)
+    return integrate_trajectory(entry_carrier(ro), lat_deg, lon_deg,
+                                heading_deg, dt_output=dt_output,
+                                max_time_s=max_time_s,
+                                initial_state_ecef=state, **kwargs)
 
 
 def aim_booster(params: BoosterParams,

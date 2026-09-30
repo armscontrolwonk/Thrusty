@@ -1034,6 +1034,25 @@ def effective_ro(params: 'BoosterParams') -> Optional[ROParams]:
     return None
 
 
+def entry_carrier(ro) -> 'BoosterParams':
+    """A stack with no propulsion and no mass, carrying ``ro``.
+
+    Lets a reentry object be flown from a stated entry condition
+    (trajectory.integrate_entry) through the same code path that flies it
+    after separation from a booster.  Burn time is zero, so the object is
+    "post-burnout" from the first instant; compose_loadout gives the stack the
+    object's mass, and nothing is left behind to fall as debris.  It is a
+    run-time construct only: never stored, and not a booster in any library.
+    """
+    p = BoosterParams(
+        name="(entry)", mass_initial=0.0, mass_propellant=0.0, mass_final=0.0,
+        diameter_m=float(getattr(ro, 'diameter_m', 0.0) or 0.0),
+        length_m=float(getattr(ro, 'length_m', 0.0) or 0.0),
+        thrust_N=0.0, burn_time_s=0.0, isp_s=0.0)
+    p.ro = ro
+    return compose_loadout(p, ro, 1)
+
+
 def compose_loadout(params: 'BoosterParams', ro=None,
                     num_ros: int = 1) -> 'BoosterParams':
     """Apply a run-level front-end loadout to a booster stage chain.

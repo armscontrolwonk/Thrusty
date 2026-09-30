@@ -102,7 +102,7 @@ observed test-flight impact zones for analytic comparison.
 | File | Purpose |
 |---|---|
 | `thrusty.py` | Tkinter GUI |
-| `trajectory.py` | 3-DOF integrator, guidance laws, range optimiser, orbital planner, reentry glide |
+| `trajectory.py` | 3-DOF integrator, guidance laws, range optimiser, orbital planner, reentry glide, and `integrate_entry` for a flight that starts from a stated entry condition |
 | `booster_models.py` | Booster and reentry-object dataclasses, drag, thrust, staging |
 | `field_registry.py` | Which of the four files owns each dataclass field. Pure data; the key tuples and the split tests derive from it |
 | `analysis.py` | Sweep drivers (range ring, parametric sweep, footprint) and result post-processing; the GUI orchestrates these, never computes |

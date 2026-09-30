@@ -1024,6 +1024,52 @@ resolves only the front-end body — adding one interstage's friction would be
 inconsistent granularity. A plain stack (no `conical`, no `has_interstage`)
 is byte-identical. `test_transition_drag.py`.
 
+
+### 6.8 Starting from an entry condition (`trajectory.integrate_entry`)
+
+A vehicle that arrives from space (a returning capsule, a space plane, any
+object whose *entry state* is what the open record gives) is flown from that
+state, not from a launch pad. `integrate_entry(ro, speed, flight-path angle,
+altitude, heading, latitude, longitude)` builds the Earth-fixed state and
+hands it to `integrate_trajectory` through `initial_state_ecef`. The object is
+flown exactly as it is after separation from a booster: same equations of
+motion, drag, lift, glide law and heating. There is no booster; the object
+rides a run-time stack with no propulsion and no mass
+(`booster_models.entry_carrier`), which is never stored.
+
+Two conventions must be stated by the caller, because published entry
+conditions differ in them and rarely say which they use:
+
+| Argument | Choices | Effect |
+|---|---|---|
+| `speed_frame` | `inertial` / `relative` | Inertial: speed, angle and heading describe the velocity in the non-rotating frame, and ω × r is removed to get the Earth-fixed velocity. Relative: they describe it relative to the rotating Earth and atmosphere. At 12.2 km/s heading 62° from 37° N the two differ by about 330 m/s |
+| `altitude_datum` | `geodetic` / `equatorial_radius` | Geodetic: height above the WGS-84 ellipsoid. Equatorial radius: the entry point lies at geocentric radius R_E + altitude, an entry interface defined as a sphere. At 37° N, 125 km on that sphere is 132.7 km geodetic |
+
+The Flight Timeline of such a run opens with `Entry interface` and carries no
+ignition, burnout, apogee, fairing, debris or boost angle-of-attack rows. Time
+runs from the entry point and range from the point beneath it.
+
+**Not modelled:** parachutes or any deployed decelerator, and the change of a
+capsule's drag coefficient with Mach number (one ballistic coefficient is
+flown throughout). The flight below drogue deployment is not the capsule's.
+
+**Accuracy against named cases** (`test_entry_start.py`):
+
+| Case | Compared | Result |
+|---|---|---|
+| Stardust reconstructed flight (Liu et al. 2008, Table 3), started at 34 s / 81.02 km | altitude and speed at 13 later points down to 51 km | altitude within 0.8 km, speed within 1.5% |
+| OSIRIS-REx nominal timeline (Ajluni et al., Fig. 6-4): 12.2 km/s, −8.2°, heading 62°, 125 km | peak heating E+51 s; peak deceleration 31.8 g at E+61 s | within 2 s and 4% |
+
+What those cases assume and do not cite: a ballistic coefficient of
+59.3 kg/m², the median implied by the Stardust flight table itself (neither
+source gives a capsule mass), carried over to OSIRIS-REx on Ajluni et al.'s
+statement that the capsule is identical to Stardust in everything relating to
+reentry; placeholder entry latitude and longitude; and, for OSIRIS-REx, 12.2
+km/s read as inertial and 125 km read as a height above the equatorial radius.
+The paper states neither. Read as geodetic, 125 km puts every event 6–8 s
+early, which the tests pin: it is a finding about the convention, not a
+validation of it.
+
 ---
 
 ## 7. Propulsion
