@@ -1089,6 +1089,50 @@ point at the very end. Both errors are small against the reading
 precision of the centre of pressure, and they pull in opposite directions.
 One motor, at the top of the size range; small motors remain unchecked.
 
+### 19h. First benchmark of a spent stage: the Shuttle SRB (2026-10-01)
+
+Flown in a scratch script, not yet a test. The SRB as a spent solid stage
+(149.16 ft by 12.17 ft; 170,000 lb, Bacchus et al., and 192,000 lb, Moore
+et al.; peak thrust 3.31×10⁶ lbf for the nozzle share) from its published
+separation state (154,000 ft, 4,330 fps, 124 s: Moore et al. 2012 Fig. 10)
+through `_fly_band`. The flight-path angle at separation is not published;
+30.8° is the value that gives the published apogee, and is derived, not
+sourced.
+
+| | Published (McDonald 1985 Fig. 19 / Moore 2012 Fig. 10) | Thrusty |
+|---|---|---|
+| Apogee | 220,000 / 230,000 ft, 68–70 s after separation | 233,000 ft, 72 s |
+| Tumble rate at apogee | 16°/s | 5–13°/s from the air alone |
+| Peak dynamic pressure | 1,700 / 1,600 psf at 42,000 / 43,000 ft, 2,400 fps, 184–188 s after separation | trimmed 3,150–3,540 psf at 36,000 ft; end over end 680–780 psf at 62–64,000 ft |
+| At 15,700 ft, before any parachute | 540 fps, 210 psf, 218 s after separation | trimmed 1,170–1,520 fps, 201–203 s; end over end 450–480 fps, 237–242 s |
+| Angle of attack at peak dynamic pressure | 170° (McDonald); band 120–188° (Ventres & Dowell) | trim 152–166° (Mach 1.5–2.86) |
+| Range | 130–141 nmi from the launch site | 114–115 nmi (trimmed), 110 nmi (end over end) from the separation point |
+
+Reading:
+- **The published fall lies between Thrusty's two ends**, as a band should
+  have it, and nearer the tumbling end in speed. The trimmed end is too
+  fast and too deep (twice the dynamic pressure); the tumbling end too slow.
+- **Flown at the angle the SRB's own wind-tunnel data gives** (§19g: 31°
+  off tail-first), with Thrusty's cylinder forces, the fall matches: peak
+  dynamic pressure 1,440–1,640 psf at 47–50,000 ft, and 215–218 s to
+  15,700 ft against 218 s published. The speed there is still high (660–730
+  against 540 fps): below Mach 1.5 the SRB swings toward broadside (Ventres
+  & Dowell's band is 95–157° at Mach 1), which a fixed angle does not do.
+  So the forces are sound and the trim angle is what a real shape changes.
+- **The tumble rate from the air is within a factor of two or three of the
+  16°/s published.** The SRB also fired eight separation motors, which
+  Thrusty does not model. At 5–13°/s it turns over about once on the climb,
+  which sits on the "did the air turn it over" threshold, so the run
+  reports the midpoint.
+- **Range does not discriminate**: the ends differ by 5 nmi, and the
+  separation point's distance from the pad is not in the sources read. The
+  published 130–141 nmi implies it was 20–30 nmi downrange, which is
+  plausible and unverified.
+
+What it argues for: stage geometry beyond a plain cylinder — a flared aft
+skirt and a protruding nozzle — so the centre of pressure can be shifted
+by the planform centroid (§19g). With that, this benchmark becomes a test.
+
 **Phase 4 — later.** A flight-plan option to drop the fins.
 
 ## 19a. Phase 1 as built (2026-09-30)
