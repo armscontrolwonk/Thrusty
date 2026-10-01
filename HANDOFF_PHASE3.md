@@ -11,6 +11,7 @@ Suite: 1180 passed, 2 skipped, about 100 s. Newest first:
 
 | Commit | What |
 |---|---|
+| `fa97577` | Phase 3 part 3: the stage's own swing (`attitude_model`, `_attitude_verdict`) picks the reported point; ± on midpoint rows |
 | `2c16c25` | `CLAUDE.md` layout row for `spent_stage_aero.py` |
 | `6a074fa` | Phase 3 part 2: drag by attitude (`spent_stage_aero.py`, Jernell data in `data/aero/`), the end-over-end climb leg to apogee, the trim-to-tumbling band reported at its midpoint, solid stages trimmed from Romaniw's nozzle ratio; `test_spent_stage_aero.py`; METHODS §14.3/§16, Part IV §19d, NOTICE, REFERENCES, README, `TODO.md` item 10 |
 | `e82c23c` | AUR corrected (user): both stages solid, stage 1 double-anchor grain at 290 kN peak; legacy-load golden regenerated for that file; damped-glide smoke test pins its constant-thrust carrier |
@@ -49,8 +50,7 @@ stay at the main flight's values.
 
 1. **Stage-impact benchmark.** The user is sourcing one; nothing checks a
    debris impact point against an observation yet.
-2. **Settle or tumble** is built (Part IV §19e, uncommitted at the time of
-   writing): the swing is followed along the flight and picks the trimmed
+2. **Settle or tumble** is built and committed (`fa97577`, Part IV §19e): the swing is followed along the flight and picks the trimmed
    or end-over-end point when it is clear; the midpoint, with ± on the
    timeline row, when it is not. Still open under it: Tobak & Peterson's
    Fig. 2 as a check of the integrator, pitch damping, the separation kick.
