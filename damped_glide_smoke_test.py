@@ -85,6 +85,15 @@ def _fly_aur_shallow(mode, zeta=None, aero="polar", terminal_alt_km=30.0):
     """AUR on a depressed (shallow) insertion — capturable (adv-pitch program:
     stage 1 → 27°, stage 2 → 0° flat, launch elev 80°, az 103°, cutoff 117 s)."""
     p = copy.deepcopy(get_booster("AUR"))
+    # Pin the carrier's propulsion at the anchors' operating point.  The
+    # shipped AUR became a solid with a regressive (double-anchor) stage-1
+    # grain on 2026-10-01 (a data correction from the user); on this program
+    # that stack burns out slower and no longer reaches the skip regime these
+    # anchors were calibrated in (less speed at burnout, so the shallow
+    # insertion plunges instead of skipping).  The test is about the glider's damping
+    # law, not AUR, so it keeps flying the constant-thrust stack.
+    for s in (p, p.stage2):
+        s.grain_type, s.thrust_peak_N = "", 0.0
     p.stage_turn_start_s, p.stage_turn_stop_s, p.stage_burnout_angle_deg = 1.0, 30.0, 27.0
     if getattr(p, "stage2", None) is not None:
         p.stage2.stage_turn_start_s = 54.0
