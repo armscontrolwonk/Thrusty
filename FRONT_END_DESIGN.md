@@ -972,6 +972,30 @@ end-on that the flat-ended cylinder gives. The ±0.05 L probe above does
 not span that. Real stage shapes stay the largest open question for the
 trimmed end; the Shuttle SRB reentry database is the document to find.
 
+**Ventres & Dowell 1977** (BBN Report 3532 for NASA MSFC, *The SRB Heat
+Shield: Aeroelastic Stability During Reentry*, read 2026-10-01). A
+heat-shield flutter study, but its §2 states the Shuttle SRB's predicted
+reentry attitude, from an MSFC trajectory memo (Gallaboff 1976, not in
+hand): the booster tumbles after separation, then "settles into a
+tail-down attitude", coning nozzle-first about an equilibrium angle. Its
+Fig. 3 (read from a rendered page) gives the band that holds in 95% of
+reentries, angle of attack measured from nose-first:
+
+| Mach | 0.8 | 1.0 | 1.5 | 2.0 | 2.75 | 3.5 |
+|---|---|---|---|---|---|---|
+| Band, deg | 85–150 | 95–157 | 138–183 | 140–186 | 120–188 | 97–190 |
+
+Peak dynamic pressure, about 85 kN/m², falls at Mach 2.75 (Fig. 2). So at
+Mach 1.5–2.75 the SRB was expected to fall tail-first roughly 20–30° off
+end-on, opening toward broadside below Mach 1.5 and above Mach 3. That is
+the same attitude Thrusty's trim gives a base-heavy stage (10–20° off
+end-on, base leading) in the Mach range where most of the drag acts, from
+a real booster with a nozzle and flared skirt. It is a pre-flight
+prediction, not a flight measurement, and it disagrees with Purinton's
+"near broadside" for the longer Ares I booster; no number is taken from
+it. It also says the tumble is arrested before peak dynamic pressure, as
+Thrusty's "settles" verdict would have it for a heavy stage.
+
 **Phase 4 — later.** A flight-plan option to drop the fins.
 
 ## 19a. Phase 1 as built (2026-09-30)

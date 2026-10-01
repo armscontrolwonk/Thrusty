@@ -11,6 +11,8 @@ Suite: 1180 passed, 2 skipped, about 100 s. Newest first:
 
 | Commit | What |
 |---|---|
+| `623d046` | Finned spent stages fly front-first when their fins hold them (`fin_stability`); Purinton and Ares I-X Fig. 8 recorded |
+| `7ee729b` | Part IV §19f (two checks, Ares I-X), `MISSING_DOCS.md` |
 | `fa97577` | Phase 3 part 3: the stage's own swing (`attitude_model`, `_attitude_verdict`) picks the reported point; ± on midpoint rows |
 | `2c16c25` | `CLAUDE.md` layout row for `spent_stage_aero.py` |
 | `6a074fa` | Phase 3 part 2: drag by attitude (`spent_stage_aero.py`, Jernell data in `data/aero/`), the end-over-end climb leg to apogee, the trim-to-tumbling band reported at its midpoint, solid stages trimmed from Romaniw's nozzle ratio; `test_spent_stage_aero.py`; METHODS §14.3/§16, Part IV §19d, NOTICE, REFERENCES, README, `TODO.md` item 10 |
@@ -56,14 +58,29 @@ stay at the main flight's values.
    Fig. 2 as a check of the integrator, pitch damping, the separation kick.
 3. **Validation list.** `TODO.md` item 10 lists every model adopted on a
    ratio, an extrapolation or an inference, with the data that would test it.
-4. **Real stage ends** (open interstage, nozzles) and **fin forces beyond
-   58°**: no source in hand.
-5. **AUR's Isp.** The double-anchor curve at 290 kN peak delivers 11.7 MN·s;
+4. **Finned stages** (`623d046`, Part IV §19f): `fin_stability` decides
+   whether the fins hold an empty stage front-first. Stable → flown
+   front-first (Strypi VIII R first stages); marginal → midpoint of
+   front-first and tumbling (No-dong, Strypi VII R); unstable → tumbling only
+   (Taepodong-I, -II). Fin forces beyond 58° are still not in any source.
+5. **Real stage shapes are the largest open question for the trimmed end.**
+   The flat-ended cylinder trims 10–20° off end-on. Evidence in hand on real
+   boosters, none of it used for a number: the Shuttle SRB was predicted to
+   cone tail-first about an equilibrium near 150–160° at Mach 2–2.75, 95% of
+   reentries inside 110–180° (Ventres & Dowell 1977, Fig. 3) — close to
+   Thrusty's trim; Ares I-X flew 151° at max-q but its Monte Carlo was 59%
+   broadside (Tartabini & Starr 2011); Purinton et al. 2011 say the Ares I
+   booster trims "near broadside" and give no values. The document to find
+   is the Shuttle SRB reentry database (`MISSING_DOCS.md` item 1).
+6. **Documents to track down** are listed in `MISSING_DOCS.md`, with a
+   Received table. PDF pages can be rendered without poppler by a small
+   Swift/PDFKit program (see Working notes).
+7. **AUR's Isp.** The double-anchor curve at 290 kN peak delivers 11.7 MN·s;
    the file's 280 s Isp implies 12.4 MN·s. The thrust curve governs; the Isp
    may be high. AUR stage 2 has no grain given (constant thrust).
-6. **Strap-on casings on the Strypi VIII R files** separate about 1 km up and
+8. **Strap-on casings on the Strypi VIII R files** separate about 1 km up and
    land at 0.0 km range; pre-existing, not looked into.
-7. `TODO.md` item 6 still says the fairing has no trajectory or impact point;
+9. `TODO.md` item 6 still says the fairing has no trajectory or impact point;
    out of date.
 
 Phase 4 (later): a flight-plan option to drop the fins.
@@ -75,7 +92,8 @@ Phase 4 (later): a flight-plan option to drop the fins.
 - Fins stay on a handed-off body; a flight-plan option to drop them comes later.
 - Where a tumbling stage lands matters more than its heating, for now.
 - **Finned stages: band only** (trim unknown) — with the midpoint rule, flown
-  tumbling only.
+  tumbling only. Since 2026-10-01 a finned stage is first checked for
+  front-first stability and flown front-first when its fins hold it.
 - Outside Mach 1.5–2.86: hold Mach 1.5 values below; tumbling drag blends to
   Klett above; trim held at Mach 2.86.
 - **Report one number.** First the midpoint of the range (2026-09-30); then
@@ -174,6 +192,12 @@ Phase 4 (later): a flight-plan option to drop the fins.
   openpyxl` and run with `PYTHONPATH=<scratch>/pylib`, or they skip.
 - Any script that dumps trajectories must blank `USER_FLIGHT_PLAN_DIRS`,
   `USER_REENTRY_PLAN_DIRS` and `USER_RO_DIRS` first (CLAUDE.md).
+- PDF figures: the Read tool needs poppler (`brew install poppler`), which
+  is not installed. Instead compile a renderer once per session: a Swift
+  file that opens the PDF with PDFKit and draws each requested page into an
+  `NSBitmapImageRep` (`swiftc -O render.swift -o render`, then
+  `./render file.pdf outprefix 7,10 1.6` and Read the PNGs). Used on
+  2026-10-01 for Ares I-X Fig. 8, Purinton Fig. 7 and the SRB Fig. 3.
 - PDFs: `pdftoppm` is not installed. Text via `pypdf` (install to the
   scratchpad; open with `PdfReader(path, strict=False)` and logging disabled —
   one Regan file has a damaged index that floods warnings). Page images via a
