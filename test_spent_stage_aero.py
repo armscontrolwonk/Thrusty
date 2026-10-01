@@ -207,13 +207,18 @@ def test_a_climbing_piece_tumbles_end_over_end_to_apogee_then_flies_the_band():
     assert np.argmax(track['alt']) > 0
     assert track['alt'][0] == pytest.approx(40e3, rel=1e-3)
     assert track['lat'][-1] == lat and track['lon'][-1] == lon
-    # The reported point is the midpoint of the band.
+    # One point is reported: an end the swing picked, or the midpoint.
     r, tm = band['random'], band['trim']
-    d_rt = range_between(*map(math.radians, r), *map(math.radians, tm))
-    d_rm = range_between(*map(math.radians, r), math.radians(lat), math.radians(lon))
-    d_tm = range_between(*map(math.radians, tm), math.radians(lat), math.radians(lon))
-    assert d_rm == pytest.approx(0.5 * d_rt, rel=1e-3)
-    assert d_tm == pytest.approx(0.5 * d_rt, rel=1e-3)
+    if band['reported'] == 'midpoint':
+        d_rt = range_between(*map(math.radians, r), *map(math.radians, tm))
+        d_rm = range_between(*map(math.radians, r), math.radians(lat), math.radians(lon))
+        d_tm = range_between(*map(math.radians, tm), math.radians(lat), math.radians(lon))
+        assert d_rm == pytest.approx(0.5 * d_rt, rel=1e-3)
+        assert d_tm == pytest.approx(0.5 * d_rt, rel=1e-3)
+        assert band['half_width_km'] == pytest.approx(0.5 * d_rt / 1000.0)
+    else:
+        assert (lat, lon) == {'trim': tm, 'tumbling': r}[band['reported']]
+        assert band['half_width_km'] is None
 
 
 def test_the_band_starts_at_apogee_not_at_separation():
@@ -241,3 +246,90 @@ def test_a_falling_piece_has_no_climb_leg_and_no_trim_means_the_tumbling_point()
     ref = tr.integrate_debris(pos, vel, 0.0, cda_of_mach=drag['cda_random'],
                               mass_kg=800.0)
     assert (lat, lon, t, spd) == pytest.approx(ref)
+
+
+# ── the swing: does it settle or keep tumbling ──────────────────────────────
+
+def test_the_moment_about_the_cg_vanishes_at_the_trim_and_pushes_off_front_first():
+    f = 0.60                                   # CG from the front: base leads
+    for M in (1.5, 2.86):
+        trim = ssa.trim_alpha(M, 1.0 - f)      # off end-on, base leading
+        a = 180.0 - trim
+        assert ssa.moment_about_cg(a - 2.0, M, LD, f) > 0      # toward the trim
+        assert ssa.moment_about_cg(a + 2.0, M, LD, f) < 0
+        # Front-first is unstable: the moment increases the angle all the way
+        # to broadside.
+        assert all(ssa.moment_about_cg(x, M, LD, f) > 0 for x in (5, 20, 45, 89))
+
+
+def test_attitude_model_inertia_and_potential():
+    m, L, d = 1000.0, 6.0, 1.0
+    even = ssa.attitude_model(L, d, m, 0.5)          # no mass at the base
+    assert even['I'] == pytest.approx(m * (L * L / 12 + d * d / 8))
+    att = ssa.attitude_model(L, d, m, 0.6)
+    share = 0.2
+    assert att['I'] == pytest.approx(
+        (1 - share) * m * (L * L / 12 + d * d / 8 + 0.01 * L * L)
+        + share * m * (0.4 * L) ** 2)
+    # Front-first is the top of the potential: at rest anywhere else the
+    # energy is negative, and the moment is odd about the axis.
+    al = np.radians(np.arange(1.0, 360.0, 1.0))
+    assert np.all(att['energy'](al, 0.0, 1000.0, 2.0) < 0)
+    assert att['energy'](0.0, 0.0, 1000.0, 2.0) == 0.0
+    assert att['cm'](np.radians(40.0), 2.0) == pytest.approx(
+        -att['cm'](np.radians(320.0), 2.0))
+    assert not att['rotating'](np.pi, 0.0, 1000.0, 2.0)
+    assert att['rotating'](np.pi, 50.0, 1000.0, 2.0)
+
+
+def test_the_swing_conserves_energy_in_steady_flow():
+    att = ssa.attitude_model(6.0, 1.0, 1000.0, 0.6)
+    t = np.linspace(0.0, 20.0, 41)
+    flow = dict(t=t, q=np.full(t.size, 2000.0), mach=np.full(t.size, 2.0),
+                turn=np.zeros(t.size))
+    a0 = np.radians([30.0, 150.0, 170.0])
+    w0 = np.array([0.0, 0.5, 3.0])
+    e0 = att['energy'](a0, w0, 2000.0, 2.0)
+    for t1 in (3.0, 11.0, 20.0):
+        a1, w1 = tr._swing(att, flow, a0, w0, 0.0, t1)
+        assert att['energy'](a1, w1, 2000.0, 2.0) == pytest.approx(e0, rel=2e-2, abs=5.0)
+
+
+def test_a_stage_released_in_vacuum_gets_no_spin_and_keeps_the_midpoint():
+    pos, vel = _state(33.0, 44.0, 200e3, 3000.0, 30.0)
+    drag = ssa.spent_stage_drag(_stage(diameter_m=1.5, length_m=8.0), 4000.0, 'upper')
+    lat, lon, t, spd, track, band = tr._fly_band(pos, vel, 4000.0, drag, False)
+    assert band['verdict'] is None and band['tumbling'] == 'random'
+    assert band['tumble_deg_s'][1] < 5.0
+    assert band['reported'] == 'midpoint' and band['half_width_km'] > 0
+    assert any('separation mechanism' in n for n in band['notes'])
+
+
+def test_a_light_stage_released_in_dense_air_is_spun_up_by_it():
+    pos, vel = _state(33.0, 44.0, 38e3, 1860.0, 60.0)
+    drag = ssa.spent_stage_drag(_stage(diameter_m=0.88, length_m=5.0), 454.0)
+    *_, band = tr._fly_band(pos, vel, 454.0, drag, False)
+    assert band['tumbling'] == 'end_over_end'
+    assert band['verdict'] in ('settles', 'tumbles', 'unclear')
+    lo, hi = band['tumble_deg_s']
+    assert 60.0 < lo <= hi < 1000.0            # hundreds of deg/s
+    assert hi < 1.5 * lo                       # robust to the disturbance
+
+
+def test_a_heavy_stage_settles_and_the_trimmed_point_is_reported():
+    # A long, heavy liquid stage released near 50 km spins slowly (tens of
+    # deg/s) and the rising air stops it well above the drag phase.
+    pos, vel = _state(33.0, 44.0, 51e3, 1775.0, 45.0)
+    drag = ssa.spent_stage_drag(_stage(diameter_m=1.32, length_m=16.5), 4800.0)
+    lat, lon, t, spd, track, band = tr._fly_band(pos, vel, 4800.0, drag, False)
+    assert band['verdict'] == 'settles' and band['reported'] == 'trim'
+    assert (lat, lon) == band['trim'] and band['half_width_km'] is None
+    assert band['tumble_deg_s'][1] < 100.0
+    assert track['lat'][-1] == pytest.approx(lat) and track['t'][-1] == pytest.approx(t)
+
+
+def test_the_half_width_label_on_a_debris_row():
+    assert tr._pm_label(dict(half_width_km=None)) == ''
+    assert tr._pm_label(dict(half_width_km=0.04)) == ''
+    assert tr._pm_label(dict(half_width_km=0.34)) == ' ±0.3 km'
+    assert tr._pm_label(dict(half_width_km=3.6)) == ' ±4 km'

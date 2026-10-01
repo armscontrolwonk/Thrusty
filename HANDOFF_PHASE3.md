@@ -1,95 +1,72 @@
-# Handoff: Part IV Phase 3, spent stages (written 2026-10-01)
+# Handoff: Part IV Phase 3, spent stages (refreshed 2026-10-01)
 
 For a new Claude session picking up the separation-handoff work. Read
 `CLAUDE.md` and `FRONT_END_DESIGN.md` Part IV (sections 16–19d) first; this
-note says where the work stopped and what was decided along the way.
+note says where the work stands and what was decided along the way.
 
-## Where it stopped
+## Where it stands
 
-The previous session was blocked by the auto-mode safety check (it reacted to
-earlier conversation content, not to any action). Nothing was lost.
-
-**Committed** (on `main`, not pushed), newest first:
+Phase 3 is built, tested, documented and committed (on `main`, not pushed).
+Suite: 1180 passed, 2 skipped, about 100 s. Newest first:
 
 | Commit | What |
 |---|---|
-| `857cc42` | Phase 3 part 1: spent stages leave at their own burnout (the debris clock now starts at `booster_core_delay_s`); `integrate_debris` runs to the main flight's tolerances and lands on the terrain model |
+| `2c16c25` | `CLAUDE.md` layout row for `spent_stage_aero.py` |
+| `6a074fa` | Phase 3 part 2: drag by attitude (`spent_stage_aero.py`, Jernell data in `data/aero/`), the end-over-end climb leg to apogee, the trim-to-tumbling band reported at its midpoint, solid stages trimmed from Romaniw's nozzle ratio; `test_spent_stage_aero.py`; METHODS §14.3/§16, Part IV §19d, NOTICE, REFERENCES, README, `TODO.md` item 10 |
+| `e82c23c` | AUR corrected (user): both stages solid, stage 1 double-anchor grain at 290 kN peak; legacy-load golden regenerated for that file; damped-glide smoke test pins its constant-thrust carrier |
+| `857cc42` | Phase 3 part 1: spent stages leave at their own burnout (the debris clock starts at `booster_core_delay_s`); `integrate_debris` runs to the main flight's tolerances and lands on the terrain model |
 | `fc2af62` | Part IV: Phase 3 revised from the readings; TN D-7228 title corrected in `data/REFERENCES.md` |
 | `607ff0c` | Part IV: Klett read from primary; the unverified AFGL handbook withdrawn |
 | `5b661b3` | Phase 2: a body's object file stores 0 = "from booster" for mass, diameter, length; pairing rule (`check_pairing`); editor saves zeros |
 | `41aee67` | Phase 1: `hand_off()` record, `result['handoff']`, `reentering_airframe()` |
 | `63dfa96` | Part IV design + Phase 0 tests (`test_handoff.py`) |
 
-**Uncommitted, built, suite passes (1172) but no tests of their own yet:**
+How a spent stage or strap-on casing is flown now (details in
+`spent_stage_aero.py`'s docstring, METHODS §14.3, Part IV §19d):
 
-- `data/aero/jernell_1968_flat_cylinders.csv` (new). Jernell, NASA TM X-1658,
-  flat-ended cylinder l/d 6, Mach 1.50/1.90/2.36/2.86, α 0–90°: C_N, C_A (cross-
-  section area) and centre of pressure from the leading face. Digitised from a
-  150 dpi scan; precision in the file header.
-- `spent_stage_aero.py` (new). Drag of a spent stage as C_D·A against Mach:
-  - **random tumbling**: Jernell's C_D(α) = C_N sin α + C_A cos α averaged over
-    random orientation (mirrored beyond 90°, an inference), C_N scaled by l/d
-    (Jernell: normal force follows planform area); held below Mach 1.5;
-    linear in Mach from 2.86 to Klett's value at Mach 10; Klett eq. 36 above;
-  - **trimmed**: trim where the measured CP (Jernell Fig. 9, Mach 1.50 and 2.86
-    only, interpolated) meets the stage's empty CG; held outside 1.5–2.86;
-  - **liquid stage CG**: engine share κ/(1+κ) of dry mass at the base, κ from
-    Shu et al. 2020 via `mass_estimator._KAPPA_E_DEFAULT` (lower 0.25, upper
-    0.12), the rest spread evenly → CG 0.40 (lower) or 0.45 (upper) of the
-    length from the base, so the base leads;
-  - **solid stages and strap-on casings**: CG unknown → tumbling only;
-  - **finned stages** (fins or grid fins): trim unknown → tumbling only;
-  - each stage's two curves are tabulated once on a Mach grid (`_MACH_GRID`).
-- `trajectory.py`:
-  - `integrate_debris(..., cda_of_mach=None, mass_kg=0.0)`: drag from C_D·A(Mach);
-  - `_fly_band()`: flies a piece trimmed and tumbling, reports ONE impact point,
-    the great-circle midpoint of the two (user's instruction: "report one
-    number, the midpoint of the range"); time and speed are the means; the
-    track is the two tracks averaged at equal fractions of flight time; the
-    milestone carries `impact_band` (both ends, leading end, notes) but the
-    timeline shows only the midpoint;
-  - spent stage bodies and strap-on casings use it; **the fairing is unchanged**.
+- still climbing at separation: end over end in the plane of flight to
+  apogee (it leaves front-first, which is unstable, and the swing grows while
+  dynamic pressure falls; an inference from Tobak & Peterson eq. 33 and
+  Regan 13.56, stated in the run's notes);
+- from apogee (or from separation if already falling): twice, tumbling and
+  trimmed; the swing calculation picks which is reported (settles → trimmed;
+  still tumbling at peak q → end over end; unclear, or no spin from the air
+  → the great-circle midpoint with ± on the timeline row); both ends, the
+  climb, the spin and the assumptions ride on the milestone as `impact_band`;
+- trim from Jernell's measured centre of pressure against the empty CG:
+  liquid, engine share (Shu et al. 2020) at the base; solid, nozzle share
+  (ratio of Romaniw 2013's fits at peak thrust) at the base; finned stages
+  and solids with no thrust in the file have no trim (tumbling only);
+- the fairing is unchanged (old β path).
 
-Effect on shipped vehicles (launch 33°N 44°E, azimuth 60°): main trajectories
-unchanged; most debris points move a few km. Trim-to-tumble spread behind each
-midpoint: AUR stage 1 44 km, Shahab-3 stage 1 17 km, upper stages 1–7 km,
-solid and finned stages 0 (tumbling only).
+The 44 km band on AUR stage 1 that prompted this: 41 km of it accrued on the
+climb. Shipped bands are now 0–8 km (Minotaur-IV stage 3: 16 km at 19,400 km
+downrange). Main trajectories unchanged. All 13 vehicles run in 7 s; the
+"6.9 min suite" reported earlier did not reproduce, so the debris tolerances
+stay at the main flight's values.
 
-## The open problem: speed
+## What is left in Phase 3
 
-The suite went from about 1.6 min to **6.9 min**: every spent piece is now
-flown twice at rtol 1e-8, atol 1e-6 m, max_step 5 s. That is metre-level
-precision against a kilometre-scale spread. The previous session was about to
-measure the impact-point change against run time for looser debris tolerances
-(e.g. rtol 1e-7 / atol 1e-3 / 10 s and rtol 1e-6 / atol 0.1 / 20 s), on
-Taepodong-II, AUR, Generic ICBM, Shahab-3 and Minotaur-IV, when it was blocked.
-The design (Part IV §19, Phase 3) says "the main flight's integration
-tolerance", so **a looser tolerance needs the user's agreement** — propose it
-with the measured numbers. Profiling showed `ecef_to_geodetic` dominates the
-debris equations of motion.
+1. **Stage-impact benchmark.** The user is sourcing one; nothing checks a
+   debris impact point against an observation yet.
+2. **Settle or tumble** is built (Part IV §19e, uncommitted at the time of
+   writing): the swing is followed along the flight and picks the trimmed
+   or end-over-end point when it is clear; the midpoint, with ± on the
+   timeline row, when it is not. Still open under it: Tobak & Peterson's
+   Fig. 2 as a check of the integrator, pitch damping, the separation kick.
+3. **Validation list.** `TODO.md` item 10 lists every model adopted on a
+   ratio, an extrapolation or an inference, with the data that would test it.
+4. **Real stage ends** (open interstage, nozzles) and **fin forces beyond
+   58°**: no source in hand.
+5. **AUR's Isp.** The double-anchor curve at 290 kN peak delivers 11.7 MN·s;
+   the file's 280 s Isp implies 12.4 MN·s. The thrust curve governs; the Isp
+   may be high. AUR stage 2 has no grain given (constant thrust).
+6. **Strap-on casings on the Strypi VIII R files** separate about 1 km up and
+   land at 0.0 km range; pre-existing, not looked into.
+7. `TODO.md` item 6 still says the fairing has no trajectory or impact point;
+   out of date.
 
-## Next steps, in order
-
-1. Measure tolerance vs accuracy vs time (above); propose; apply once agreed.
-2. Tests (`test_handoff.py` or a new `test_spent_stage_aero.py`):
-   - `random_cd` reproduces the data average at the tested Machs (l/d 6: about
-     7.25 at 1.5, 6.62 at 2.86) and equals `klett_random_cd` at Mach 10 (5.893
-     for l/d 6); held below 1.5; continuous at 2.86 and 10;
-   - Klett eq. 36 check: (0.393 + 0.178 D/L)(2 − K) on area L·D;
-   - `trim_alpha`: CG 0.40 from the leading face → about 18° at Mach 1.5 and
-     11.5° at 2.86; a CG past the CP plateau → None;
-   - `spent_stage_drag`: liquid → trim with base leading; solid → tumbling
-     only; finned or grid-finned → tumbling only;
-   - `_fly_band`: midpoint lies between the two ends; with no trim it equals
-     the tumbling impact; `impact_band` present on the milestone;
-   - `integrate_debris` with a constant `cda_of_mach` equals the β path.
-3. Docs: `NOTICE.md` (add a row for `data/aero/jernell_1968_flat_cylinders.csv`:
-   NASA TM X-1658, U.S. Government work, values digitised by Thrusty);
-   `data/REFERENCES.md` (Jernell row; Shu et al. if not present); METHODS
-   (spent-stage drag section, §14.3 debris); README and CLAUDE.md layout rows
-   for `spent_stage_aero.py`; FRONT_END_DESIGN.md §19d "as built".
-4. Show the user before/after debris impact points per shipped vehicle, then
-   commit as "Phase 3 part 2".
+Phase 4 (later): a flight-plan option to drop the fins.
 
 ## Decisions the user made (do not re-litigate)
 
@@ -101,10 +78,19 @@ debris equations of motion.
   tumbling only.
 - Outside Mach 1.5–2.86: hold Mach 1.5 values below; tumbling drag blends to
   Klett above; trim held at Mach 2.86.
-- **Report one number: the midpoint of the range.**
+- **Report one number.** First the midpoint of the range (2026-09-30); then
+  (2026-10-01) the end the physics picks when it picks one, the midpoint
+  with its half-width on the timeline row when it does not. Assumptions stay
+  in the data and the docs, not on screen.
 - Boost-nose fix (a body's nose length during boost) is **held** until nose
   lengths are sourced (Part IV §19a).
 - The user sources the stage-impact benchmark themselves.
+- (2026-10-01) AUR is solid in both stages; stage 1 double-anchor, 290 kN peak.
+- (2026-10-01) Romaniw's case/insulation/nozzle fits are used **as a ratio
+  only** ("the data isn't ideal but the ratios might be ok"); peak thrust is
+  the input.
+- (2026-10-01) Keep a list of models to validate with Thrusty-collected data
+  (`TODO.md` item 10).
 
 ## What the sources showed (all read from primary, page refs in Part IV §19c)
 
@@ -126,6 +112,12 @@ debris equations of motion.
   (`~/Desktop/garber1959.pdf`, `~/Desktop/norling1962.pdf`), Regan 1984 and
   Regan & Anandakrishnan 1993 (complete, `~/Desktop/Stuff/Thrusty-papers/`):
   small-angle envelopes only.
+- **Romaniw** 2013, Georgia Tech dissertation (Drive, id
+  `12a4--7Hd-JpbF2Rl37XTvT7WHCq9cNlE`), Appendix A pp. 289–291: solid motor
+  case, insulation and nozzle mass against thrust; his own regressions, data
+  not tabulated. The MER folder (Drive `1j3157f0u6UjmJ2KsKPauePtgaBZdY9GK`, 18
+  papers) has no other case/nozzle split; Rohrschneider §6 is liquid-engine
+  constants; Shu et al. 2020 Table 11 is the κ_E source.
 - The AFGL reentry handbook (AFGL-TR-78-0019) cited in the user's note
   `~/Downloads/spent-stage-tumbling.md` **may not exist**; nothing from it is used.
 - The file named "Dynamics of Atmospheric Re-Entry … Anna's Archive.pdf" is

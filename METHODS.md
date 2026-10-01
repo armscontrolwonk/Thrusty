@@ -5295,11 +5295,41 @@ envelope of the swing that follows grows as dynamic pressure falls
 eq. 13.56; both ∝ q^(−1/4)), so nothing arrests it before apogee. No
 source treats arrest on a climb directly; this is an inference from those
 two results, stated in the run's notes. From apogee — or from separation,
-for a piece already falling — it is flown twice, tumbling randomly and
-trimmed, and the run reports **one point, the great-circle midpoint** of
-the two impacts (user decision, 2026-09-30), with the mean time and speed;
-both ends, the climb and the assumptions are kept on the milestone as
-`impact_band`. With no trim the tumbling point is reported. Before the
+for a piece already falling — it is flown twice, tumbling and trimmed, and
+the run reports **one point** (user decisions, 2026-09-30 and 2026-10-01).
+Which one is settled by following the stage's swing (`_attitude_verdict`):
+
+```
+I · dω/dt = q · S · L · C_m(α, M)        dα/dt = ω − (turn rate of the velocity vector)
+C_m = C_N(α) · (x_cg − x_cp(α)) / L      [Jernell C_N and centre of pressure, about the CG]
+I   = thin-walled cylinder + the engine or nozzle share as a point mass at the base
+```
+
+planar and undamped, as in [Tobak & Peterson 1964](#16-references), with the
+measured moment in place of their sine law, started front-first with a
+disturbance of ±0.5°, ±2° and ±10° at separation. The air turns the stage
+over and it leaves the atmosphere spinning (shipped vehicles: 20–40°/s for
+Shahab-3's first stage, 240–280°/s for AUR's); coming down, it can
+overturn again only while its energy, ½Iω² + V(α), exceeds the potential's
+maximum at front-first.
+
+- *Settles*: no case can overturn once 5% of the fall's drag impulse
+  (∫q dt) has accrued → the **trimmed** impact is reported.
+- *Tumbles*: every case is still overturning at peak dynamic pressure → the
+  **tumbling** impact is reported, flown end over end (it is tumbling in the
+  plane of its flight).
+- *Unclear*, or the air gave the stage no spin on the climb (separation in
+  near-vacuum: its tumble rate is the separation mechanism's, which no
+  source in hand gives) → the **great-circle midpoint** of the two impacts,
+  with the mean time and speed, and the timeline row carries the
+  half-distance between them ("±3 km").
+
+Both ends, the climb, the spin rate, the verdict and the assumptions are
+kept on the milestone as `impact_band`. With no trim the tumbling point is
+reported. Limits: no damping, so a settled stage's remaining swing (which
+raises its drag above the trim value) is not flown; no kick from the
+separation mechanism; the moment is held at its Mach 1.5 and 2.86 values
+outside the tested range. Before the
 climb leg, a stage separating at Mach 6 at 38 km had a 44 km band, 41 km
 of it accrued on the climb; with it, the shipped bands are 0–8 km.
 

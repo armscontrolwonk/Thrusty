@@ -1995,7 +1995,8 @@ def _climb_to_apogee(pos_ecef, vel_ecef, mass_kg, cda_of_mach,
                      terrain_dem=False, max_time_s=14400.0):
     """Fly a piece from a climbing state to its apogee.
 
-    Returns (pos, vel, t_apogee_s, track) at the top of the climb, or None
+    Returns (pos, vel, t_apogee_s, track, solution) at the top of the climb
+    (solution: the dense state against time from separation), or None
     when the piece reaches the ground or no apogee within max_time_s (an
     orbit).  Same tolerances as integrate_debris."""
     _eom = _debris_eom(0.0, cda_of_mach, mass_kg)
@@ -2010,7 +2011,8 @@ def _climb_to_apogee(pos_ecef, vel_ecef, mass_kg, cda_of_mach,
         return None
     t_apo = float(sol.t_events[0][0])
     y = sol.y_events[0][0]
-    return y[:3].copy(), y[3:].copy(), t_apo, _sample_track(sol.sol, t_apo)
+    return (y[:3].copy(), y[3:].copy(), t_apo, _sample_track(sol.sol, t_apo),
+            sol.sol)
 
 
 def integrate_debris(pos_ecef: np.ndarray, vel_ecef: np.ndarray,
@@ -2018,7 +2020,8 @@ def integrate_debris(pos_ecef: np.ndarray, vel_ecef: np.ndarray,
                      max_time_s: float = 7200.0,
                      return_trajectory: bool = False,
                      terrain_dem: bool = False,
-                     cda_of_mach=None, mass_kg: float = 0.0):
+                     cda_of_mach=None, mass_kg: float = 0.0,
+                     return_solution: bool = False):
     """
     Integrate a tumbling debris piece from separation to ground impact.
 
@@ -2038,6 +2041,8 @@ def integrate_debris(pos_ecef: np.ndarray, vel_ecef: np.ndarray,
     terrain_dem : the ground is the terrain model's height at the point
                   beneath the piece, as for the main flight (_hit_ground);
                   otherwise sea level on the ellipsoid
+    return_solution : with return_trajectory, also append the dense state
+                  against time (for the attitude pass, _attitude_verdict)
 
     Integrated to the main ballistic flight's tolerances (rtol 1e-8, atol
     1e-6 m, max_step 5 s; FRONT_END_DESIGN.md Part IV Phase 3): a spent
@@ -2062,7 +2067,7 @@ def integrate_debris(pos_ecef: np.ndarray, vel_ecef: np.ndarray,
     sol_ev = solve_ivp(_eom, (0.0, max_time_s), state0,
                        method='RK45', events=_ground,
                        rtol=1e-8, atol=1e-6, max_step=5.0,
-                       dense_output=return_trajectory)
+                       dense_output=return_trajectory or return_solution)
 
     # If the ground event never fired the stage did not impact within the
     # timeout — it is in orbit (or on a very long sub-orbital arc).  Return
@@ -2086,38 +2091,142 @@ def integrate_debris(pos_ecef: np.ndarray, vel_ecef: np.ndarray,
 
     # Smooth output on a regular 10-second grid, sampled from the SAME
     # integration's dense interpolant (no second integration).
-    return result + (_sample_track(sol_ev.sol, t_impact),)
+    out = result + (_sample_track(sol_ev.sol, t_impact),)
+    return out + (sol_ev.sol,) if return_solution else out
 
 
 # ---------------------------------------------------------------------------
 # Public integration interface
 # ---------------------------------------------------------------------------
 
+# Disturbance from front-first at separation over which the swing is
+# followed: the angle itself is not known, so the verdict must hold across
+# small to large values on either side.
+_ATTITUDE_ALPHA0_DEG = (-10.0, -2.0, -0.5, 0.5, 2.0, 10.0)
+# The drag phase of the fall starts where this share of the fall's drag
+# impulse (the integral of dynamic pressure over time) has accrued; a stage
+# that has stopped overturning by then is flown trimmed.
+_DRAG_PHASE_START = 0.05
+
+
+def _flow_history(sol, t_end, dt=0.5):
+    """Dynamic pressure, Mach number and the turn rate of the velocity vector
+    against time along a flown arc (sol: its dense state)."""
+    t = np.append(np.arange(0.0, t_end, dt), t_end)
+    y = sol(t)
+    v = y[3:6]
+    sp = np.linalg.norm(v, axis=0)
+    q, mach = np.empty_like(t), np.empty_like(t)
+    for i in range(t.size):
+        _, _, alt = ecef_to_geodetic(y[:3, i])
+        _, _, rho, a_snd = atmosphere(max(alt, 0.0))
+        q[i], mach[i] = 0.5 * rho * sp[i] ** 2, sp[i] / a_snd
+    turn = np.linalg.norm(np.gradient(v / sp, t, axis=1), axis=0)
+    return dict(t=t, q=q, mach=mach, turn=turn)
+
+
+def _swing(att, flow, alpha, omega, t0, t1):
+    """Advance the planar, undamped swing of a spent stage along an arc:
+    I d(omega)/dt = q S L C_m(alpha, Mach), d(alpha)/dt = omega - turn rate
+    of the velocity vector.  alpha, omega are arrays, one entry per starting
+    disturbance."""
+    n = alpha.size
+    ft, fq, fm, fw = flow['t'], flow['q'], flow['mach'], flow['turn']
+    k = att['SL'] / att['I']
+    def rhs(t, y):
+        q = np.interp(t, ft, fq)
+        return np.concatenate([y[n:] - np.interp(t, ft, fw),
+                               q * k * att['cm'](y[:n], np.interp(t, ft, fm))])
+    r = solve_ivp(rhs, (t0, t1), np.concatenate([alpha, omega]),
+                  method='RK45', rtol=1e-6, atol=1e-8)
+    return r.y[:n, -1], r.y[n:, -1]
+
+
+def _attitude_verdict(att, climb_sol, t_apogee, fall_sol=None, t_impact=None):
+    """Whether a spent stage that separated on the climb settles to its trim
+    or keeps tumbling on the way down (FRONT_END_DESIGN.md §19e).
+
+    The stage leaves front-first, which is unstable, so the air turns it
+    over and it carries the spin out of the atmosphere; coming down, the
+    air stops the tumble if the swing's energy falls below the barrier at
+    front-first before the drag phase.  The swing is planar and undamped
+    (Tobak & Peterson, NASA TR R-203) with the measured moment
+    (spent_stage_aero.attitude_model), followed for each disturbance in
+    _ATTITUDE_ALPHA0_DEG.
+
+    With climb_sol only: {'spun_up', 'tumble_deg_s'} — whether every case
+    turned over at least once on the climb, and the range of spin rates at
+    apogee.  A stage that did not turn over got no spin from the air; its
+    rate is set by the separation mechanism, which no source in hand gives.
+    With the fall as well, adds 'verdict':
+      'settles'  no case can overturn again once the drag phase starts
+      'tumbles'  every case is still overturning at peak dynamic pressure
+      'unclear'  anything else
+    """
+    flow = _flow_history(climb_sol, t_apogee)
+    a0 = np.radians(_ATTITUDE_ALPHA0_DEG)
+    a1, w1 = _swing(att, flow, a0, np.full(a0.size, flow['turn'][0]),
+                    0.0, t_apogee)
+    out = dict(spun_up=bool(np.all(np.abs(a1 - a0) >= 2.0 * np.pi)),
+               tumble_deg_s=(float(np.degrees(np.min(np.abs(w1)))),
+                             float(np.degrees(np.max(np.abs(w1))))))
+    if fall_sol is None or not out['spun_up']:
+        return out
+    flow = _flow_history(fall_sol, t_impact)
+    t, q = flow['t'], flow['q']
+    cum = np.concatenate([[0.0], np.cumsum(0.5 * (q[1:] + q[:-1]) * np.diff(t))])
+    t_drag = float(np.interp(_DRAG_PHASE_START * cum[-1], cum, t))
+    i_pk = int(np.argmax(q))
+    at = lambda tt: (float(np.interp(tt, t, q)),
+                     float(np.interp(tt, t, flow['mach'])))
+    a2, w2 = _swing(att, flow, a1, w1, 0.0, t_drag)
+    if not np.any(att['rotating'](a2, w2, *at(t_drag))):
+        out['verdict'] = 'settles'
+        return out
+    if t[i_pk] > t_drag:
+        a2, w2 = _swing(att, flow, a2, w2, t_drag, float(t[i_pk]))
+    out['verdict'] = ('tumbles' if np.all(att['rotating'](a2, w2, *at(t[i_pk])))
+                      else 'unclear')
+    return out
+
+
 def _fly_band(pos, vel, mass_kg, drag, terrain_dem):
-    """Fly a spent piece at both ends of its attitude band and return the
-    midpoint (FRONT_END_DESIGN.md §19, user 2026-09-30: report one number).
+    """Fly a spent piece to the ground and return one impact point
+    (FRONT_END_DESIGN.md §19, user 2026-09-30: report one number).
 
     drag : spent_stage_aero.spent_stage_drag result.  A piece that is still
     climbing at separation first tumbles end over end to its apogee (see
     spent_stage_aero: it cannot trim while dynamic pressure falls).  From
     there — or from separation, for a piece already falling — it is flown
-    tumbling randomly and, when a trim is known, trimmed.  Returns
-    (lat, lon, flight_time_s, impact_speed_ms, track, band) like
-    integrate_debris with return_trajectory, or None when it does not come
-    down; `band` gives each end's impact point and the climb, when there was
-    one.  With no trim the midpoint is the tumbling impact itself.
+    tumbling and, when a trim is known, trimmed.  Which of the two is
+    reported (user, 2026-10-01):
 
-    The reported point is the midpoint of the great-circle segment between
-    the two impact points; time and speed are the mean of the two; the track
-    is the climb followed by the two descent tracks averaged at equal
-    fractions of their flight times, so it ends at the reported point."""
+      * no trim known: the tumbling point;
+      * the air turned it over on the climb and the swing calculation
+        (_attitude_verdict) says it settles before the drag phase: the
+        trimmed point; says it is still tumbling at peak dynamic pressure:
+        the tumbling point, flown end over end, as it is tumbling in the
+        plane of its flight;
+      * otherwise (the verdict is unclear, or the air gave it no spin so its
+        tumble rate is the separation mechanism's, unknown): the midpoint of
+        the great-circle segment between the two, with the mean time and
+        speed and the two tracks averaged at equal fractions of flight time.
+
+    Returns (lat, lon, flight_time_s, impact_speed_ms, track, band) like
+    integrate_debris with return_trajectory, or None when it does not come
+    down.  `band` gives each end's impact point, the climb, the verdict,
+    which point was reported ('reported': 'tumbling' | 'trim' | 'midpoint')
+    and, for a midpoint, half the distance between the ends
+    ('half_width_km')."""
     climb = None
     if float(np.dot(pos, vel)) > 0.0:                # still climbing
         climb = _climb_to_apogee(pos, vel, mass_kg, drag['cda_end_over_end'],
                                  terrain_dem)
     notes = list(drag['notes'])
+    att = drag.get('attitude') if drag.get('cda_trim') is not None else None
+    swing = None
     if climb is not None:
-        pos, vel, t0, climb_track = climb
+        pos, vel, t0, climb_track, climb_sol = climb
         apogee_km = float(climb_track['alt'][-1]) / 1000.0
         notes.append(f"end over end in the plane of its flight from "
                      f"separation to apogee ({apogee_km:.0f} km, {t0:.0f} s "
@@ -2125,19 +2234,50 @@ def _fly_band(pos, vel, mass_kg, drag, terrain_dem):
                      f"with is unstable and the swing grows while dynamic "
                      f"pressure falls (Klett eq. 32; Tobak & Peterson eq. 33)")
         band_climb = dict(apogee_km=apogee_km, t_s=t0)
+        if att is not None:
+            swing = _attitude_verdict(att, climb_sol, t0)
     else:
         t0, climb_track, band_climb = 0.0, None, None
 
-    fly = lambda cda: integrate_debris(pos, vel, 0.0, max_time_s=14400.0,
-                                       return_trajectory=True,
-                                       terrain_dem=terrain_dem,
-                                       cda_of_mach=cda, mass_kg=mass_kg)
-    a = fly(drag['cda_random'])
+    # A stage the air turned over is tumbling in the plane of its flight;
+    # otherwise the tumbling end keeps the random-orientation convention.
+    planar = bool(swing and swing['spun_up'])
+    fly = lambda cda, sol=False: integrate_debris(
+        pos, vel, 0.0, max_time_s=14400.0, return_trajectory=True,
+        terrain_dem=terrain_dem, cda_of_mach=cda, mass_kg=mass_kg,
+        return_solution=sol)
+    a = fly(drag['cda_end_over_end'] if planar else drag['cda_random'], planar)
     b = fly(drag['cda_trim']) if drag.get('cda_trim') is not None else None
     if a is None:
         return None
+    verdict = None
+    if planar:
+        swing = _attitude_verdict(att, climb_sol, t0, a[5], a[2])
+        verdict = swing['verdict']
+        lo, hi = swing['tumble_deg_s']
+        notes.append(
+            f"the air turned it over on the climb: it leaves the atmosphere "
+            f"tumbling at {lo:.0f}-{hi:.0f} deg/s (planar, undamped swing with "
+            f"the measured moment, for disturbances of 0.5-10 deg at "
+            f"separation; a kick from the separation mechanism is not "
+            f"included); on the way down it "
+            + {'settles': "settles to its trim before the drag phase, so the "
+                          "trimmed impact is reported",
+               'tumbles': "is still tumbling at peak dynamic pressure, so "
+                          "the end-over-end impact is reported",
+               'unclear': "neither clearly settles nor clearly keeps "
+                          "tumbling, so the midpoint is reported"}[verdict])
+    elif swing is not None:
+        notes.append("the air gave it no spin on the climb; its tumble rate "
+                     "is set by the separation mechanism, which is not known, "
+                     "so the midpoint of the tumbling and trimmed impacts is "
+                     "reported")
     band = dict(random=(a[0], a[1]), trim=None if b is None else (b[0], b[1]),
-                leading=drag.get('leading'), climb=band_climb, notes=notes)
+                tumbling='end_over_end' if planar else 'random',
+                leading=drag.get('leading'), climb=band_climb,
+                verdict=verdict,
+                tumble_deg_s=swing['tumble_deg_s'] if swing else None,
+                reported='tumbling', half_width_km=None, notes=notes)
 
     def with_climb(track):
         """The descent track behind the climb, on the clock from separation."""
@@ -2147,8 +2287,11 @@ def _fly_band(pos, vel, mass_kg, drag, terrain_dem):
         return {k: np.concatenate([climb_track[k], track[k][1:]])
                 for k in ('t', 'lat', 'lon', 'alt')}
 
-    if b is None:
+    if b is None or verdict == 'tumbles':
         return (a[0], a[1], t0 + a[2], a[3], with_climb(a[4]), band)
+    if verdict == 'settles':
+        band['reported'] = 'trim'
+        return (b[0], b[1], t0 + b[2], b[3], with_climb(b[4]), band)
     pa = np.array([np.cos(np.radians(a[0])) * np.cos(np.radians(a[1])),
                    np.cos(np.radians(a[0])) * np.sin(np.radians(a[1])),
                    np.sin(np.radians(a[0]))])
@@ -2159,6 +2302,10 @@ def _fly_band(pos, vel, mass_kg, drag, terrain_dem):
     m /= np.linalg.norm(m)
     lat = float(np.degrees(np.arcsin(m[2])))
     lon = float(np.degrees(np.arctan2(m[1], m[0])))
+    band['reported'] = 'midpoint'
+    band['half_width_km'] = 0.5 * range_between(
+        np.radians(a[0]), np.radians(a[1]),
+        np.radians(b[0]), np.radians(b[1])) / 1000.0
     s = np.linspace(0.0, 1.0, 101)
     def at(tr):
         f = (tr['t'] - tr['t'][0]) / max(tr['t'][-1] - tr['t'][0], 1e-9)
@@ -2169,6 +2316,16 @@ def _fly_band(pos, vel, mass_kg, drag, terrain_dem):
                  alt=0.5 * (al + alb))
     track['lat'][-1], track['lon'][-1] = lat, lon
     return lat, lon, t0 + t_mid, 0.5 * (a[3] + b[3]), with_climb(track), band
+
+
+def _pm_label(band):
+    """' ±N km' for a debris row whose point is the midpoint of a band, the
+    half-distance between its ends; nothing when one end was reported or the
+    ends lie within 0.1 km."""
+    hw = band.get('half_width_km')
+    if not hw or hw < 0.1:
+        return ''
+    return f" ±{hw:.0f} km" if hw >= 1.0 else f" ±{hw:.1f} km"
 
 
 def _handoff_record(params, stored_ro):
@@ -3497,7 +3654,8 @@ def integrate_trajectory(params: BoosterParams,
                 _rng = range_between(lat0, lon0,
                                      np.radians(_d_lat), np.radians(_d_lon))
                 _insert_chrono({
-                    'event':              f"Stage {_sn} empty impact",
+                    'event':              f"Stage {_sn} empty impact"
+                                          + _pm_label(_band),
                     'impact_band':        _band,
                     't_s':                _t_bo + _dt,
                     'alt_km':             0.0,
@@ -3587,7 +3745,8 @@ def integrate_trajectory(params: BoosterParams,
                 _rng = range_between(lat0, lon0,
                                      np.radians(_d_lat), np.radians(_d_lon))
                 _insert_chrono({
-                    'event':              "Booster casing impact",
+                    'event':              "Booster casing impact"
+                                          + _pm_label(_band_b),
                     'impact_band':        _band_b,
                     't_s':                _t_bsep + _dt,
                     'alt_km':             0.0,

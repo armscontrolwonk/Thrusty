@@ -6,8 +6,10 @@ A spent stage does not tumble randomly once dynamic pressure builds: it
 settles to a trim set by where its centre of gravity sits against its centre
 of pressure.  Whether it gets there is a dynamic question no source in hand
 settles for a stage that separates inside the atmosphere, so a stage is flown
-twice — trimmed, and tumbling randomly — and the run reports the midpoint of
-the two impact points (user, 2026-09-30).
+twice — trimmed, and tumbling — and the run reports one point: the end that
+the stage's own swing picks when it is clear (attitude_model here,
+trajectory._attitude_verdict), else the midpoint of the two impact points
+(user, 2026-09-30 and 2026-10-01).
 
 A stage that separates while still climbing is flown a third way until
 apogee: tumbling end over end in the plane of its flight (Klett's
@@ -292,6 +294,95 @@ def empty_cg_fraction_solid(stage):
                f"at the base, case and insulation spread evenly")
 
 
+def _cp_from_leading_face(a1_deg, mach):
+    """Centre of pressure as a fraction of length from the leading face at
+    a1 (0-90 deg off end-on): Jernell's Fig. 9 curves (Mach 1.50 and 2.86)
+    interpolated in Mach, held outside; below the smallest angle read, the
+    value there (the normal force vanishes with it)."""
+    m = min(max(float(mach), MACH_LO), MACH_HI)
+    w = (m - MACH_LO) / (MACH_HI - MACH_LO)
+    def curve(mm):
+        al, _, _, xcp = _table()[mm]
+        ok = ~np.isnan(xcp)
+        return np.interp(a1_deg, al[ok], xcp[ok])
+    return (1.0 - w) * curve(MACH_LO) + w * curve(MACH_HI)
+
+
+def moment_about_cg(alpha_deg, mach, ld, f):
+    """Pitching-moment coefficient about the CG on area * LENGTH, positive
+    when it increases alpha.  alpha is measured from FRONT-first (0) through
+    broadside to base-first (180 deg); f is the CG's fraction of the length
+    from the front.  The normal force (C_N, scaled by planform) acts at the
+    measured centre of pressure; the axial force acts along the axis and
+    gives no moment."""
+    a = float(alpha_deg)
+    if a <= 90.0:
+        cn, _ = _coeffs(a, mach, ld)
+        return cn * (f - float(_cp_from_leading_face(a, mach)))
+    a1 = 180.0 - a
+    cn, _ = _coeffs(a1, mach, ld)
+    return -cn * ((1.0 - f) - float(_cp_from_leading_face(a1, mach)))
+
+
+def attitude_model(length_m, diameter_m, mass_kg, f):
+    """What the planar swing of a spent stage needs (trajectory.
+    _attitude_verdict): its transverse moment of inertia, and the measured
+    moment about its CG as a function of attitude and Mach.
+
+    The empty stage is a thin-walled cylinder carrying a point mass at the
+    base (the engine or nozzle share that put the CG at f from the front:
+    share = 2f - 1).  The swing is planar and undamped, as in Tobak &
+    Peterson (NASA TR R-203), with the measured moment in place of their
+    sine law.
+
+    Returns a dict:
+      I         kg m^2, about the CG
+      SL        reference area * length, m^3
+      cm(alpha_rad, mach)        moment coefficient, any angle (array)
+      energy(alpha_rad, omega, q, mach)     (1/2) I omega^2 + V, J; V the
+                potential of the moment, zero at front-first (its maximum)
+      rotating(alpha_rad, omega, q, mach)   True where that energy is
+                positive: the swing can pass front-first again
+    """
+    L, d, m = float(length_m), float(diameter_m), float(mass_kg)
+    ld = L / d
+    share = min(max(2.0 * f - 1.0, 0.0), 1.0)
+    I = ((1.0 - share) * m * (L * L / 12.0 + d * d / 8.0
+                              + (f - 0.5) ** 2 * L * L)
+         + share * m * ((1.0 - f) * L) ** 2)
+    machs = np.array(sorted(_table()))
+    grid = np.arange(0.0, 180.5, 1.0)
+    cm_tab = np.array([[moment_about_cg(a, mm, ld, f) for a in grid]
+                       for mm in machs])
+    rad = np.radians(grid)
+    v_tab = -np.concatenate(
+        [np.zeros((machs.size, 1)),
+         np.cumsum(0.5 * (cm_tab[:, 1:] + cm_tab[:, :-1]) * np.diff(rad),
+                   axis=1)], axis=1)
+
+    def _at(tab, alpha_rad, mach, odd):
+        a = np.degrees(np.asarray(alpha_rad, float)) % 360.0
+        over = a > 180.0
+        a = np.where(over, 360.0 - a, a)
+        mm = min(max(float(mach), machs[0]), machs[-1])
+        j = int(min(np.searchsorted(machs, mm, side='right') - 1,
+                    machs.size - 2))
+        w = (mm - machs[j]) / (machs[j + 1] - machs[j])
+        y = ((1.0 - w) * np.interp(a, grid, tab[j])
+             + w * np.interp(a, grid, tab[j + 1]))
+        return np.where(over, -y, y) if odd else y
+
+    SL = math.pi * d * d / 4.0 * L
+    energy = lambda alpha, omega, q, mach: (
+        0.5 * I * np.asarray(omega, float) ** 2
+        + q * SL * _at(v_tab, alpha, mach, False))
+    return dict(
+        I=I, SL=SL,
+        cm=lambda alpha, mach: _at(cm_tab, alpha, mach, True),
+        energy=energy,
+        rotating=lambda alpha, omega, q, mach: energy(alpha, omega, q, mach) > 0.0)
+
+
 # Mach grid on which a stage's two drag curves are tabulated once, then
 # interpolated in the equations of motion: the tested points, a fine step to
 # Klett's Mach 10, and on to 30 for his weak (2 - K) dependence.
@@ -314,6 +405,7 @@ def spent_stage_drag(stage, dry_mass_kg, role='lower'):
       cda_end_over_end  callable Mach -> C_D*A, tumbling end over end in the
                         plane of flight (the climb to apogee)
       cda_trim          callable Mach -> C_D*A at its trim, or None
+      attitude    attitude_model(...) when there is a trim, else absent
       leading     'front' | 'base' | None — the end that leads when trimmed
       notes       plain sentences on what was assumed
     """
@@ -349,6 +441,8 @@ def spent_stage_drag(stage, dry_mass_kg, role='lower'):
         return (t[1] if t is not None else random_cd(M, ld)) * area
     out['cda_trim'] = _tabulated(cda_trim)
     out['leading'] = lead
+    if dry_mass_kg and dry_mass_kg > 0:
+        out['attitude'] = attitude_model(L, d, dry_mass_kg, f)
     a_lo, a_hi = trim_alpha(MACH_LO, g), trim_alpha(MACH_HI, g)
     notes.append(f"trims with its {lead} leading, CG {g:.2f} of its length "
                  f"from that end: "

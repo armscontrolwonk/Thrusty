@@ -844,6 +844,47 @@ cone- and ogive-cylinders go to 185°. Values read from a 150 dpi scan
   settle-or-tumble estimate (Tobak & Peterson Fig. 2) as a labelled note;
   the stage-impact benchmark (user).
 
+### 19e. Settle or tumble: the swing (2026-10-01)
+
+The user's point: the tumble rate is not an input to look up, it follows
+from the stage's mass, geometry and the energy the air puts into it. Built
+as `spent_stage_aero.attitude_model` (inertia; the measured moment about
+the CG, C_N times the lever from Jernell's centre of pressure; its
+potential) and `trajectory._attitude_verdict` (the planar, undamped swing
+followed along the flown climb and fall, for disturbances of ±0.5°, ±2°,
+±10° from front-first at separation).
+
+What it shows on shipped vehicles (33°N 44°E, az 60°):
+
+| Stage | Spin leaving the atmosphere | On the way down | Reported |
+|---|---|---|---|
+| Shahab-3 stage 1 (4.8 t, 16.5 m, sep 51 km) | 19–39°/s | stops overturning at 55–75 km, before any drag | trimmed point (moves 4 km) |
+| AUR stage 1 (454 kg, 5 m, sep 40 km) | 241–273°/s | some cases stop near 40 km, most never | midpoint of end-over-end and trimmed, ±1 km |
+| Minotaur-IV stage 1 | 163–192°/s | unclear | midpoint (ends within 0.1 km) |
+| Strypi VIII R strap-on casings (released at 1 km) | about 1000°/s | still tumbling at peak q | end-over-end point |
+| every stage released above the air (upper stages; Generic ICBM stage 1 at 76 km) | under 1°/s from the air | — | midpoint, ± on the timeline row |
+
+Rule (user, 2026-10-01, replacing "always the midpoint"): report the end
+the physics picks — trimmed when no case can overturn after 5% of the
+fall's drag impulse has accrued, end over end when every case is still
+overturning at peak dynamic pressure — and the midpoint with its
+half-width otherwise. A stage the air did not turn over keeps the
+midpoint: its rate is the separation mechanism's, unknown. A stage the air
+did turn over tumbles in its flight plane, so its tumbling end is flown
+end over end, not random.
+
+What a coupled check showed (scratch, drag taken at the swinging angle):
+AUR stage 1 feels 3.1–3.2 m² when it keeps tumbling, against 3.3 end over
+end and 4.1 random — the end-over-end curve is the right tumbling drag.
+Shahab-3 stage 1, settled, feels 3.4–7.3 m² against 3.3–3.7 trimmed,
+because the undamped swing left after arrest is large when the spin was
+high; its impact lies 0.3–4.2 km beyond the trimmed point toward the
+tumbling one (8 km away). Real damping shrinks that; no source gives it.
+So the trimmed point is the likelier end but can be short by up to half
+the old band. Listed in `TODO.md` item 10.
+
+Cost: all 13 vehicles 8 s (was 7); suite 143 s (was 101).
+
 **Phase 4 — later.** A flight-plan option to drop the fins.
 
 ## 19a. Phase 1 as built (2026-09-30)
