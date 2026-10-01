@@ -21,6 +21,12 @@ copyright in the United States (17 U.S.C. § 105).
 The gazetteer and terrain files are derived products; `gazetteer_build.py` and
 `dem_build.py` reproduce them from the sources above.
 
+## Aerodynamic reference data
+
+| Files | Source | Terms |
+|---|---|---|
+| `data/aero/jernell_1968_flat_cylinders.csv` | Jernell, L. S., *Aerodynamic Characteristics of Bodies of Revolution at Mach Numbers from 1.50 to 2.86 and Angles of Attack to 180°*, NASA TM X-1658, 1968 (NTRS 19680026721). Values digitised by Thrusty from the report's Figs. 3 and 9 (2026-09-30); precision stated in the file header | U.S. Government work, not subject to copyright in the United States. The digitised table is Thrusty's and is released under CC BY-SA 4.0 (`LICENSE-DATA`) |
+
 ## Materials and propulsion data
 
 | Files | Source | Terms |

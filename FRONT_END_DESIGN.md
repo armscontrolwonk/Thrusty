@@ -775,9 +775,74 @@ cone- and ogive-cylinders go to 185°. Values read from a 150 dpi scan
   Minotaur-IV's third stage, 2.7 km): that was the old integration error. Main
   trajectories are unchanged. Runtime about doubles for debris, still under a
   second per vehicle; the suite takes about 20 s longer.
-- Still to come: drag by attitude (trim from the measured centre-of-pressure
-  curve for finless stages, random tumbling as the other end of the band,
-  Mach-dependent), and the band's impact points.
+- **Drag by attitude (2026-10-01).** `spent_stage_aero.py` builds three
+  C_D·A(Mach) curves per spent stage or strap-on casing from Jernell's
+  flat-ended cylinder (`data/aero/jernell_1968_flat_cylinders.csv`, l/d 6,
+  Mach 1.50–2.86; C_N scaled by l/d) and Klett's Newtonian cylinder above:
+  random tumbling (sin α weight; Klett eq. 36 from Mach 10, linear between),
+  end over end (uniform in α; Klett eq. 32), and the trim where Jernell's
+  Fig. 9 centre of pressure meets the empty CG. A liquid stage's CG puts the
+  engine (κ_E/(1+κ_E) of the dry mass, Shu et al. 2020: 0.25 lower, 0.12
+  upper) at the base and spreads the rest evenly: CG 0.40 or 0.45 of the
+  length from the base, so it trims base first, 18° off end-on at Mach 1.5
+  and 12° at 2.86 (lower stage). A solid stage or casing puts its nozzle at
+  the base with the share given by the ratio of Romaniw's (2013, Appendix
+  A) case, insulation and nozzle fits in motor thrust — 28% of the empty
+  mass at 0.3 MN, 14% at 10 MN, peak thrust when the file has one — so AUR
+  stage 1's CG is 0.36 from the base and it trims 15° off end-on at Mach
+  1.5. Only the ratio is used: the absolute fits give 815 kg for AUR stage
+  1's 454 kg (user, 2026-10-01: "the data isn't ideal but the ratios might
+  be ok"). The MER folder in the Drive (18 papers) has no other case/nozzle
+  split; Zandbergen 2026 Fig. 1 gives the Shuttle SRB's "SRM hardware,
+  including the casing, nozzle, thermal insulation, and ignition system" as
+  one 66 t number, and Rohrschneider's §6 is liquid-engine constants. A
+  solid with no thrust in its file, and a finned stage (no fin forces
+  beyond 58°), have no trim and are flown tumbling only. The fairing keeps
+  the old β path.
+- **The band and the one reported point.** `trajectory._fly_band` flies a
+  piece tumbling randomly and, when it has one, trimmed, and reports the
+  great-circle midpoint of the two impacts with the mean time and speed;
+  both ends, the climb and the assumptions ride on the milestone as
+  `impact_band`. With no trim the tumbling point is reported.
+- **The climb leg, and where a 44 km band came from.** Flown trimmed or
+  tumbling from separation, AUR's first stage (then entered as a liquid;
+  separates at 38 km, 1.86 km/s, climbs to 157 km) gave a 44 km band; by
+  switching the trimmed drag on over parts of the fall, 41 km of it was
+  found to accrue on the climb (Mach 3–6, where the trim is only held at
+  its Mach 2.86 value) and 2.5 km on the descent. A stage cannot trim on
+  the climb: it leaves front-first, which is statically unstable (the CP
+  sits near the leading face, Jernell Fig. 9), and the swing envelope grows
+  as q falls (Tobak & Peterson eq. 33, Regan 13.56; both ∝ q^(−1/4)). No
+  source treats arrest on a climb; the inference is stated in the run's
+  notes. So a piece still climbing at separation is flown end over end
+  (Klett's constant-rate case) to apogee and the band is flown from there.
+  Shahab-3's stage-1 band went 17 → 8 km; the AUR case 44 → 2.5 km before
+  its file was corrected.
+- **AUR corrected (user, 2026-10-01).** Both stages are solid; stage 1 is a
+  double-anchor (regressive) grain with 290 kN peak thrust. The shipped file
+  had both as liquid. Main range at 33°N 44°E, az 60°: 4554 → 4133 km (the
+  regressive curve at 290 kN peak gives 0.75 × 290 × 54 = 11.7 MN·s against
+  12.4 MN·s from the file's 280 s Isp; the 290 kN is the user's number and
+  stands). The damped-glide smoke test pins its carrier at the old
+  constant-thrust stack, as it already pins mass and handoff altitude; the
+  legacy-load golden was regenerated for this one file.
+- **Effect on shipped vehicles** (33°N 44°E, az 60°, against 857cc42):
+  main trajectories unchanged; debris impact points move 0–6 km, except
+  Minotaur-IV's third stage, 25 km at 19,400 km downrange. Bands now:
+  AUR 2 / 4 km, Generic ICBM 4 / 7 km, Shahab-3 8 km, Minotaur-IV 0.2 / 4 /
+  16 km, Taepodong-I 5 km (stage 2), Taepodong-II 3 / 6 km (stages 2, 3),
+  STARS-1 0 / 0.6 / 1 km, Strypi upper stages 0.6 km; finned stages 0. All
+  13 vehicles run in 7 s against 5 s.
+- **Validation debt.** Romaniw's ratio, Shu's κ_E as a CG, the climb-leg
+  inference, and the end-for-end mirror are each a model with no
+  Thrusty-collected check behind it; `TODO.md` now lists them with what
+  data would test each.
+- Tests: `test_spent_stage_aero.py` (the data averages, Klett's equations on
+  his reference area, the joins, trim angles, the stage kinds, the band and
+  its midpoint, the climb leg, the β path).
+- Still open: a solid stage's CG (needs a cited nozzle mass); the
+  settle-or-tumble estimate (Tobak & Peterson Fig. 2) as a labelled note;
+  the stage-impact benchmark (user).
 
 **Phase 4 — later.** A flight-plan option to drop the fins.
 

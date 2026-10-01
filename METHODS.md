@@ -5251,11 +5251,60 @@ velocity" or "30 km terminal velocity" claims.
 
 ### 14.3 Debris arcs
 
-After staging or shroud jettison, each spent body continues on a
-ballistic arc until impact, computed with a tumbling-cylinder ballistic
-coefficient (`tumbling_cylinder_beta`, `booster_models.py`). This
-gives a more realistic descent than treating the spent body as a point
-mass:
+After staging or shroud jettison, each spent body continues on an
+unpowered arc to impact (`integrate_debris`, `trajectory.py`): J2 gravity,
+drag, Coriolis and centrifugal terms, the main ballistic flight's
+integration tolerances (rtol 1e-8, atol 1e-6 m, max_step 5 s), and the
+terrain model's ground when the run uses it.
+
+**Spent stages and strap-on casings** (`spent_stage_aero.py`;
+`FRONT_END_DESIGN.md` Part IV §18a–19d) are flown with drag as
+C_D·A(Mach) set by attitude, on the cross-section area πd²/4:
+
+- *Random tumbling.* C_D(α) = C_N sin α + C_A cos α from Jernell's
+  flat-ended cylinder ([Jernell 1968](#16-references), NASA TM X-1658:
+  l/d 6, Mach 1.50–2.86, α 0–90°, `data/aero/jernell_1968_flat_cylinders.csv`;
+  C_N scaled by l/d, since it follows the planform area; the body taken as
+  symmetric end for end beyond 90°), averaged over random orientation
+  (weight sin α). Linear in Mach from 2.86 to Klett eq. 36 at Mach 10,
+  (4/π)(0.393 l/d + 0.178)(2 − K), K the normal-shock density ratio
+  ([Klett 1964](#16-references)); Klett above; held below Mach 1.5.
+- *End over end.* The same data averaged uniformly in α (a turn at
+  constant rate in the plane of flight); Klett eq. 32,
+  (4/π)(0.283 l/d + 0.303)(2 − K), above Mach 10, blended the same way.
+- *Trimmed.* The angle off end-on at which Jernell's measured centre of
+  pressure (Fig. 9, Mach 1.50 and 2.86, interpolated in Mach) meets the
+  empty centre of gravity, and the drag at that angle; held outside
+  1.50–2.86. A liquid stage's empty CG puts the engine, κ_E/(1 + κ_E) of
+  the dry mass ([Shu et al. 2020](#16-references): κ_E 0.25 lower stage,
+  0.12 upper), at the base and spreads the rest evenly, so the base leads
+  with the CG 0.40 (lower) or 0.45 (upper) of the length from it. A solid
+  stage or strap-on casing puts the nozzle at the base with the share that
+  the ratio of [Romaniw 2013](#16-references)'s case, insulation and nozzle
+  fits in motor thrust gives (about 28% of the empty mass at 0.3 MN, 14% at
+  10 MN; peak thrust when the file has one); only the ratio is used, his
+  absolute fits being far too heavy for small motors. A solid with no
+  thrust in its file, and a finned stage (no fin forces beyond Jorgensen's
+  58°), have no trim.
+
+How a piece is flown: one still climbing at separation is flown end over
+end to apogee. It leaves front-first, which is statically unstable (the CP
+sits near the leading face near end-on, ahead of the empty CG), and the
+envelope of the swing that follows grows as dynamic pressure falls
+([Tobak & Peterson 1964](#16-references) eq. 33; [Regan 1984](#16-references)
+eq. 13.56; both ∝ q^(−1/4)), so nothing arrests it before apogee. No
+source treats arrest on a climb directly; this is an inference from those
+two results, stated in the run's notes. From apogee — or from separation,
+for a piece already falling — it is flown twice, tumbling randomly and
+trimmed, and the run reports **one point, the great-circle midpoint** of
+the two impacts (user decision, 2026-09-30), with the mean time and speed;
+both ends, the climb and the assumptions are kept on the milestone as
+`impact_band`. With no trim the tumbling point is reported. Before the
+climb leg, a stage separating at Mach 6 at 38 km had a 44 km band, 41 km
+of it accrued on the climb; with it, the shipped bands are 0–8 km.
+
+**Fairings** keep the earlier tumbling-cylinder ballistic coefficient
+(`tumbling_cylinder_beta`, `booster_models.py`):
 
 ```
 A_end   = π · D² / 4                          [end-on cross-section]
@@ -5269,8 +5318,8 @@ approximates the time-averaged area for a cylinder tumbling in the
 pitch plane. `C_D = 1.0` (the function's default) is representative of
 bluff-body turbulent flow ([Hoerner 1965](#16-references)). The function
 returns 0 if either length or diameter is zero, so missiles without a
-configured shroud or spent-body geometry simply have no debris arcs
-computed. The same function has a **two-orientation hypersonic form**
+configured shroud geometry simply have no fairing arc; a spent stage
+without a diameter likewise has none. The same function has a **two-orientation hypersonic form**
 (`cd=None`, each orientation with its own Hoerner Ch. XVIII coefficient)
 used for a reentering body flagged `tumbling` (§8.11); debris arcs keep
 the legacy single-`C_D = 1.0` mean-area form above.
@@ -5520,6 +5569,46 @@ optimisation) should use higher-fidelity tools.
   (eq. 44, Fig. 24), and blunt cylinder face `C_D = 0.89·C_p•` (Fig. 22),
   with continuum cross-flow anchors from pp. 3-8/3-9 (Fig. 12) and p. 3-16
   (Fig. 28).
+
+- **Jernell, L. S.** (1968). *Aerodynamic Characteristics of Bodies of
+  Revolution at Mach Numbers from 1.50 to 2.86 and Angles of Attack to
+  180°.* NASA TM X-1658. The flat-ended cylinder (l/d 6, Figs. 3 and 9)
+  behind a spent stage's tumbling drag and trim (Section 14.3), digitised
+  in `data/aero/jernell_1968_flat_cylinders.csv`.
+
+- **Klett, R. D.** (1964). *Drag Coefficients and Heating Ratios for Right
+  Circular Cylinders in Free-Molecular and Continuum Flow from Mach 10
+  to 30.* Sandia SC-RR-64-2141. Eq. 32 (end over end) and eq. 36 (random
+  tumbling), modified Newtonian on area L·D, the hypersonic end of a spent
+  stage's drag curves (Section 14.3).
+
+- **Regan, F. J.** (1984). *Re-Entry Vehicle Dynamics.* AIAA Education
+  Series. Ch. XIII, eq. 13.56: the undamped small-angle oscillation
+  envelope ∝ ρ^(−1/4), used with Tobak & Peterson for the climb leg of a
+  spent stage (Section 14.3); also the worked accuracy-manoeuvre case
+  (Section 9).
+
+- **Romaniw, Y. A.** (2013). *The Relationship Between Light-Weighting with
+  Carbon Fiber Reinforced Polymers and the Life Cycle Environmental Impacts
+  of Orbital Launch Rockets.* PhD dissertation, Georgia Institute of
+  Technology. Appendix A, Figs. A2–A4: solid motor case, insulation and
+  nozzle mass as power laws in motor thrust, his own regressions on data
+  not tabulated in the text. Only their ratio is used, for the nozzle's
+  share of a spent solid stage's empty mass (Section 14.3).
+
+- **Shu, J.-I., Lee, J., Kim, J., Lee, S. & Wang, P.** (2020). "Multistage
+  Liquid Rocket Weight Estimation and Optimization for Early Design
+  Stages." *J. Aerospace Engineering* 33(6), 04020069. Eq. 4 and Table 11:
+  the engine-to-structure mass ratio κ_E by stage, behind the dry-mass
+  estimator's `_KAPPA_E_DEFAULT` (Section 6.1) and a spent liquid stage's
+  empty centre of gravity (Section 14.3).
+
+- **Tobak, M. & Peterson, V. L.** (1964). *Theory of Tumbling Bodies
+  Entering Planetary Atmospheres with Application to Probe Vehicles and
+  the Australian Tektites.* NASA TR R-203. The published settle-or-tumble
+  analysis; eq. 33, the oscillation envelope ∝ q^(−1/4) after arrest,
+  which with Regan 1984 is why a climbing spent stage is flown end over
+  end to apogee (Section 14.3).
 
 ### Atmosphere
 

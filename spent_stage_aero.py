@@ -1,0 +1,358 @@
+"""
+Drag of a spent stage falling after separation (FRONT_END_DESIGN.md Part IV,
+Phase 3).
+
+A spent stage does not tumble randomly once dynamic pressure builds: it
+settles to a trim set by where its centre of gravity sits against its centre
+of pressure.  Whether it gets there is a dynamic question no source in hand
+settles for a stage that separates inside the atmosphere, so a stage is flown
+twice — trimmed, and tumbling randomly — and the run reports the midpoint of
+the two impact points (user, 2026-09-30).
+
+A stage that separates while still climbing is flown a third way until
+apogee: tumbling end over end in the plane of its flight (Klett's
+end-over-end case).  Two measured facts rule out a trim on the climb.  A
+stage leaves its booster flying front-first, and near end-on the centre of
+pressure of a flat-ended cylinder sits close to the leading face (Jernell,
+Fig. 9), ahead of the empty centre of gravity: the attitude is statically
+unstable and the stage swings away from it.  Every published envelope for
+the swing that follows grows as dynamic pressure falls (Tobak & Peterson
+TR R-203 eq. 33; Regan 1984 eq. 13.56; both ~ q^(-1/4)), and on a climb
+dynamic pressure falls, so nothing arrests the swing before apogee.  No
+source treats arrest on a climb directly, so this is an inference from
+those two results; the ends of the trim-to-tumbling band are then flown
+from the apogee state (2026-10-01).  Before this leg was added the band
+for a stage separating at Mach 6 in dense air was 44 km wide, 41 km of it
+accrued on the climb.
+
+SOURCES
+  Jernell, NASA TM X-1658 (1968): a circular cylinder flat at both ends, l/d 6,
+      tested at Mach 1.50, 1.90, 2.36 and 2.86 from 0 to about 100 deg
+      (data/aero/jernell_1968_flat_cylinders.csv).  Normal force "primarily
+      dependent upon the magnitude of the planform area", so C_N is scaled by
+      l/d from the l/d 6 body; fineness ratio has "little effect" on C_A.
+      Near end-on the centre of pressure moves toward the leading face
+      (Fig. 9); from about 25 deg to 90 deg it sits near mid-length.
+  Klett, Sandia SC-RR-64-2141 (1964), eq. 36: random tumbling in continuum
+      flow, C_D = (0.393 + 0.178 D/L)(2 - K) on area L*D, Mach 10-30; K the
+      density ratio across a normal shock (perfect gas, gamma 1.4).  Eq. 32:
+      end-over-end tumbling at constant rate, the same model averaged
+      uniformly in angle, C_D = (0.283 + 0.303 D/L)(2 - K) on area L*D.
+  Shu et al. (2020), via mass_estimator._KAPPA_E_DEFAULT: engine-to-
+      structure mass ratio by stage role (lower 0.25, upper 0.12; anchors
+      KSLV-II 0.252/0.177/0.094, Titan II 0.250/0.111), for a liquid stage's
+      empty centre of gravity.
+  Romaniw (2013), Georgia Tech dissertation, Appendix A Figs. A2-A4: solid
+      motor case, insulation and nozzle mass as power laws in motor thrust
+      (N), his own regressions on data he does not tabulate, plotted to
+      12 MN (R^2 0.97-0.98).  Only the RATIO of the three is used, for the
+      nozzle's share of a solid stage's empty mass; the absolute fits
+      overshoot a small motor badly (815 kg against AUR stage 1's 454 kg)
+      and are not used (user, 2026-10-01).
+
+WHAT IS INFERRED, NOT MEASURED (each stated in the output):
+  * Beyond 90 deg the flat-ended cylinder is taken as symmetric end for end:
+    Jernell tested it only to about 100 deg; the data near 90 deg agree with
+    symmetry, and his cone- and ogive-cylinders show the same pull of the CP
+    toward a leading flat base near end-on.
+  * Outside Mach 1.50-2.86 (user, 2026-09-30): below Mach 1.50 the Mach 1.50
+    values are held; above Mach 2.86 the random-tumbling and end-over-end
+    drags are interpolated linearly in Mach to Klett's values at Mach 10, and
+    Klett's are used above that; the trimmed state is held at its Mach 2.86
+    value.
+  * End over end, the stage is taken to turn at a constant rate, as Klett
+    does (eq. 30: the drag averaged uniformly in angle).
+  * A liquid stage's empty CG: the engine, kappa/(1+kappa) of the dry mass
+    (Shu et al.), at the base; the rest spread evenly along the stage.
+  * A solid stage's or casing's empty CG: the nozzle, Romaniw's share of
+    case + insulation + nozzle at the motor's thrust (about 28% at 0.3 MN,
+    14% at 10 MN; peak thrust when the file gives one, else the average),
+    at the base; case and insulation spread evenly.  A solid whose file
+    gives no thrust has no CG estimate and is flown tumbling only.
+  * The trim uses the centre-of-pressure curves Jernell printed (Fig. 9, Mach
+    1.50 and 2.86), interpolated linearly in Mach; the values computed from
+    C_m/C_N at Mach 1.90 and 2.36 are too uncertain near end-on (+-0.1).
+  * A finned stage: fin forces beyond 58 deg are not in any source in hand,
+    so its trim is not computed and it is reported as tumbling (user decision,
+    2026-09-30: finned stages as a band only).
+The real ends of a stage — an open interstage, nozzles — differ from the flat
+faces tested; no source in hand covers them.
+"""
+
+from __future__ import annotations
+
+import csv
+import math
+import os
+from functools import lru_cache
+
+import numpy as np
+
+_DATA = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'aero',
+                     'jernell_1968_flat_cylinders.csv')
+DATA_LD = 6.0                  # fineness ratio of the tabulated body
+MACH_LO, MACH_HI = 1.50, 2.86  # tested range
+KLETT_MACH = 10.0              # lower end of Klett's stated range
+GAMMA = 1.4
+
+
+@lru_cache(maxsize=1)
+def _table():
+    """{mach: (alpha_deg, CN, CA, xcp_over_l)} as arrays, sorted by alpha."""
+    rows = {}
+    with open(_DATA) as f:
+        for r in csv.DictReader(line for line in f if not line.startswith('#')):
+            m = float(r['mach'])
+            x = r['xcp_over_l'].strip()
+            rows.setdefault(m, []).append((float(r['alpha_deg']), float(r['CN']),
+                                           float(r['CA']),
+                                           float(x) if x else np.nan))
+    out = {}
+    for m, v in rows.items():
+        v.sort()
+        out[m] = tuple(np.array(c) for c in zip(*v))
+    return out
+
+
+def _bracket(mach):
+    """The two tabulated Mach numbers around `mach` and the weight of the
+    upper one; held at the ends of the tested range."""
+    ms = sorted(_table())
+    m = min(max(float(mach), ms[0]), ms[-1])
+    for lo, hi in zip(ms, ms[1:]):
+        if m <= hi:
+            return lo, hi, (m - lo) / (hi - lo)
+    return ms[-1], ms[-1], 0.0
+
+
+def _coeffs(alpha_deg, mach, ld):
+    """C_N (scaled to fineness ratio ld by planform area) and C_A of the
+    flat-ended cylinder at alpha 0-180 deg, cross-section reference.  Beyond
+    90 deg the body is taken as symmetric end for end (an inference)."""
+    a = float(alpha_deg) % 360.0
+    a = 360.0 - a if a > 180.0 else a
+    mirror = a > 90.0
+    a1 = 180.0 - a if mirror else a
+    lo, hi, w = _bracket(mach)
+    def at(m):
+        al, cn, ca, _ = _table()[m]
+        return np.interp(a1, al, cn), np.interp(a1, al, ca)
+    (n0, x0), (n1, x1) = at(lo), at(hi)
+    cn = (1.0 - w) * n0 + w * n1
+    ca = (1.0 - w) * x0 + w * x1
+    return cn * ld / DATA_LD, (-ca if mirror else ca)
+
+
+def cd_at(alpha_deg, mach, ld):
+    """Drag coefficient on the cross-section area at angle alpha:
+    C_D = C_N sin(alpha) + C_A cos(alpha) (Jorgensen, TR R-474 eq. 2.17)."""
+    cn, ca = _coeffs(alpha_deg, mach, ld)
+    a = math.radians(alpha_deg)
+    return cn * math.sin(a) + ca * math.cos(a)
+
+
+@lru_cache(maxsize=4096)
+def _random_from_data(mach, ld):
+    """Average of cd_at over random orientation (weight sin alpha)."""
+    th = np.linspace(0.0, math.pi / 2.0, 181)
+    f = [cd_at(math.degrees(t), mach, ld) * math.sin(t) for t in th]
+    return float(np.trapezoid(f, th))
+
+
+@lru_cache(maxsize=4096)
+def _end_over_end_from_data(mach, ld):
+    """Average of cd_at over a turn at constant rate in the plane of flight
+    (uniform weight in alpha; Klett eq. 30).  Symmetric end for end, so the
+    quarter turn stands for the whole."""
+    th = np.linspace(0.0, math.pi / 2.0, 181)
+    f = [cd_at(math.degrees(t), mach, ld) for t in th]
+    return float(np.trapezoid(f, th) / (math.pi / 2.0))
+
+
+def _klett_2_minus_K(mach):
+    """2 - K, K = [(gamma-1)M^2 + 2] / [(gamma+1)M^2] (normal shock, perfect
+    gas): the modified-Newtonian pressure factor in Klett's drag equations."""
+    m2 = float(mach) ** 2
+    return 2.0 - ((GAMMA - 1.0) * m2 + 2.0) / ((GAMMA + 1.0) * m2)
+
+
+def klett_random_cd(mach, ld):
+    """Klett eq. 36 on the cross-section area: (4/pi)(0.393 l/d + 0.178)(2-K)."""
+    return (4.0 / math.pi) * (0.393 * ld + 0.178) * _klett_2_minus_K(mach)
+
+
+def klett_end_over_end_cd(mach, ld):
+    """Klett eq. 32 on the cross-section area: (4/pi)(0.283 l/d + 0.303)(2-K)."""
+    return (4.0 / math.pi) * (0.283 * ld + 0.303) * _klett_2_minus_K(mach)
+
+
+def _blend_to_klett(mach, ld, from_data, klett):
+    """The data value up to Mach 2.86, Klett's from Mach 10, linear in Mach
+    between (user, 2026-09-30)."""
+    m = float(mach)
+    if m <= MACH_HI:
+        return from_data(m, ld)
+    if m >= KLETT_MACH:
+        return klett(m, ld)
+    a, b = from_data(MACH_HI, ld), klett(KLETT_MACH, ld)
+    return a + (b - a) * (m - MACH_HI) / (KLETT_MACH - MACH_HI)
+
+
+def random_cd(mach, ld):
+    """Random-tumbling drag coefficient on the cross-section area."""
+    return _blend_to_klett(mach, ld, _random_from_data, klett_random_cd)
+
+
+def end_over_end_cd(mach, ld):
+    """Drag coefficient on the cross-section area, tumbling end over end in
+    the plane of flight."""
+    return _blend_to_klett(mach, ld, _end_over_end_from_data,
+                           klett_end_over_end_cd)
+
+
+def trim_alpha(mach, g):
+    """Angle off end-on (deg) at which the measured centre of pressure meets
+    a CG a fraction g of the length from the leading face, or None when the
+    CP never reaches it (CG at or beyond mid-length: no preferred attitude).
+    g below the CP at the smallest tabulated angle trims at end-on (0)."""
+    if g >= 0.5:
+        # The measured CP never passes mid-length, so such a CG meets it
+        # only broadside, by symmetry: no preferred attitude (Part IV §18a).
+        return None
+    m = min(max(float(mach), MACH_LO), MACH_HI)
+    lo, hi = MACH_LO, MACH_HI                      # Jernell Fig. 9 curves
+    w = (m - lo) / (hi - lo)
+    grid = np.arange(0.0, 90.0001, 0.25)
+    def curve(mm):
+        al, _, _, xcp = _table()[mm]
+        ok = ~np.isnan(xcp)
+        return np.interp(grid, al[ok], xcp[ok], left=np.nan)
+    xcp = (1.0 - w) * curve(lo) + w * curve(hi)
+    defined = ~np.isnan(xcp)
+    if g < np.nanmin(xcp[defined][:1]):
+        return 0.0
+    idx = np.where(defined & (xcp >= g))[0]
+    return float(grid[idx[0]]) if idx.size else None
+
+
+def trim_cd(mach, ld, g):
+    """(alpha_trim_deg, C_D at trim) on the cross-section area, or None.
+    Held at its Mach 2.86 value above the tested range and at Mach 1.50
+    below it."""
+    m = min(max(float(mach), MACH_LO), MACH_HI)
+    a = trim_alpha(m, g)
+    if a is None:
+        return None
+    return a, abs(cd_at(a, m, ld))
+
+
+def empty_cg_fraction(stage, dry_mass_kg, role='lower'):
+    """(CG fraction of length from the FRONT of the stage, basis) for an empty
+    liquid stage: the engine, kappa/(1+kappa) of the dry mass with kappa the
+    engine-to-structure ratio for its role (Shu et al. 2020, via
+    mass_estimator._KAPPA_E_DEFAULT: 'lower' 0.25, 'upper' 0.12), at the base;
+    the rest spread evenly."""
+    from mass_estimator import _KAPPA_E_DEFAULT
+    k = _KAPPA_E_DEFAULT.get(role, _KAPPA_E_DEFAULT[''])
+    share = k / (1.0 + k)
+    f = share * 1.0 + (1.0 - share) * 0.5
+    return f, (f"liquid {role} stage: engine {share:.0%} of the dry mass "
+               f"(engine/structure {k:g}, Shu et al. 2020) at the base, the "
+               f"rest spread evenly")
+
+
+def solid_nozzle_share(thrust_N):
+    """The nozzle's share of a solid motor's case + insulation + nozzle mass,
+    from the ratio of Romaniw's (2013, Figs. A2-A4) fits in motor thrust (N):
+    case 7e-5 T^1.2393, insulation 1e-4 T^1.1412, nozzle 0.0013 T^0.9615.
+    The share falls with size because the nozzle grows nearly linearly in
+    thrust and the case faster."""
+    T = float(thrust_N)
+    if T <= 0.0:
+        return None
+    case = 7e-5 * T ** 1.2393
+    ins = 1e-4 * T ** 1.1412
+    noz = 0.0013 * T ** 0.9615
+    return noz / (case + ins + noz)
+
+
+def empty_cg_fraction_solid(stage):
+    """(CG fraction of length from the FRONT, basis) for an empty solid stage
+    or casing: the nozzle, Romaniw's share at the motor's thrust, at the base;
+    case and insulation spread evenly.  None when the file gives no thrust."""
+    T = float(getattr(stage, 'thrust_peak_N', 0.0) or 0.0) or \
+        float(getattr(stage, 'thrust_N', 0.0) or 0.0)
+    s = solid_nozzle_share(T)
+    if s is None:
+        return None, ("solid stage: no thrust in its file, so no nozzle share "
+                      "and no CG estimate; flown tumbling only")
+    f = s * 1.0 + (1.0 - s) * 0.5
+    return f, (f"solid stage: nozzle {s:.0%} of the empty mass (ratio of "
+               f"Romaniw 2013 case/insulation/nozzle fits at {T/1e3:.0f} kN) "
+               f"at the base, case and insulation spread evenly")
+
+
+# Mach grid on which a stage's two drag curves are tabulated once, then
+# interpolated in the equations of motion: the tested points, a fine step to
+# Klett's Mach 10, and on to 30 for his weak (2 - K) dependence.
+_MACH_GRID = np.unique(np.r_[0.0, 1.5, 1.9, 2.36, 2.86,
+                             np.arange(3.0, 10.01, 0.5),
+                             np.arange(12.0, 30.01, 2.0)])
+
+
+def _tabulated(f):
+    """f(Mach) evaluated on _MACH_GRID and returned as a fast interpolant."""
+    y = np.array([f(m) for m in _MACH_GRID])
+    return lambda M, _x=_MACH_GRID, _y=y: float(np.interp(M, _x, _y))
+
+
+def spent_stage_drag(stage, dry_mass_kg, role='lower'):
+    """Drag of a spent cylindrical stage, as (C_D*A)(Mach) in m^2.
+
+    Returns a dict:
+      cda_random        callable Mach -> C_D*A, random tumbling
+      cda_end_over_end  callable Mach -> C_D*A, tumbling end over end in the
+                        plane of flight (the climb to apogee)
+      cda_trim          callable Mach -> C_D*A at its trim, or None
+      leading     'front' | 'base' | None — the end that leads when trimmed
+      notes       plain sentences on what was assumed
+    """
+    d = float(stage.diameter_m or 0.0)
+    L = float(stage.length_m or 0.0) or 2.0 * d
+    ld = L / d if d > 0 else DATA_LD
+    area = math.pi * d * d / 4.0
+    notes = []
+    out = dict(cda_random=_tabulated(lambda M: random_cd(M, ld) * area),
+               cda_end_over_end=_tabulated(
+                   lambda M: end_over_end_cd(M, ld) * area),
+               cda_trim=None, leading=None, notes=notes)
+    if getattr(stage, 'has_fins', False) or getattr(stage, 'has_grid_fins', False):
+        notes.append("finned: trim not computed (no fin forces beyond 58 deg "
+                     "in the sources); flown tumbling only")
+        return out
+    if getattr(stage, 'solid_motor', False):
+        f, basis = empty_cg_fraction_solid(stage)
+        notes.append(basis)
+        if f is None:
+            return out
+    else:
+        f, basis = empty_cg_fraction(stage, dry_mass_kg, role)
+        notes.append(basis)
+    g = min(f, 1.0 - f)
+    lead = 'base' if f > 0.5 else 'front'
+    if trim_alpha(MACH_HI, g) is None and trim_alpha(MACH_LO, g) is None:
+        notes.append("CG at mid-length: no preferred attitude; flown "
+                     "tumbling only")
+        return out
+    def cda_trim(M, _g=g):
+        t = trim_cd(M, ld, _g)
+        return (t[1] if t is not None else random_cd(M, ld)) * area
+    out['cda_trim'] = _tabulated(cda_trim)
+    out['leading'] = lead
+    a_lo, a_hi = trim_alpha(MACH_LO, g), trim_alpha(MACH_HI, g)
+    notes.append(f"trims with its {lead} leading, CG {g:.2f} of its length "
+                 f"from that end: "
+                 f"{'end-on' if not a_lo else f'{a_lo:.0f} deg'} off end-on at "
+                 f"Mach 1.5, {'end-on' if not a_hi else f'{a_hi:.0f} deg'} at "
+                 f"Mach 2.86 (Jernell flat-ended cylinder)")
+    return out

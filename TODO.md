@@ -7,6 +7,26 @@ invent.
 
 ## New — not yet planned
 
+### 10. Models to validate with our own data — OPEN LIST (2026-10-01)
+
+Each of these is a published relation, or an inference from one, that
+Thrusty uses without a Thrusty-collected check behind it. The list exists so
+that when a usable observation turns up it has somewhere to go. Add to it
+whenever a model is adopted on a ratio, an extrapolation or an inference;
+strike an entry only with the comparison recorded in `BENCHMARKING.md`.
+
+| Model | Where | What would test it | Status |
+|---|---|---|---|
+| Nozzle share of a spent solid stage's empty mass (ratio of Romaniw 2013 case/insulation/nozzle fits) | `spent_stage_aero.solid_nozzle_share` | Component masses of a few real motors from manufacturer or NASA documents (Castor, GEM, Star, Orion families; SRB): nozzle ÷ (case + insulation + nozzle) against motor thrust | adopted on the ratio only; absolute fits rejected |
+| Empty CG of a liquid stage from Shu et al. 2020 κ_E (engine at the base, the rest uniform) | `spent_stage_aero.empty_cg_fraction` | Any published empty-stage CG or component layout (Saturn S-IVB, Titan, Delta); Goldyn et al. 2025 Table D1 gives a per-component geometry that could be built and compared | adopted; no check |
+| A climbing spent stage tumbles end over end to apogee and cannot trim (inference from Tobak & Peterson eq. 33, Regan 13.56) | `trajectory._fly_band`, `_climb_to_apogee` | Tracked or filmed spent-stage attitudes after separation (Ares I-X first stage, Tartabini & Starr 2011; Shuttle ET footage; any range-safety reconstruction) | inference, labelled in notes |
+| Flat-ended cylinder taken as symmetric end for end beyond 90° (Jernell tested to ~100°) | `spent_stage_aero._coeffs` | Jorgensen & Treon TM X-580 (rocket booster, 0–180°, M 0.6–4; not obtainable so far) or any 0–180° cylinder data | inference |
+| Tumbling drag blended linearly in Mach from Jernell's 2.86 to Klett's 10 | `spent_stage_aero._blend_to_klett` | Cylinder drag data between Mach 3 and 10 at high angle (AEDC or ballistic-range reports) | convention (user, 2026-09-30) |
+| Trim held at its Mach 2.86 value above the tested range, and Mach 1.5 values held below | `spent_stage_aero.trim_cd` | Jernell-type CP curves at higher and lower Mach; subsonic flat-cylinder data (Lockwood TN D-3932) | convention (user, 2026-09-30) |
+| Spent-stage impact point as a whole (the midpoint of the band) | `trajectory._fly_band` | A reported spent-stage impact zone with a known launch (the user is sourcing one); NOTAM or debris-recovery coordinates for a shipped vehicle | benchmark pending (user) |
+| Random-tumbling convention for finned stages | `spent_stage_aero.spent_stage_drag` | Fin normal force beyond 58° (Jorgensen's limit) from any source; or an observed impact of a finned spent stage | user decision, 2026-09-30 |
+| Nose-cap heating correlation (Tauber eq. 40) against detailed computation | `heating_locations.ACCURACY['nose_cap']` | Already compared to Stardust (29% low in flux) and FIRE II; needs a third flight case to decide whether the gap is the correlation or the comparison | open (HANDOFF_PHASE3.md item 6) |
+
 ### 9. Whole-body L/D "over-prediction" — REASSESSED, NO CEILING CHANGE (2026-08-28)
 Chasing "non-separating bodies over-range in phugoid glide", the working
 hypothesis was that `glider_ld.whole_booster_LD` over-predicts L/D_max.  It

@@ -142,6 +142,37 @@ debris equations of motion.
    Perkins Fig. 7 before changing it.
 5. The shipped **Strypi VII R stalls** at Mach 1.001 (~8.5 s) at any launch
    site tried; pre-existing.
+6. **Nose-cap heating validation (open since the heating revision).** Tauber
+   Eq. 40 reads 29% low in flux, about 8% low in temperature, against the
+   Stardust detailed computation (Trumble et al. 2010, 942 W/cm² at 51 s) —
+   outside the 3–5% temperature target. Against FIRE II flight (Hash et al.
+   2007) it is within about 5% in temperature, but the convective part is
+   18–24% below fully catalytic computation. Read so far as a gap between
+   correlations and CFD, not a Thrusty error; not closed. See
+   `heating_locations.ACCURACY['nose_cap']` and METHODS §13.15.
+7. **Body nose length and nose radius.** Scud-B and Al Hussein store
+   `body_nose_length_m` 0 and `nose_radius_m` 0, so their nose-cap and
+   windward-face heating report "not given", and the held boost-nose fix
+   (Part IV §19a) waits on the same numbers. Needs a sourced value; do not
+   invent one.
+8. **Conductivity for a solid, non-ablating nose tip.** `heating_by_location`
+   evaluates a solid tip with `heating_solid.cone_tip_response`, which needs
+   the material's density, specific heat and AXIAL conductivity. The catalog
+   (`heating.TPS_MATERIALS`) carries `k_W_mK` only for three ablators, and
+   that value is through-thickness (bondline screen); ablators do not take the
+   solid path. So every solid non-ablating tip (C/C-SiC, carbon-carbon, RCC,
+   UHTC, metals) reports "conductivity not in the materials catalog". The
+   SHEFEX II check's 17 W/(m K) (Böhrk et al. 2012, Table 1, exponent
+   unreadable in the scan) lives only in `test_heating_solid.py`. Likely fix:
+   read the TPSX archive already in the repo (`data/tpsx/catalog.json`; C/SiC
+   is id 26; `test_tpsx_crosscheck.py` shows how fields are pinned) for the
+   isotropic or in-plane conductivity of each solid tip material, wire it as
+   the axial value with its direction stated, and pin it in the cross-check
+   test. TPSX values are mostly room temperature; carbon composites change a
+   lot with temperature, so state that limit in the output.
+9. **Wing leading edge with angle of attack** (Tauber Eq. 49): no test case.
+   **Windward face**: reported as a flat-plate–cone band; neither end meets
+   3–5% yet (STS-3, Throckmorton et al. NASA TM 84500).
 
 ## Working notes
 

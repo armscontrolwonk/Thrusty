@@ -88,6 +88,7 @@ from coordinates import (
     coriolis_acceleration, centrifugal_acceleration,
     range_between, OMEGA_EARTH,
 )
+from spent_stage_aero import spent_stage_drag
 from booster_models import (
     BoosterParams, booster_mass, drag_force_vector, thrust_force,
     active_stage, active_stage_and_t, total_burn_time, tumbling_cylinder_beta,
@@ -1939,11 +1940,85 @@ def _analytical_equil_glide(
 # Debris ballistic arc integrator
 # ---------------------------------------------------------------------------
 
+def _debris_eom(beta_kg_m2, cda_of_mach=None, mass_kg=0.0):
+    """Equations of motion of an unpowered piece: gravity (J2), drag,
+    Coriolis and centrifugal terms.  Drag is q/β, or q·C_D·A(Mach)/m when
+    `cda_of_mach` is given (spent_stage_aero)."""
+    def _eom(t, state):
+        pos, vel = state[:3], state[3:]
+        _, _, alt = ecef_to_geodetic(pos)
+        g     = gravity_ecef(pos)
+        speed = np.linalg.norm(vel)
+        if speed > 1e-6:
+            _, _, rho, a_snd = atmosphere(max(alt, 0.0))
+            q      = 0.5 * rho * speed ** 2
+            if cda_of_mach is not None:
+                a_drag = -(q * cda_of_mach(speed / a_snd) / mass_kg) * (vel / speed)
+            else:
+                a_drag = -(q / beta_kg_m2) * (vel / speed)
+        else:
+            a_drag = np.zeros(3)
+        a_cor = coriolis_acceleration(vel)
+        a_cen = centrifugal_acceleration(pos)
+        return np.concatenate([vel, g + a_drag + a_cor + a_cen])
+    return _eom
+
+
+def _debris_ground(terrain_dem):
+    """Terminal event: height above the ground, the terrain model's when the
+    run uses it (as _hit_ground), else sea level on the ellipsoid."""
+    def _ground(t, state):
+        lat, lon, alt = ecef_to_geodetic(state[:3])
+        if terrain_dem:
+            import terrain as _terrain
+            return alt - _terrain.ground_elevation(
+                np.degrees(lat), np.degrees(lon), hi_res=False)
+        return alt
+    _ground.terminal  = True
+    _ground.direction = -1
+    return _ground
+
+
+def _sample_track(sol, t_end, t_offset=0.0):
+    """A dense solution sampled on a 10 s grid to t_end, as the geodetic
+    track dict the debris plots use; times shifted by t_offset."""
+    t_eval = np.append(np.arange(0.0, t_end, 10.0), t_end)
+    ys = sol(t_eval)
+    lla = [ecef_to_geodetic(ys[:3, i]) for i in range(ys.shape[1])]
+    return {'t':   t_eval + t_offset,
+            'lat': np.degrees(np.array([x[0] for x in lla])),
+            'lon': np.degrees(np.array([x[1] for x in lla])),
+            'alt': np.array([float(x[2]) for x in lla])}
+
+
+def _climb_to_apogee(pos_ecef, vel_ecef, mass_kg, cda_of_mach,
+                     terrain_dem=False, max_time_s=14400.0):
+    """Fly a piece from a climbing state to its apogee.
+
+    Returns (pos, vel, t_apogee_s, track) at the top of the climb, or None
+    when the piece reaches the ground or no apogee within max_time_s (an
+    orbit).  Same tolerances as integrate_debris."""
+    _eom = _debris_eom(0.0, cda_of_mach, mass_kg)
+    def _apogee(t, state):
+        return float(np.dot(state[:3], state[3:]))     # radial rate
+    _apogee.terminal, _apogee.direction = True, -1
+    sol = solve_ivp(_eom, (0.0, max_time_s),
+                    np.concatenate([pos_ecef, vel_ecef]),
+                    method='RK45', events=[_apogee, _debris_ground(terrain_dem)],
+                    rtol=1e-8, atol=1e-6, max_step=5.0, dense_output=True)
+    if len(sol.t_events[0]) == 0 or len(sol.t_events[1]) > 0:
+        return None
+    t_apo = float(sol.t_events[0][0])
+    y = sol.y_events[0][0]
+    return y[:3].copy(), y[3:].copy(), t_apo, _sample_track(sol.sol, t_apo)
+
+
 def integrate_debris(pos_ecef: np.ndarray, vel_ecef: np.ndarray,
                      beta_kg_m2: float,
                      max_time_s: float = 7200.0,
                      return_trajectory: bool = False,
-                     terrain_dem: bool = False):
+                     terrain_dem: bool = False,
+                     cda_of_mach=None, mass_kg: float = 0.0):
     """
     Integrate a tumbling debris piece from separation to ground impact.
 
@@ -1957,6 +2032,9 @@ def integrate_debris(pos_ecef: np.ndarray, vel_ecef: np.ndarray,
     vel_ecef   : ECEF velocity at separation (m/s), shape (3,)
     beta_kg_m2 : ballistic coefficient β = m / (Cd · A_eff) in kg/m²
     max_time_s : integration timeout (s)
+    cda_of_mach, mass_kg : drag as C_D*A (m^2) against Mach number, and the
+                  piece's mass; when given, beta_kg_m2 is not used
+                  (spent_stage_aero, FRONT_END_DESIGN.md §19)
     terrain_dem : the ground is the terrain model's height at the point
                   beneath the piece, as for the main flight (_hit_ground);
                   otherwise sea level on the ellipsoid
@@ -1972,30 +2050,8 @@ def integrate_debris(pos_ecef: np.ndarray, vel_ecef: np.ndarray,
     flight_time_s   : time from separation to impact (s)
     impact_speed_ms : ECEF-frame speed at impact (m/s)
     """
-    def _eom(t, state):
-        pos, vel = state[:3], state[3:]
-        _, _, alt = ecef_to_geodetic(pos)
-        g     = gravity_ecef(pos)
-        speed = np.linalg.norm(vel)
-        if speed > 1e-6:
-            _, _, rho, _ = atmosphere(max(alt, 0.0))
-            q      = 0.5 * rho * speed ** 2
-            a_drag = -(q / beta_kg_m2) * (vel / speed)
-        else:
-            a_drag = np.zeros(3)
-        a_cor = coriolis_acceleration(vel)
-        a_cen = centrifugal_acceleration(pos)
-        return np.concatenate([vel, g + a_drag + a_cor + a_cen])
-
-    def _ground(t, state):
-        lat, lon, alt = ecef_to_geodetic(state[:3])
-        if terrain_dem:
-            import terrain as _terrain
-            return alt - _terrain.ground_elevation(
-                np.degrees(lat), np.degrees(lon), hi_res=False)
-        return alt
-    _ground.terminal  = True
-    _ground.direction = -1
+    _eom    = _debris_eom(beta_kg_m2, cda_of_mach, mass_kg)
+    _ground = _debris_ground(terrain_dem)
 
     state0 = np.concatenate([pos_ecef, vel_ecef])
     # Single pass: find the impact time with the event detector.  When the
@@ -2030,27 +2086,90 @@ def integrate_debris(pos_ecef: np.ndarray, vel_ecef: np.ndarray,
 
     # Smooth output on a regular 10-second grid, sampled from the SAME
     # integration's dense interpolant (no second integration).
-    t_eval = np.append(np.arange(0.0, t_impact, 10.0), t_impact)
-    ys = sol_ev.sol(t_eval)          # shape (6, N)
-
-    d_lats, d_lons, d_alts = [], [], []
-    for i in range(ys.shape[1]):
-        la, lo, al = ecef_to_geodetic(ys[:3, i])
-        d_lats.append(float(np.degrees(la)))
-        d_lons.append(float(np.degrees(lo)))
-        d_alts.append(float(al))
-    traj = {
-        't':   t_eval,
-        'lat': np.array(d_lats),
-        'lon': np.array(d_lons),
-        'alt': np.array(d_alts),
-    }
-    return result + (traj,)
+    return result + (_sample_track(sol_ev.sol, t_impact),)
 
 
 # ---------------------------------------------------------------------------
 # Public integration interface
 # ---------------------------------------------------------------------------
+
+def _fly_band(pos, vel, mass_kg, drag, terrain_dem):
+    """Fly a spent piece at both ends of its attitude band and return the
+    midpoint (FRONT_END_DESIGN.md §19, user 2026-09-30: report one number).
+
+    drag : spent_stage_aero.spent_stage_drag result.  A piece that is still
+    climbing at separation first tumbles end over end to its apogee (see
+    spent_stage_aero: it cannot trim while dynamic pressure falls).  From
+    there — or from separation, for a piece already falling — it is flown
+    tumbling randomly and, when a trim is known, trimmed.  Returns
+    (lat, lon, flight_time_s, impact_speed_ms, track, band) like
+    integrate_debris with return_trajectory, or None when it does not come
+    down; `band` gives each end's impact point and the climb, when there was
+    one.  With no trim the midpoint is the tumbling impact itself.
+
+    The reported point is the midpoint of the great-circle segment between
+    the two impact points; time and speed are the mean of the two; the track
+    is the climb followed by the two descent tracks averaged at equal
+    fractions of their flight times, so it ends at the reported point."""
+    climb = None
+    if float(np.dot(pos, vel)) > 0.0:                # still climbing
+        climb = _climb_to_apogee(pos, vel, mass_kg, drag['cda_end_over_end'],
+                                 terrain_dem)
+    notes = list(drag['notes'])
+    if climb is not None:
+        pos, vel, t0, climb_track = climb
+        apogee_km = float(climb_track['alt'][-1]) / 1000.0
+        notes.append(f"end over end in the plane of its flight from "
+                     f"separation to apogee ({apogee_km:.0f} km, {t0:.0f} s "
+                     f"after separation): the front-first attitude it leaves "
+                     f"with is unstable and the swing grows while dynamic "
+                     f"pressure falls (Klett eq. 32; Tobak & Peterson eq. 33)")
+        band_climb = dict(apogee_km=apogee_km, t_s=t0)
+    else:
+        t0, climb_track, band_climb = 0.0, None, None
+
+    fly = lambda cda: integrate_debris(pos, vel, 0.0, max_time_s=14400.0,
+                                       return_trajectory=True,
+                                       terrain_dem=terrain_dem,
+                                       cda_of_mach=cda, mass_kg=mass_kg)
+    a = fly(drag['cda_random'])
+    b = fly(drag['cda_trim']) if drag.get('cda_trim') is not None else None
+    if a is None:
+        return None
+    band = dict(random=(a[0], a[1]), trim=None if b is None else (b[0], b[1]),
+                leading=drag.get('leading'), climb=band_climb, notes=notes)
+
+    def with_climb(track):
+        """The descent track behind the climb, on the clock from separation."""
+        track = dict(track, t=track['t'] + t0)
+        if climb_track is None:
+            return track
+        return {k: np.concatenate([climb_track[k], track[k][1:]])
+                for k in ('t', 'lat', 'lon', 'alt')}
+
+    if b is None:
+        return (a[0], a[1], t0 + a[2], a[3], with_climb(a[4]), band)
+    pa = np.array([np.cos(np.radians(a[0])) * np.cos(np.radians(a[1])),
+                   np.cos(np.radians(a[0])) * np.sin(np.radians(a[1])),
+                   np.sin(np.radians(a[0]))])
+    pb = np.array([np.cos(np.radians(b[0])) * np.cos(np.radians(b[1])),
+                   np.cos(np.radians(b[0])) * np.sin(np.radians(b[1])),
+                   np.sin(np.radians(b[0]))])
+    m = pa + pb
+    m /= np.linalg.norm(m)
+    lat = float(np.degrees(np.arcsin(m[2])))
+    lon = float(np.degrees(np.arctan2(m[1], m[0])))
+    s = np.linspace(0.0, 1.0, 101)
+    def at(tr):
+        f = (tr['t'] - tr['t'][0]) / max(tr['t'][-1] - tr['t'][0], 1e-9)
+        return [np.interp(s, f, tr[k]) for k in ('lat', 'lon', 'alt')]
+    (la, lo, al), (lb, lob, alb) = at(a[4]), at(b[4])
+    t_mid = 0.5 * (a[2] + b[2])
+    track = dict(t=s * t_mid, lat=0.5 * (la + lb), lon=0.5 * (lo + lob),
+                 alt=0.5 * (al + alb))
+    track['lat'][-1], track['lon'][-1] = lat, lon
+    return lat, lon, t0 + t_mid, 0.5 * (a[3] + b[3]), with_climb(track), band
+
 
 def _handoff_record(params, stored_ro):
     """booster_models.hand_off as plain data for the run result: what was
@@ -3351,50 +3470,51 @@ def integrate_trajectory(params: BoosterParams,
             _body_jettisoned = True   # non-last stages always shed their body
             _cas_mass = _node.mass_final
 
-        if _body_jettisoned and _cas_mass > 0 and _t_bo <= t_arr[-1]:
-            beta = tumbling_cylinder_beta(_cas_mass,
-                                          _node.diameter_m, _node.length_m)
-            if beta > 0:
-                _pos_s, _vel_s = _ecef_state_at(_t_bo)
-                _debris = integrate_debris(_pos_s, _vel_s, beta,
-                                           max_time_s=14400.0,
-                                           return_trajectory=True,
-                                           terrain_dem=bool(getattr(params, '_terrain_dem', False)))
-                if _debris is None:
-                    # Stage did not re-enter within the integration window —
-                    # it is in orbit; add an informational row with no impact
-                    # coordinates so no spurious marker appears on the map.
-                    _insert_chrono({
-                        'event':   f"Stage {_sn} empty body — in orbit",
-                        't_s':     _t_bo,
-                        'alt_km':  0.0, 'range_km': 0.0,
-                        'speed_kms': 0.0, 'inertial_speed_kms': 0.0,
-                        'accel_ms2': 0.0,
-                        'mass_t':  _cas_mass / 1000.0,
-                        'is_debris': True,
-                    })
-                else:
-                    _d_lat, _d_lon, _dt, _d_spd, _d_traj = _debris
-                    _rng = range_between(lat0, lon0,
-                                         np.radians(_d_lat), np.radians(_d_lon))
-                    _insert_chrono({
-                        'event':              f"Stage {_sn} empty impact",
-                        't_s':                _t_bo + _dt,
-                        'alt_km':             0.0,
-                        'range_km':           _rng / 1000.0,
-                        'speed_kms':          _d_spd / 1000.0,
-                        'inertial_speed_kms': _d_spd / 1000.0,
-                        'accel_ms2':          0.0,
-                        'mass_t':             _cas_mass / 1000.0,
-                        'is_debris':          True,
-                        'impact_lat':         _d_lat,
-                        'impact_lon':         _d_lon,
-                    })
-                    _d_traj['t'] = _d_traj['t'] + _t_bo
-                    _debris_trajectories.append({
-                        'label': f"Stage {_sn} body",
-                        **_d_traj,
-                    })
+        if (_body_jettisoned and _cas_mass > 0 and _t_bo <= t_arr[-1]
+                and _node.diameter_m > 0):
+            # Drag by attitude: trimmed and tumbling, reported at the
+            # midpoint of the two (spent_stage_aero; Part IV §19).
+            _drag = spent_stage_drag(_node, _cas_mass,
+                                     'lower' if _sn == 1 else 'upper')
+            _pos_s, _vel_s = _ecef_state_at(_t_bo)
+            _debris = _fly_band(_pos_s, _vel_s, _cas_mass, _drag,
+                                bool(getattr(params, '_terrain_dem', False)))
+            if _debris is None:
+                # Stage did not re-enter within the integration window —
+                # it is in orbit; add an informational row with no impact
+                # coordinates so no spurious marker appears on the map.
+                _insert_chrono({
+                    'event':   f"Stage {_sn} empty body — in orbit",
+                    't_s':     _t_bo,
+                    'alt_km':  0.0, 'range_km': 0.0,
+                    'speed_kms': 0.0, 'inertial_speed_kms': 0.0,
+                    'accel_ms2': 0.0,
+                    'mass_t':  _cas_mass / 1000.0,
+                    'is_debris': True,
+                })
+            else:
+                _d_lat, _d_lon, _dt, _d_spd, _d_traj, _band = _debris
+                _rng = range_between(lat0, lon0,
+                                     np.radians(_d_lat), np.radians(_d_lon))
+                _insert_chrono({
+                    'event':              f"Stage {_sn} empty impact",
+                    'impact_band':        _band,
+                    't_s':                _t_bo + _dt,
+                    'alt_km':             0.0,
+                    'range_km':           _rng / 1000.0,
+                    'speed_kms':          _d_spd / 1000.0,
+                    'inertial_speed_kms': _d_spd / 1000.0,
+                    'accel_ms2':          0.0,
+                    'mass_t':             _cas_mass / 1000.0,
+                    'is_debris':          True,
+                    'impact_lat':         _d_lat,
+                    'impact_lon':         _d_lon,
+                })
+                _d_traj['t'] = _d_traj['t'] + _t_bo
+                _debris_trajectories.append({
+                    'label': f"Stage {_sn} body",
+                    **_d_traj,
+                })
         _t_node = _t_bo + _node.coast_time_s
         _node   = _node.stage2
         _sn    += 1
@@ -3450,39 +3570,41 @@ def integrate_trajectory(params: BoosterParams,
             _b_len = (params.booster_length_m
                       if params.booster_length_m > 0
                       else 2.0 * params.booster_diam_m)
-            _beta_b = tumbling_cylinder_beta(
-                params.booster_inert_kg,
-                params.booster_diam_m,
-                _b_len,
-            )
-            if _beta_b > 0:
-                _pos_b, _vel_b = _ecef_state_at(_t_bsep)
-                _debris_b = integrate_debris(_pos_b, _vel_b, _beta_b,
-                                             max_time_s=14400.0,
-                                             return_trajectory=True,
-                                           terrain_dem=bool(getattr(params, '_terrain_dem', False)))
-                if _debris_b is not None:
-                    _d_lat, _d_lon, _dt, _d_spd, _d_traj = _debris_b
-                    _rng = range_between(lat0, lon0,
-                                         np.radians(_d_lat), np.radians(_d_lon))
-                    _insert_chrono({
-                        'event':              "Booster casing impact",
-                        't_s':                _t_bsep + _dt,
-                        'alt_km':             0.0,
-                        'range_km':           _rng / 1000.0,
-                        'speed_kms':          _d_spd / 1000.0,
-                        'inertial_speed_kms': _d_spd / 1000.0,
-                        'accel_ms2':          0.0,
-                        'mass_t':             params.booster_inert_kg / 1000.0,
-                        'is_debris':          True,
-                        'impact_lat':         _d_lat,
-                        'impact_lon':         _d_lon,
-                    })
-                    _d_traj['t'] = _d_traj['t'] + _t_bsep
-                    _debris_trajectories.append({
-                        'label': f'Booster casings ({params.n_boosters}×)',
-                        **_d_traj,
-                    })
+            # Strap-on casings are solid motors; their empty CG comes from
+            # the nozzle share at the booster's thrust (spent_stage_aero).
+            from types import SimpleNamespace as _NS
+            _drag_b = spent_stage_drag(
+                _NS(diameter_m=params.booster_diam_m, length_m=_b_len,
+                    solid_motor=True, has_fins=False, has_grid_fins=False,
+                    thrust_N=params.booster_thrust_n, thrust_peak_N=0.0),
+                params.booster_inert_kg, 'lower')
+            _pos_b, _vel_b = _ecef_state_at(_t_bsep)
+            _debris_b = _fly_band(_pos_b, _vel_b, params.booster_inert_kg,
+                                  _drag_b,
+                                  bool(getattr(params, '_terrain_dem', False)))
+            if _debris_b is not None:
+                _d_lat, _d_lon, _dt, _d_spd, _d_traj, _band_b = _debris_b
+                _rng = range_between(lat0, lon0,
+                                     np.radians(_d_lat), np.radians(_d_lon))
+                _insert_chrono({
+                    'event':              "Booster casing impact",
+                    'impact_band':        _band_b,
+                    't_s':                _t_bsep + _dt,
+                    'alt_km':             0.0,
+                    'range_km':           _rng / 1000.0,
+                    'speed_kms':          _d_spd / 1000.0,
+                    'inertial_speed_kms': _d_spd / 1000.0,
+                    'accel_ms2':          0.0,
+                    'mass_t':             params.booster_inert_kg / 1000.0,
+                    'is_debris':          True,
+                    'impact_lat':         _d_lat,
+                    'impact_lon':         _d_lon,
+                })
+                _d_traj['t'] = _d_traj['t'] + _t_bsep
+                _debris_trajectories.append({
+                    'label': f'Booster casings ({params.n_boosters}×)',
+                    **_d_traj,
+                })
 
     # Apogee
     # A descending entry state is its own highest point; that is the entry

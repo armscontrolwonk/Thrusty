@@ -134,6 +134,7 @@ variant per object is remembered in
 | `grid_fin_sizing.py` | ~350 | Barrowman static-margin / centre-of-pressure sizing for finned boosters |
 | `trim_gate.py` | ~160 | Trim/control gate — is a derived L/D actually achievable? |
 | `coordinates.py` | ~240 | WGS-84 coordinate conversions, Vincenty geodesic, Coriolis/centrifugal, great-circle bearing and Earth-rotation-corrected aiming |
+| `spent_stage_aero.py` | ~300 | Drag of a spent stage after separation, as C_D·A against Mach by attitude: random tumbling and end over end from Jernell's flat-ended cylinder blended to Klett's Newtonian cylinder, and the trim where the measured centre of pressure meets the empty centre of gravity. `trajectory._fly_band` flies a stage end over end to apogee, then at both ends of its trim-to-tumbling band, and reports the midpoint |
 | `analysis.py` | ~330 | Sweep drivers (range ring, parametric sweep, bank-angle footprint) and result post-processing (impact point, derived Mach/q, footprint envelope) — the computation the dialogs used to do inline; the GUI only orchestrates |
 | `atmosphere.py` | ~355 | NRLMSISE-00 (default) / US Std Atm 1976 (fallback), 0–1000 km, dynamic pressure |
 | `gravity.py` | ~62 | WGS-84 J2 gravity vector in ECEF |
