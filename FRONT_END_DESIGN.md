@@ -905,7 +905,19 @@ The body force at these angles is read to ±0.4 in C_N and scaled by l/d
 from an l/d 6 cylinder, so the ratios are rough. Reading: the Strypi first
 stages probably fly on front-first like an arrow and are flown wrongly as
 tumbling today; the Scud-family first stages turn over like bare ones, and
-only then do fin forces at large angle matter. Not built.
+only then do fin forces at large angle matter.
+
+Built the same day as `spent_stage_aero.fin_stability`, at 15° and 20°
+only (below that the ±0.4 reading precision of C_N is too large a share of
+it), with the precision carried: stable if the fins win even with the body
+force read 0.4 high, unstable if they lose even with it read 0.4 low,
+marginal otherwise. Stable → flown front-first from separation at
+flat-face drag plus fin drag, no climb tumble; marginal → the midpoint of
+the front-first and tumbling impacts, ± on the row; unstable → tumbling
+only, as before. Shipped: Strypi VIII R first stages stable (points move
+14 and 12 km downrange); Strypi VII R and No-dong marginal (No-dong ±6 km,
+moved 6.5 km); Taepodong-I, Taepodong-II unstable; STARS-1 has grid fins
+with no dimensions, so no answer. The fins' own mass is not in the CG.
 
 **Stage ends.** Jernell's table perturbed and every trimmed stage reflown:
 
@@ -935,6 +947,30 @@ database still could not call the attitude; Thrusty's "unclear → midpoint"
 is the honest equivalent. Their footprints (first stage 32.7 × 9.2 nmi,
 121.4 nmi from the pad) are a possible benchmark once a booster file
 exists. `MISSING_DOCS.md` lists the papers it points to.
+
+Its Fig. 8 (read from a rendered page): the upper-stage simulator's centre
+of pressure at Mach 4.5 against total angle of attack, from the nose, with
+the CG at 67% of the length — about 40% at 5°, 50% at 15°, 57% at 40°, 60%
+at 80°, 63–65% at 120–150°, 67% near 160°, 77% near 178°. Two things
+Thrusty assumes show in it for a real stage shape: near end-on the centre
+of pressure sits toward the leading end at both ends, and the stable trim
+is tail-first about 20° off end-on, where the curve crosses the CG. It is
+one body with a nose and is not used for any number.
+
+**Purinton et al. 2011** (AIAA 2011-14, read 2026-10-01), the booster
+aerodynamics behind that simulation. A methods paper: wind-tunnel tests at
+Mach 0.5–6, 0–180°, all roll angles, gaps bridged from an earlier Shuttle
+five-segment SRB reentry database. The numbers were removed from its plots
+before release, so it gives no data. What it does say: the booster tumbles
+through a wide range of attitude and then finds "a trim point near a
+broadside angle of attack"; and "small changes in booster shape, length, or
+mass properties can cause significant changes in the reentry dynamics".
+That is a caution for Thrusty's trim: a booster with a nose cone and a
+flared aft skirt trimmed near broadside or 30° off tail-first (Ares I-X in
+flight: 151° at max-q), a much higher-drag attitude than the 10–20° off
+end-on that the flat-ended cylinder gives. The ±0.05 L probe above does
+not span that. Real stage shapes stay the largest open question for the
+trimmed end; the Shuttle SRB reentry database is the document to find.
 
 **Phase 4 — later.** A flight-plan option to drop the fins.
 

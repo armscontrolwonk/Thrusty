@@ -333,3 +333,88 @@ def test_the_half_width_label_on_a_debris_row():
     assert tr._pm_label(dict(half_width_km=0.04)) == ''
     assert tr._pm_label(dict(half_width_km=0.34)) == ' ±0.3 km'
     assert tr._pm_label(dict(half_width_km=3.6)) == ' ±4 km'
+
+
+# ── finned stages: do the fins hold it front-first ──────────────────────────
+
+import json
+import booster_models as bm
+
+
+def _shipped_stage1(name):
+    return bm.booster_from_dict(json.load(open(f'booster_library/{name}.booster.json')))
+
+
+def test_front_first_drag_is_the_flat_face_value():
+    assert ssa.front_first_cd(1.5, LD) == pytest.approx(1.62, abs=0.01)   # Jernell, alpha 0
+    assert ssa.front_first_cd(0.5, LD) == ssa.front_first_cd(1.5, LD)     # held below
+    K = (0.4 * 100 + 2.0) / (2.4 * 100)
+    assert ssa.front_first_cd(10.0, LD) == pytest.approx(0.909 * (2.0 - K))  # Klett eq. 22
+    assert ssa.front_first_cd(2.0, LD) < 0.5 * ssa.end_over_end_cd(2.0, LD)
+
+
+@pytest.mark.parametrize('name, verdict', [
+    ('Strypi_VIII_R', 'stable'),       # large fins on a short solid stage
+    ('No-dong', 'marginal'),
+    ('Taepodong-II', 'unstable'),      # small fins on a wide liquid stage
+])
+def test_whether_the_fins_hold_a_shipped_first_stage_front_first(name, verdict):
+    p = _shipped_stage1(name)
+    f = (ssa.empty_cg_fraction_solid(p) if p.solid_motor
+         else ssa.empty_cg_fraction(p, p.mass_final, 'lower'))[0]
+    got, lo, hi = ssa.fin_stability(p, f)
+    assert got == verdict and 0 < lo <= hi
+    d = ssa.spent_stage_drag(p, p.mass_final, 'lower')
+    assert d['cda_trim'] is None
+    if verdict == 'unstable':
+        assert d.get('cda_front_first') is None
+        assert any('cannot hold it front-first' in n for n in d['notes'])
+    else:
+        assert d['fin_stability'] == verdict
+        # Flat face plus fins: far less drag than tumbling.
+        assert 0 < d['cda_front_first'](2.0) < 0.5 * d['cda_end_over_end'](2.0)
+
+
+def test_bigger_fins_are_more_stabilising_and_no_fin_size_means_no_answer():
+    p = _shipped_stage1('Taepodong-II')
+    f = ssa.empty_cg_fraction(p, p.mass_final, 'lower')[0]
+    small = ssa.fin_stability(p, f)
+    p.fin_span_m *= 3.0
+    big = ssa.fin_stability(p, f)
+    assert big[1] > small[1]
+    p.fin_span_m = 0.0
+    assert ssa.fin_stability(p, f) is None
+    assert ssa.fin_stability(_stage(has_fins=True), 0.6) is None   # no fin fields
+
+
+def test_a_stage_its_fins_hold_is_flown_front_first_from_separation():
+    pos, vel = _state(33.0, 44.0, 30e3, 1200.0, 50.0)
+    p = _shipped_stage1('Strypi_VIII_R')
+    drag = ssa.spent_stage_drag(p, p.mass_final, 'lower')
+    lat, lon, t, spd, track, band = tr._fly_band(pos, vel, p.mass_final, drag, False)
+    assert band['reported'] == 'front_first' and band['climb'] is None
+    assert (lat, lon) == band['front_first'] and band['half_width_km'] is None
+    ref = tr.integrate_debris(pos, vel, 0.0, cda_of_mach=drag['cda_front_first'],
+                              mass_kg=p.mass_final)
+    assert (lat, lon, t, spd) == pytest.approx(ref)
+    # It lands beyond where the same stage would land tumbling.
+    tumbling = tr._fly_band(pos, vel, p.mass_final,
+                            dict(drag, cda_front_first=None), False)
+    here = lambda la, lo: range_between(math.radians(33.0), math.radians(44.0),
+                                        math.radians(la), math.radians(lo))
+    assert here(lat, lon) > here(tumbling[0], tumbling[1])
+
+
+def test_a_marginal_finned_stage_reports_the_midpoint_with_its_half_width():
+    pos, vel = _state(33.0, 44.0, 50e3, 2000.0, 45.0)
+    p = _shipped_stage1('No-dong')
+    drag = ssa.spent_stage_drag(p, p.mass_final, 'lower')
+    lat, lon, t, spd, track, band = tr._fly_band(pos, vel, p.mass_final, drag, False)
+    assert band['reported'] == 'midpoint' and band['half_width_km'] > 0
+    d_ends = range_between(*map(math.radians, band['front_first']),
+                           *map(math.radians, band['random']))
+    d_mid = range_between(*map(math.radians, band['front_first']),
+                          math.radians(lat), math.radians(lon))
+    assert d_mid == pytest.approx(0.5 * d_ends, rel=1e-3)
+    assert band['half_width_km'] == pytest.approx(0.5 * d_ends / 1000.0)
+    assert track['lat'][-1] == lat and track['t'][-1] == pytest.approx(t)

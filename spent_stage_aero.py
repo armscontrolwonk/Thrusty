@@ -200,6 +200,20 @@ def _blend_to_klett(mach, ld, from_data, klett):
     return a + (b - a) * (m - MACH_HI) / (KLETT_MACH - MACH_HI)
 
 
+def klett_end_on_cd(mach, ld=None):
+    """Klett eq. 22 on the cross-section area, flat face first: 0.909 (2-K)
+    (the average face pressure is 0.909 of stagnation, after Stoney &
+    Swanson)."""
+    return 0.909 * _klett_2_minus_K(mach)
+
+
+def front_first_cd(mach, ld):
+    """Drag coefficient on the cross-section area flying end-on: Jernell's
+    axial force at zero angle of attack, blended to Klett eq. 22."""
+    return _blend_to_klett(mach, ld, lambda m, _ld: _coeffs(0.0, m, _ld)[1],
+                           klett_end_on_cd)
+
+
 def random_cd(mach, ld):
     """Random-tumbling drag coefficient on the cross-section area."""
     return _blend_to_klett(mach, ld, _random_from_data, klett_random_cd)
@@ -383,6 +397,58 @@ def attitude_model(length_m, diameter_m, mass_kg, f):
         rotating=lambda alpha, omega, q, mach: energy(alpha, omega, q, mach) > 0.0)
 
 
+# Angles and reading precision for the finned-stage check: Jernell's C_N is
+# read to +-0.4 (file header), too coarse a fraction of it below 15 deg.
+_FIN_CHECK_ALPHA_DEG = (15.0, 20.0)
+_CN_READING = 0.4
+
+
+def fin_stability(stage, f):
+    """Whether tail fins hold an empty stage front-first (FRONT_END_DESIGN.md
+    §19f).  About the CG (f of the length from the front), the body's
+    normal force acts ahead of it and overturns the stage (Jernell C_N at
+    his centre of pressure); the fins' acts behind it and restores
+    (glider_ld's fin slope with the N-K-P carryover, C_N = slope sin(2a)/2,
+    at the fin's mid-root-chord station).  The ratio restoring/overturning
+    is taken at 15 and 20 deg, Mach 1.50 and 2.86, with the body force at
+    its reading, and at its reading +-0.4.
+
+    Returns (verdict, lowest nominal ratio, highest nominal ratio):
+      'stable'    restoring wins everywhere even with the body force read high
+      'unstable'  overturning wins everywhere even with it read low
+      'marginal'  otherwise
+    or None when the fin force cannot be computed (no planar-fin dimensions).
+    The fins' own mass is not in the CG."""
+    import copy
+    import glider_ld
+    try:
+        st = copy.copy(stage)
+        st.stage2, st.ro = None, None
+        d, L = float(st.diameter_m), float(st.length_m)
+        x_fin = L - 0.5 * float(st.fin_root_chord_m or 0.0)
+        slopes = {m: float(glider_ld.whole_booster_LD(st, mach=m)['c_na_fin'])
+                  for m in (MACH_LO, MACH_HI)}
+    except Exception:
+        return None
+    if min(slopes.values()) <= 0.0 or x_fin <= f * L:
+        return None
+    ld = L / d
+    nom, pess, opt = [], [], []
+    for m, slope in slopes.items():
+        for a in _FIN_CHECK_ALPHA_DEG:
+            cn, _ = _coeffs(a, m, ld)
+            lever = (f - float(_cp_from_leading_face(a, m))) * L
+            restoring = (slope * math.sin(2.0 * math.radians(a)) / 2.0
+                         * (x_fin - f * L))
+            dcn = _CN_READING * ld / DATA_LD
+            nom.append(restoring / (cn * lever))
+            pess.append(restoring / ((cn + dcn) * lever))
+            opt.append(restoring / (max(cn - dcn, 1e-9) * lever))
+    verdict = ('stable' if min(pess) >= 1.0 else
+               'unstable' if max(opt) < 1.0 else 'marginal')
+    return verdict, min(nom), max(nom)
+
+
 # Mach grid on which a stage's two drag curves are tabulated once, then
 # interpolated in the equations of motion: the tested points, a fine step to
 # Klett's Mach 10, and on to 30 for his weak (2 - K) dependence.
@@ -406,6 +472,9 @@ def spent_stage_drag(stage, dry_mass_kg, role='lower'):
                         plane of flight (the climb to apogee)
       cda_trim          callable Mach -> C_D*A at its trim, or None
       attitude    attitude_model(...) when there is a trim, else absent
+      cda_front_first, fin_stability   a finned stage whose fins hold it
+                  front-first ('stable') or may ('marginal'): C_D*A flown
+                  front-first, flat-face drag plus fin drag
       leading     'front' | 'base' | None — the end that leads when trimmed
       notes       plain sentences on what was assumed
     """
@@ -419,8 +488,37 @@ def spent_stage_drag(stage, dry_mass_kg, role='lower'):
                    lambda M: end_over_end_cd(M, ld) * area),
                cda_trim=None, leading=None, notes=notes)
     if getattr(stage, 'has_fins', False) or getattr(stage, 'has_grid_fins', False):
-        notes.append("finned: trim not computed (no fin forces beyond 58 deg "
-                     "in the sources); flown tumbling only")
+        f = (empty_cg_fraction_solid(stage) if getattr(stage, 'solid_motor', False)
+             else empty_cg_fraction(stage, dry_mass_kg, role))[0]
+        stab = fin_stability(stage, f) if f is not None else None
+        if stab is None or stab[0] == 'unstable':
+            notes.append(
+                "finned: " + (
+                    "its fins cannot hold it front-first (their restoring "
+                    f"moment is {stab[1]:.1f}-{stab[2]:.1f} of the body's "
+                    "overturning moment), so it turns over; "
+                    if stab else "") +
+                "trim not computed (no fin forces beyond 58 deg in the "
+                "sources); flown tumbling only")
+            return out
+        from booster_models import _cd_fins
+        def cda_front(M):
+            return (front_first_cd(M, ld) + _cd_fins(
+                stage.n_fins, stage.fin_span_m, stage.fin_root_chord_m,
+                stage.fin_tip_chord_m, stage.fin_thickness_m, d, M,
+                sweep_deg=stage.fin_sweep_deg)) * area
+        out['cda_front_first'] = _tabulated(cda_front)
+        out['fin_stability'] = stab[0]
+        notes.append(
+            f"finned: its fins' restoring moment is {stab[1]:.1f}-{stab[2]:.1f} "
+            f"of the body's overturning moment at 15-20 deg, Mach 1.5-2.86 "
+            f"(Jernell body force, read to +-0.4; fin force from the "
+            f"build-up): " + (
+                "it stays front-first like an arrow and is flown that way, "
+                "at flat-face drag plus fin drag"
+                if stab[0] == 'stable' else
+                "too close to call, so the midpoint of the front-first and "
+                "tumbling impacts is reported"))
         return out
     if getattr(stage, 'solid_motor', False):
         f, basis = empty_cg_fraction_solid(stage)

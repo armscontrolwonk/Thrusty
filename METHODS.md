@@ -5286,6 +5286,22 @@ C_D·A(Mach) set by attitude, on the cross-section area πd²/4:
   absolute fits being far too heavy for small motors. A solid with no
   thrust in its file, and a finned stage (no fin forces beyond Jorgensen's
   58°), have no trim.
+- *Front-first (finned stages).* Tail fins may hold an empty stage
+  front-first, in which case it never turns over (`fin_stability`). About
+  the empty CG, the body's normal force (Jernell C_N at his centre of
+  pressure) overturns and the fins' (the build-up's fin slope with N-K-P
+  carryover, C_N = slope · sin 2α / 2, at the mid-root-chord station)
+  restores; the ratio is taken at 15° and 20°, Mach 1.50 and 2.86, with the
+  body force at its reading and at ±0.4, the digitising precision. Restoring
+  wins everywhere even with the body force read high → **stable**: flown
+  front-first from separation at flat-face drag (Jernell C_A at α = 0,
+  blended to Klett eq. 22, 0.909(2 − K)) plus the existing fin drag
+  (`_cd_fins`). Overturning wins everywhere even with it read low →
+  unstable: it turns over and, with no fin forces at large angle, is flown
+  tumbling only. Otherwise **marginal**: the midpoint of the front-first
+  and tumbling impacts, with its half-width on the timeline row. Shipped:
+  Strypi VIII R first stages stable (their points move 12–14 km downrange);
+  No-dong marginal (±6 km); Taepodong-I and -II unstable.
 
 How a piece is flown: one still climbing at separation is flown end over
 end to apogee. It leaves front-first, which is statically unstable (the CP

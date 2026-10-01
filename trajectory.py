@@ -2190,6 +2190,31 @@ def _attitude_verdict(att, climb_sol, t_apogee, fall_sol=None, t_impact=None):
     return out
 
 
+def _midpoint_of(a, b):
+    """One flight standing for two: (lat, lon, time, speed, track) at the
+    midpoint of the great-circle segment between the impacts of a and b
+    (each a result tuple whose first five entries are those), with the mean
+    time and speed and the two tracks averaged at equal fractions of their
+    flight times, ending at the midpoint."""
+    unit = lambda la, lo: np.array([np.cos(np.radians(la)) * np.cos(np.radians(lo)),
+                                    np.cos(np.radians(la)) * np.sin(np.radians(lo)),
+                                    np.sin(np.radians(la))])
+    m = unit(a[0], a[1]) + unit(b[0], b[1])
+    m /= np.linalg.norm(m)
+    lat = float(np.degrees(np.arcsin(m[2])))
+    lon = float(np.degrees(np.arctan2(m[1], m[0])))
+    s = np.linspace(0.0, 1.0, 101)
+    def at(tr):
+        f = (tr['t'] - tr['t'][0]) / max(tr['t'][-1] - tr['t'][0], 1e-9)
+        return [np.interp(s, f, tr[k]) for k in ('lat', 'lon', 'alt')]
+    (la, lo, al), (lb, lob, alb) = at(a[4]), at(b[4])
+    t_mid = 0.5 * (a[2] + b[2])
+    track = dict(t=s * t_mid, lat=0.5 * (la + lb), lon=0.5 * (lo + lob),
+                 alt=0.5 * (al + alb))
+    track['lat'][-1], track['lon'][-1] = lat, lon
+    return lat, lon, t_mid, 0.5 * (a[3] + b[3]), track
+
+
 def _fly_band(pos, vel, mass_kg, drag, terrain_dem):
     """Fly a spent piece to the ground and return one impact point
     (FRONT_END_DESIGN.md §19, user 2026-09-30: report one number).
@@ -2218,6 +2243,36 @@ def _fly_band(pos, vel, mass_kg, drag, terrain_dem):
     which point was reported ('reported': 'tumbling' | 'trim' | 'midpoint')
     and, for a midpoint, half the distance between the ends
     ('half_width_km')."""
+    if drag.get('cda_front_first') is not None:
+        # A finned stage its fins hold front-first does not turn over: one
+        # flight from separation.  When that is too close to call, the
+        # midpoint of it and the tumbling flight.
+        ff = integrate_debris(pos, vel, 0.0, max_time_s=14400.0,
+                              return_trajectory=True, terrain_dem=terrain_dem,
+                              cda_of_mach=drag['cda_front_first'],
+                              mass_kg=mass_kg)
+        tumbling = None
+        if drag.get('fin_stability') != 'stable' or ff is None:
+            rest = dict(drag, cda_front_first=None)
+            tumbling = _fly_band(pos, vel, mass_kg, rest, terrain_dem)
+            if ff is None or tumbling is None:
+                return tumbling
+        band = dict(random=None if tumbling is None else tumbling[5]['random'],
+                    trim=None, front_first=(ff[0], ff[1]),
+                    tumbling=None if tumbling is None else tumbling[5]['tumbling'],
+                    leading='front', climb=None, verdict=None,
+                    tumble_deg_s=None, reported='front_first',
+                    half_width_km=None, notes=list(drag['notes']))
+        if tumbling is None:
+            return ff[:5] + (band,)
+        lat, lon, t_mid, spd, track = _midpoint_of(ff, tumbling)
+        band['reported'] = 'midpoint'
+        band['climb'] = tumbling[5]['climb']
+        band['half_width_km'] = 0.5 * range_between(
+            np.radians(ff[0]), np.radians(ff[1]),
+            np.radians(tumbling[0]), np.radians(tumbling[1])) / 1000.0
+        return lat, lon, t_mid, spd, track, band
+
     climb = None
     if float(np.dot(pos, vel)) > 0.0:                # still climbing
         climb = _climb_to_apogee(pos, vel, mass_kg, drag['cda_end_over_end'],
@@ -2292,30 +2347,12 @@ def _fly_band(pos, vel, mass_kg, drag, terrain_dem):
     if verdict == 'settles':
         band['reported'] = 'trim'
         return (b[0], b[1], t0 + b[2], b[3], with_climb(b[4]), band)
-    pa = np.array([np.cos(np.radians(a[0])) * np.cos(np.radians(a[1])),
-                   np.cos(np.radians(a[0])) * np.sin(np.radians(a[1])),
-                   np.sin(np.radians(a[0]))])
-    pb = np.array([np.cos(np.radians(b[0])) * np.cos(np.radians(b[1])),
-                   np.cos(np.radians(b[0])) * np.sin(np.radians(b[1])),
-                   np.sin(np.radians(b[0]))])
-    m = pa + pb
-    m /= np.linalg.norm(m)
-    lat = float(np.degrees(np.arcsin(m[2])))
-    lon = float(np.degrees(np.arctan2(m[1], m[0])))
     band['reported'] = 'midpoint'
     band['half_width_km'] = 0.5 * range_between(
         np.radians(a[0]), np.radians(a[1]),
         np.radians(b[0]), np.radians(b[1])) / 1000.0
-    s = np.linspace(0.0, 1.0, 101)
-    def at(tr):
-        f = (tr['t'] - tr['t'][0]) / max(tr['t'][-1] - tr['t'][0], 1e-9)
-        return [np.interp(s, f, tr[k]) for k in ('lat', 'lon', 'alt')]
-    (la, lo, al), (lb, lob, alb) = at(a[4]), at(b[4])
-    t_mid = 0.5 * (a[2] + b[2])
-    track = dict(t=s * t_mid, lat=0.5 * (la + lb), lon=0.5 * (lo + lob),
-                 alt=0.5 * (al + alb))
-    track['lat'][-1], track['lon'][-1] = lat, lon
-    return lat, lon, t0 + t_mid, 0.5 * (a[3] + b[3]), with_climb(track), band
+    lat, lon, t_mid, spd, track = _midpoint_of(a, b)
+    return lat, lon, t0 + t_mid, spd, with_climb(track), band
 
 
 def _pm_label(band):
