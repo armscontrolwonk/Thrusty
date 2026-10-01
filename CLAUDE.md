@@ -113,6 +113,7 @@ observed test-flight impact zones for analytic comparison.
 | `heating_locations.py` | Engineering-tier convective heating per location (Tauber, NASA TP-2914) with a radiating-wall energy balance. Not yet wired into the verdicts |
 | `heating_solid.py` | One-dimensional conduction estimate for a solid conical tip. Not yet wired into the verdicts |
 | `heating_by_location.py` | Heating at each place an object's `heating_locations` list names; supplies no number the file does not give. Not yet wired into the verdicts |
+| `spent_stage_aero.py` | Drag of a spent stage after separation by attitude (random tumbling, end over end, trimmed), from Jernell's flat-ended cylinder and Klett; `trajectory._fly_band` flies the climb to apogee and the trim-to-tumbling band and reports the midpoint |
 | `slv_performance.py` | Schilling payload-to-orbit estimator |
 | `METHODS.md` | Governing equations and citations for every model |
 | `BENCHMARKING.md` | Validation against published figures |
