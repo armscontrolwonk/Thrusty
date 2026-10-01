@@ -885,6 +885,57 @@ the old band. Listed in `TODO.md` item 10.
 
 Cost: all 13 vehicles 8 s (was 7); suite 143 s (was 101).
 
+### 19f. Two checks on stage ends and fins, and Ares I-X (2026-10-01)
+
+**Finned stages, empty, front-first.** Moment about the empty CG at 10–20°
+from Jernell's body force and centre of pressure against the fin normal
+force from the existing build-up (`glider_ld.whole_booster_LD`), Mach 1.5
+and 2.86:
+
+| Stage | Fins' restoring moment ÷ body's overturning moment | Front-first |
+|---|---|---|
+| Strypi VIII R stage 1 (both files) | 1.3–1.9 | stable, +0.4 to +0.7 cal |
+| Strypi VII R stage 1 | 1.0–1.4 | marginal to stable |
+| No-dong stage 1 | 0.45–1.05 | unstable (marginal at 20°, Mach 2.86) |
+| Taepodong-I stage 1 | 0.30–0.70 | unstable |
+| Taepodong-II stage 1 | 0.44–0.85 | unstable |
+| STARS-1 stage 1 | — | grid fins with no dimensions in the file |
+
+The body force at these angles is read to ±0.4 in C_N and scaled by l/d
+from an l/d 6 cylinder, so the ratios are rough. Reading: the Strypi first
+stages probably fly on front-first like an arrow and are flown wrongly as
+tumbling today; the Scud-family first stages turn over like bare ones, and
+only then do fin forces at large angle matter. Not built.
+
+**Stage ends.** Jernell's table perturbed and every trimmed stage reflown:
+
+| Change | Reported point moves | Trimmed end moves |
+|---|---|---|
+| End-on drag ±20% | 0–2 km (Minotaur-IV stage 3: 8–10 km at 19,400 km) | 0–4 km (15–18 km) |
+| Centre of pressure 0.05 L toward the leading face | 0–4 km | 0–8 km |
+| Centre of pressure 0.05 L toward mid-length | 0–1 km | 0–2 km |
+
+The centre of pressure near end-on matters more than the end-on drag, and
+only in the direction that makes the stage trim closer to end-on; liquid
+upper stages (CG 0.45) are the sensitive ones. A real stage's ends (open
+interstage, nozzle) would enter here.
+
+**Ares I-X** (Tartabini & Starr 2011, read 2026-10-01). The upper-stage
+simulator, unstable in forward flight, began tumbling within seconds of
+separation at high dynamic pressure, in more than 99% of pre-flight cases
+and in flight; at a tenth of that dynamic pressure it would not have for
+about 40 s. That is the climb-leg inference, observed, and the "no spin
+from the air" case as well. The first stage was given a tumble by motors,
+on purpose, to keep it from trimming nose-first; in flight it came in
+tail-first (151° at max-q). Pre-flight Monte Carlo: nose-first 4%,
+broadside 59%, tail-first 37%, set mainly by CG and centre-of-pressure
+position, the centre of pressure being "difficult to characterize" in
+tumbling flight. So a six-degree-of-freedom simulation with a wind-tunnel
+database still could not call the attitude; Thrusty's "unclear → midpoint"
+is the honest equivalent. Their footprints (first stage 32.7 × 9.2 nmi,
+121.4 nmi from the pad) are a possible benchmark once a booster file
+exists. `MISSING_DOCS.md` lists the papers it points to.
+
 **Phase 4 — later.** A flight-plan option to drop the fins.
 
 ## 19a. Phase 1 as built (2026-09-30)
