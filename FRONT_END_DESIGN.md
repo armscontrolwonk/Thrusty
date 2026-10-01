@@ -996,6 +996,99 @@ prediction, not a flight measurement, and it disagrees with Purinton's
 it. It also says the tumble is arrested before peak dynamic pressure, as
 Thrusty's "settles" verdict would have it for a heavy stage.
 
+**Parachutes** (user's question, 2026-10-01). The SRB did use them, but
+late: the booster slows from about Mach 5 to Mach 0.5 on its own drag, and
+only then is the nose cap ejected and the drogue opened, near 15,000 ft
+(Bacchus, Kross & Moog 1985). The attitude band above is for Mach 0.8–3.5,
+all of it before any parachute. For an impact benchmark the parachute
+phase adds little downrange (the booster is near vertical at Mach 0.5) but
+changes the time and the impact speed, which Thrusty would not reproduce.
+One more thing that paper makes plain: the near-broadside attitude was
+wanted, for drag, and the recovery design leaned on it; the trim itself is
+natural, set by the CG (near 90° with the CG at about 53% of length; the
+burnout CG is 5–6% further aft, which makes it "somewhat tail first"; a
+CG 3 ft further aft adds about 10°).
+
+**The data itself is now in hand**: Johnson & Braddock, DMS-DR-2111
+(1974), a 0.563% SRB model at Mach 0.6–4.96, −10° to 190°, with normal
+force, moment, axial force and centre of pressure plotted and tabulated.
+Not digitised. It would allow (a) a check of the flat-ended cylinder's
+trim and drag against a real booster shape through 180°, and (b) with an
+SRB booster file, a benchmark against the predicted attitude band and the
+recovery point about 140 nmi downrange.
+
+### 19g. The flat-ended cylinder against a real booster (2026-10-01)
+
+Johnson & Braddock (DMS-DR-2111, 1974): a 0.563% model of the 142-inch
+Shuttle SRB (nose cone, flared aft skirt, nozzle; l/d 12.25), with
+separation rockets and electrical tunnel, roll 45/90/135°. Read from the
+rendered plots at Mach 1.20, 1.96 and 3.48 (data pages 32, 33, 42, 46–48;
+C_N to ±0.5, centre of pressure to ±0.01 L), against Thrusty's model for a
+cylinder of the same l/d. Nothing here is in the code.
+
+| | SRB, measured | Flat-ended cylinder model |
+|---|---|---|
+| C_N broadside, Mach 1.96 / 3.48 | 20–22 / 19–20.5 | 21.1 / 19.8 |
+| C_N at 150° and 160°, Mach 3.48 | 6 and 3 | 6.5 and 3.9 |
+| Centre of pressure from the nose, Mach 1.96, at 95° / 120° / 150° / 160° / 166° | 0.545 / 0.555 / 0.585 / 0.62 / 0.66–0.69 | 0.504 / 0.52 / 0.543 / 0.56 / 0.635 |
+| Same, Mach 1.20, at 95° / 150° / 160° | 0.54 / 0.60 / 0.63–0.65 | 0.507 / 0.56 / 0.58 |
+| Same, Mach 3.48, at 95° / 150° / 160° | 0.54 / 0.575 / 0.58 | 0.50 / 0.51 / 0.52 |
+| Centre of pressure, nose-first side, Mach 2.74 (clean body), at 8° / 16° / 25° / 50° | 0.35 / 0.45 / 0.49 / 0.52 | 0.33 / 0.45 / 0.49 / 0.50 (Jernell, Mach 2.86) |
+| Axial force, Mach 1.96: nose-first / tail-first | 1.1–1.3 / 2.3–2.6 | 1.66 either way |
+| Trim with the CG at 58.5% of length, Mach 1.96 | 149° (31° off tail-first) | 162° (18° off) |
+| Drag at that trim, Mach 1.96 | about 6.1 | 2.8 |
+
+Reading:
+- **The normal force is right**, at broadside and near tail-first, to
+  5–15%. Scaling Jernell's l/d 6 cylinder by l/d holds at l/d 12.
+- **The centre of pressure is 0.03–0.06 L nearer the tail on the SRB** at
+  every angle beyond broadside. At broadside it sits at the planform's
+  centroid: 0.50 for a plain cylinder, about 0.53–0.545 for the SRB with
+  its tapered nose and flared skirt (Bacchus, Kross & Moog give 53% as the
+  area centroid). Jernell says the same: a rearward planform centroid gives
+  a rearward centre of pressure. So this is the shape, not an error in the
+  cylinder data.
+- **That shift doubles the trimmed drag.** The cylinder model trims an
+  SRB-proportioned stage 13° nearer end-on than the SRB data does, and at
+  18° off end-on the drag is 2.8 against about 6.1 at 31° (the cylinder's
+  own drag at 31° is 5.6, so the forces agree; the trim angle does not).
+  The SRB value sits between the model's trimmed (2.8) and end-over-end
+  (10.7) drag.
+- **The end-for-end mirror holds in form**: the centre of pressure moves
+  toward whichever end leads, on both sides, as assumed.
+- The tail-first axial force of a flared skirt and nozzle is about 1.5
+  times a flat face; a nose cone's is about 0.7 of it.
+
+What it means for Thrusty: for a plain cylindrical stage the model stands.
+For a stage whose planform centroid is aft of mid-length (a flared skirt,
+a protruding nozzle, a tapered front) the trimmed drag is too low by up to
+a factor of two. In impact terms that is the "centre of pressure toward
+the leading face" row of §19f: 0–8 km on the trimmed end for the shipped
+vehicles. A sourced fix exists in outline — shift the centre of pressure
+by the stage's planform-centroid offset — but spent stages carry no skirt
+or nozzle-exit geometry to compute it from. Not built.
+
+**A first check of the nozzle share and the empty CG** (2026-10-01).
+McDonald 1985, Table V (verified from the page image), the Shuttle
+high-performance motor, lbm: case 97,536; insulation 18,670; liner 1,346;
+inhibitor 1,895; nozzle forward section 17,160 and aft exit cone 5,883,
+so nozzle 23,043; burnout weight 138,295; burnout CG 823.5 in from the
+igniter boss on a motor 126 ft long.
+
+| | Thrusty | The motor |
+|---|---|---|
+| Nozzle share of case + insulation + nozzle | 12.9% (ratio of Romaniw's fits at the 14.7 MN maximum vacuum thrust) | 16.5% |
+| Romaniw's absolute fits, kg: case / insulation / nozzle | 53,300 / 15,100 / 10,100 | 44,200 / 8,500 / 10,500 |
+| Empty CG, fraction of length from the front | 0.565 (nozzle as a point mass at the base, the rest uniform) | 0.545 |
+
+At this size Romaniw's nozzle fit is within 4% and his case fit 20% high;
+the ratio comes out a fifth low. The point-mass-at-the-base model then
+puts the CG 2% of length too far aft even with a share that is too small:
+the nozzle is partly submerged in the case and the real mass is not a
+point at the very end. Both errors are small against the reading
+precision of the centre of pressure, and they pull in opposite directions.
+One motor, at the top of the size range; small motors remain unchecked.
+
 **Phase 4 — later.** A flight-plan option to drop the fins.
 
 ## 19a. Phase 1 as built (2026-09-30)
