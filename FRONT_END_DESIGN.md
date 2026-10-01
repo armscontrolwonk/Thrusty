@@ -491,7 +491,7 @@ flag only drives the editor lock. Default off → existing boosters unchanged.
 
 # Part IV — One handoff at separation
 
-Status: **approved 2026-09-30; Phases 0–2 built (boost nose held, §19a); Phase 3 next.** Parts I–III made the body
+Status: **approved 2026-09-30; Phases 0–2 built (boost nose held, §19a); Phase 3 revised, readings under way.** Parts I–III made the body
 honest in what it shows and what it owns. Part IV makes the moment of
 separation a single, explicit step, in both kinds of vehicle.
 
@@ -659,15 +659,83 @@ know it is a body — so user files are handled by the pairing report instead.
 empty stage, the fairing and the strap-on casings fly with their own mass,
 dimensions and fins, the terrain model and the main flight's integration
 tolerance. The debris release clock starts at `booster_core_delay_s`, as
-every other stage clock does. Drag follows §18a: the stage's own CG and CP
-(fins included) decide whether it flies end-on (stable), trims at an angle,
-or is taken as tumbling; the nominal is random tumbling, and the impact
-points at the two ends of the band are reported with it, so each stage lands
-as a stretch of ground, not a point. The fixed-angle law is averaged over
-orientation from cited formulas, with Mach dependence from Hoerner below the
-hypersonic range, and the averaging is tested against Hoerner's rotating
-cubes. **Every debris impact point moves, on purpose**; before-and-after
-impact points are reported for each shipped vehicle.
+every other stage clock does.
+
+Attitude and drag (revised 2026-09-30, user): the stage's attitude comes from
+its own moment balance, using the two-station all-angle build-up Thrusty
+already cites for the trim gate — Allen & Perkins (NACA Rep. 1048), Jorgensen
+(NASA TR R-474; TN D-7228, "angles of attack from 0° to 180°"), stations per
+Simon & Blake (AIAA 99-4258): a potential normal force (∝ sin 2α) acting near
+the front, and a viscous crossflow (∝ sin²α) acting at the planform
+centroid, fins included. With two stations the balance point moves with
+angle, so the trim angle follows the CG:
+
+    tan α_trim = (x_cg − x_front)·C_Nα,pot ÷ [(x_centroid − x_cg)·η·C_dn·A_p/A_r]
+
+— broadside when the CG sits at the planform centroid, toward end-on as it
+moves away. That is the behaviour the withdrawn handbook table described,
+from sources in hand. Klett's one-station Newtonian model cannot produce it.
+For each spent stage: its own empty CG (engines aft) and planform with fins;
+its trim angle; its drag at that attitude from the same build-up
+(C_D = C_N sin α + C_A cos α), at every Mach number; Klett as the check at
+Mach ≥ 10 (the build-up's C_dn = 1.2 against Klett's ⅔(2 − K) ≈ 1.23). Random
+tumbling is reported alongside as the other end of the band, because whether
+a tumble is arrested is dynamic, not settled by a static balance; each stage
+lands as a stretch of ground. This also replaces the small-angle static
+margin for the stability decision.
+
+To read from primary before coding: how TN D-7228 treats α > 90° (base
+leading); the potential term for a stage whose front is a flat bulkhead or an
+open interstage, not a nose; fins at high angle; Tobak & Peterson (NASA TR
+R-203) on the arrest of a tumble.
+
+**Every debris impact point moves, on purpose**; before-and-after impact
+points are reported for each shipped vehicle.
+
+### 19c. Readings for Phase 3 (2026-09-30)
+
+**Jorgensen, NASA TN D-6996 (1973), the 0–180° method** (user's copy). Its
+equations (1)–(5) confirm TR R-474's, with A (not A_r) as reference area, d
+as the moment length, and the minus sign in (5) on the first bracket only.
+For a flat face leading, C_A ≈ C_p,stag (Fig. 7: 1.66 at M 2, 1.755 at M 3,
+1.79 at M 4, 1.83 at M 10), plus skin friction and Gabeaud base pressure
+(eq. 11); no transonic or subsonic C_A procedure.
+
+**The measured flat-faced cylinder overturns the two-station assumption for
+this shape.** Jernell's data (NASA TM X-1658, via D-6996 Figs. 10 and 16a;
+checked against the page images): bodies 1 and 2, cylinders flat at both
+ends, ℓ/d 6 and 8, M 2.86, Re_d 1.25×10⁵. Measured centre of pressure from the
+leading face: about 0.25ℓ at 5–10°, 0.46ℓ at 20°, 0.47–0.49ℓ from 25° to about
+90°; measured C_m about mid-length ≈ 0 throughout. Jorgensen's method, with
+its potential force at the leading face, computes C_m peaks of +2.4 and +3.4
+and a CP well forward (0.37–0.43ℓ at 20–50°), which the data do not show.
+Measured C_N is within about 10% of computed. No measurements above 95° for
+these bodies; the curve is taken as symmetric end for end (they are flat at
+both ends), which is an inference.
+
+Consequence: for a plain flat-ended cylinder the CP sits at mid-length except
+within about 20° of end-on, where it moves toward the leading face. The trim
+is where the CP meets the CG: a stage whose CG is a fraction g of its length
+from the leading face, with 0.25 < g < 0.47, trims about 10–20° off end-on
+with that face leading; a CG near mid-length gives no preferred attitude
+(broadside or flat spin). An engine-heavy stage (CG aft) would fall base
+first, about 10–20° off end-on, at close to end-on drag — far less drag than
+random tumbling. This is from one Mach number, finless, flat both ends; it
+disagrees with the withdrawn handbook's trims of 105–138°.
+
+**Dynamics** (Tobak & Peterson TR R-203; Garber 1959; Regan & Anandakrishnan
+1993 Ch. 12; Norling 1962): only Tobak & Peterson decide settle-or-tumble —
+a nonlinear, large-angle, undamped analysis with arrest read from their Fig. 2
+against the initial tumble rate — for one stable trim, a sine-law moment, and
+entry from outside the atmosphere. The others are small-angle envelope laws
+(∝ q^(−1/4)). So settling is reported as a labelled estimate, not used to
+choose the band's end.
+
+**Decision (user, 2026-09-30): finned stages are reported as a band only** —
+trim unknown to random tumbling — until a source gives fin forces beyond
+Jorgensen's tested 58°. A finless stage gets the trim from the measured
+centre-of-pressure curve. Jernell's report itself (NASA TM X-1658, Mach
+1.50–2.86, 0–180°) is now in hand and being read for the full Mach range.
 
 **Phase 4 — later.** A flight-plan option to drop the fins.
 
