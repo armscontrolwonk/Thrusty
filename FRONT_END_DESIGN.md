@@ -705,8 +705,9 @@ For a flat face leading, C_A ≈ C_p,stag (Fig. 7: 1.66 at M 2, 1.755 at M 3,
 this shape.** Jernell's data (NASA TM X-1658, via D-6996 Figs. 10 and 16a;
 checked against the page images): bodies 1 and 2, cylinders flat at both
 ends, ℓ/d 6 and 8, M 2.86, Re_d 1.25×10⁵. Measured centre of pressure from the
-leading face: about 0.25ℓ at 5–10°, 0.46ℓ at 20°, 0.47–0.49ℓ from 25° to about
-90°; measured C_m about mid-length ≈ 0 throughout. Jorgensen's method, with
+leading face: about 0.25ℓ at 5°, 0.4ℓ at 10°, 0.46–0.48ℓ at 15–20°, 0.47–0.50ℓ
+from 25° to about 90° (corrected from Jernell's own Fig. 9, below); measured
+C_m about mid-length ≈ 0 throughout. Jorgensen's method, with
 its potential force at the leading face, computes C_m peaks of +2.4 and +3.4
 and a CP well forward (0.37–0.43ℓ at 20–50°), which the data do not show.
 Measured C_N is within about 10% of computed. No measurements above 95° for
@@ -736,6 +737,47 @@ trim unknown to random tumbling — until a source gives fin forces beyond
 Jorgensen's tested 58°. A finless stage gets the trim from the measured
 centre-of-pressure curve. Jernell's report itself (NASA TM X-1658, Mach
 1.50–2.86, 0–180°) is now in hand and being read for the full Mach range.
+
+**Jernell, NASA TM X-1658 (1968), read from the user's copy.** Langley
+Unitary Plan, M 1.50, 1.90, 2.36, 2.86, Re 1.0×10⁶/ft, d = 1.5 in, moment
+centre at mid-length, trips fore and aft, straight and 45°-bent stings (the
+report blames its discontinuities on support interference). No stated
+accuracy. The flat-ended cylinders were tested only to about 100°; only the
+cone- and ogive-cylinders go to 185°. Values read from a 150 dpi scan
+(C_N ±0.4, C_A ±0.03, C_m ±0.4).
+- Centre of pressure from the leading face (Fig. 9): M 1.50, 0.11 at 5.5°,
+  0.18 at 10°, 0.35–0.38 at 15°, 0.42 at 20°, 0.44–0.47 at 30–45°, 0.47–0.49
+  at 60–85°; M 2.86, 0.24–0.27 at 5.5°, 0.38–0.41 at 10°, 0.45 at 15°, 0.48 at
+  20°, 0.49–0.50 at 25–90°. Near end-on the CP moves toward the leading face
+  at every Mach number, more strongly at lower Mach.
+- Symmetry end for end: consistent between 80° and 100° within reading
+  precision; not tested beyond. Supporting it: on the cone- and
+  ogive-cylinders flying base first, the CP moves toward the leading flat base
+  near end-on (0.75–0.8ℓ at 170°, 0.88ℓ at 180°, M 2.86).
+- Axial force: face first 1.62–1.73 (≈ C_p,stag); base first −1.5 to −1.65.
+- Drag averaged from these data over random orientation (mirrored beyond 90°,
+  an inference), cross-section reference, ℓ/d 6: 7.3 (M 1.5), 7.2 (1.9),
+  7.0 (2.36), 6.6 (2.86) — falling toward Klett's hypersonic 5.9. At a trim of
+  5–20° off end-on it is 1.7–2.6: random tumbling has three to four times the
+  drag of a trimmed stage.
+
+### 19d. Phase 3 as built so far (2026-09-30)
+
+- **Release time.** The spent-stage walk (and the orbital-lifetime walk)
+  started its clock at 0; every other stage clock starts at
+  `booster_core_delay_s`. With strap-ons lit first, every spent stage left
+  from the wrong point of the flight. Fixed; tested on Strypi VIII R with a
+  1 s core delay. No shipped vehicle sets a delay, so no shipped result moves.
+- **Precision and ground.** `integrate_debris` now runs to the main ballistic
+  flight's tolerances (rtol 1e-8, atol 1e-6 m, max_step 5 s; it was rtol 1e-5,
+  atol 10 m, no step limit) and lands on the terrain model when the run uses
+  it. Shipped debris impact points move 0–2.7 km (mostly 0.1–0.6 km; largest,
+  Minotaur-IV's third stage, 2.7 km): that was the old integration error. Main
+  trajectories are unchanged. Runtime about doubles for debris, still under a
+  second per vehicle; the suite takes about 20 s longer.
+- Still to come: drag by attitude (trim from the measured centre-of-pressure
+  curve for finless stages, random tumbling as the other end of the band,
+  Mach-dependent), and the band's impact points.
 
 **Phase 4 — later.** A flight-plan option to drop the fins.
 

@@ -245,3 +245,44 @@ def test_every_shipped_body_object_stores_only_what_the_body_adds():
         assert (ro.mass_kg, ro.diameter_m, ro.length_m) == (0.0, 0.0, 0.0), \
             ro.name
     assert sorted(bodies) == ['Al Hussein warhead', 'Scud-B warhead']
+
+
+# ── Phase 3: spent pieces ───────────────────────────────────────────────────
+@pytest.mark.parametrize('delay', [0.0, 1.0])
+def test_a_spent_stage_leaves_at_its_own_burnout(delay):
+    """Each spent stage's debris arc starts at that stage's burnout in the
+    run's own timeline.  The debris clock used to start at 0 while every
+    other stage clock starts at booster_core_delay_s, so with strap-ons lit
+    first every spent stage left from the wrong point of the flight.
+    (A core delay needs strap-ons to lift the vehicle: Strypi VIII R.)"""
+    p = bm.get_booster("Strypi VIII R")
+    assert p.n_boosters > 0
+    p.booster_core_delay_s = delay
+    res = tr.integrate_trajectory(p, 21.97, -159.76, 0.0)
+    for k in (1, 2):
+        burnout = next(m['t_s'] for m in res['milestones']
+                       if m['event'].startswith(f'Stage {k} burnout'))
+        arc = next(d for d in res['debris_trajectories']
+                   if d['label'] == f'Stage {k} body')
+        assert arc['t'][0] == pytest.approx(burnout, abs=1e-9)
+    assert next(d for d in res['debris_trajectories']
+                if d['label'] == 'Stage 1 body')['t'][0] == pytest.approx(
+        delay + p.burn_time_s, abs=1e-9)
+
+
+def test_a_spent_piece_lands_on_the_terrain_when_the_run_uses_it():
+    """Debris uses the same ground as the main flight: with the terrain
+    model on it stops at the terrain height beneath it, not at sea level.
+    A piece dropped over the Tibetan plateau (about 4.7 km)."""
+    import terrain
+    from coordinates import geodetic_to_ecef, ecef_to_geodetic
+    pos = np.asarray(geodetic_to_ecef(np.radians(32.0), np.radians(90.0),
+                                      20e3), float)
+    vel = np.zeros(3)
+    sea = tr.integrate_debris(pos, vel, 2000.0, max_time_s=600.0)
+    dem = tr.integrate_debris(pos, vel, 2000.0, max_time_s=600.0,
+                              terrain_dem=True, return_trajectory=True)
+    ground = terrain.ground_elevation(dem[0], dem[1], hi_res=False)
+    assert ground > 4000.0
+    assert dem[4]['alt'][-1] == pytest.approx(ground, abs=1.0)
+    assert dem[2] < sea[2]                       # it lands sooner

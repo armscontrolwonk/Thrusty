@@ -1942,7 +1942,8 @@ def _analytical_equil_glide(
 def integrate_debris(pos_ecef: np.ndarray, vel_ecef: np.ndarray,
                      beta_kg_m2: float,
                      max_time_s: float = 7200.0,
-                     return_trajectory: bool = False):
+                     return_trajectory: bool = False,
+                     terrain_dem: bool = False):
     """
     Integrate a tumbling debris piece from separation to ground impact.
 
@@ -1956,6 +1957,13 @@ def integrate_debris(pos_ecef: np.ndarray, vel_ecef: np.ndarray,
     vel_ecef   : ECEF velocity at separation (m/s), shape (3,)
     beta_kg_m2 : ballistic coefficient β = m / (Cd · A_eff) in kg/m²
     max_time_s : integration timeout (s)
+    terrain_dem : the ground is the terrain model's height at the point
+                  beneath the piece, as for the main flight (_hit_ground);
+                  otherwise sea level on the ellipsoid
+
+    Integrated to the main ballistic flight's tolerances (rtol 1e-8, atol
+    1e-6 m, max_step 5 s; FRONT_END_DESIGN.md Part IV Phase 3): a spent
+    stage is handed off and flown to the ground like the object is.
 
     Returns
     -------
@@ -1980,7 +1988,11 @@ def integrate_debris(pos_ecef: np.ndarray, vel_ecef: np.ndarray,
         return np.concatenate([vel, g + a_drag + a_cor + a_cen])
 
     def _ground(t, state):
-        _, _, alt = ecef_to_geodetic(state[:3])
+        lat, lon, alt = ecef_to_geodetic(state[:3])
+        if terrain_dem:
+            import terrain as _terrain
+            return alt - _terrain.ground_elevation(
+                np.degrees(lat), np.degrees(lon), hi_res=False)
         return alt
     _ground.terminal  = True
     _ground.direction = -1
@@ -1993,7 +2005,8 @@ def integrate_debris(pos_ecef: np.ndarray, vel_ecef: np.ndarray,
     # multi-stage run's cost.
     sol_ev = solve_ivp(_eom, (0.0, max_time_s), state0,
                        method='RK45', events=_ground,
-                       rtol=1e-5, atol=10.0, dense_output=return_trajectory)
+                       rtol=1e-8, atol=1e-6, max_step=5.0,
+                       dense_output=return_trajectory)
 
     # If the ground event never fired the stage did not impact within the
     # timeout — it is in orbit (or on a very long sub-orbital arc).  Return
@@ -3303,7 +3316,10 @@ def integrate_trajectory(params: BoosterParams,
     # ro_separates build flag is mass bookkeeping, not a separation input.
     _ro_run = params.ro
     _run_separates = (run_separation_mode(params) == 'separating_ro')
-    _t_node = 0.0
+    # The stage clock starts when the core lights: after
+    # booster_core_delay_s when strap-ons ignite first, as in
+    # _stage_event_times and total_burn_time.
+    _t_node = float(getattr(params, 'booster_core_delay_s', 0.0) or 0.0)
     _node   = params
     _sn     = 1
     while _node is not None:
@@ -3342,7 +3358,8 @@ def integrate_trajectory(params: BoosterParams,
                 _pos_s, _vel_s = _ecef_state_at(_t_bo)
                 _debris = integrate_debris(_pos_s, _vel_s, beta,
                                            max_time_s=14400.0,
-                                           return_trajectory=True)
+                                           return_trajectory=True,
+                                           terrain_dem=bool(getattr(params, '_terrain_dem', False)))
                 if _debris is None:
                     # Stage did not re-enter within the integration window —
                     # it is in orbit; add an informational row with no impact
@@ -3399,7 +3416,8 @@ def integrate_trajectory(params: BoosterParams,
             if beta > 0:
                 _pos_s, _vel_s = _ecef_state_at(_t_fair)
                 _debris = integrate_debris(_pos_s, _vel_s, beta,
-                                           return_trajectory=True)
+                                           return_trajectory=True,
+                                           terrain_dem=bool(getattr(params, '_terrain_dem', False)))
                 if _debris is not None:
                     _d_lat, _d_lon, _dt, _d_spd, _d_traj = _debris
                     _rng = range_between(lat0, lon0,
@@ -3441,7 +3459,8 @@ def integrate_trajectory(params: BoosterParams,
                 _pos_b, _vel_b = _ecef_state_at(_t_bsep)
                 _debris_b = integrate_debris(_pos_b, _vel_b, _beta_b,
                                              max_time_s=14400.0,
-                                             return_trajectory=True)
+                                             return_trajectory=True,
+                                           terrain_dem=bool(getattr(params, '_terrain_dem', False)))
                 if _debris_b is not None:
                     _d_lat, _d_lon, _dt, _d_spd, _d_traj = _debris_b
                     _rng = range_between(lat0, lon0,
@@ -3862,7 +3881,7 @@ def integrate_trajectory(params: BoosterParams,
 
         # Walk the stage list; for any stage whose burnout time is within the
         # arc AND whose debris does NOT re-enter, report orbital elements.
-        _t_node2 = 0.0
+        _t_node2 = float(getattr(params, 'booster_core_delay_s', 0.0) or 0.0)
         _node2   = params
         _sn2     = 1
         while _node2 is not None:
