@@ -177,6 +177,26 @@ class BoosterParams:
     interstage_mass_kg:     float = 0.0
     interstage_jettison_s:  Optional[float] = None
 
+    # Outline of the stage beyond a plain cylinder, for how it falls once
+    # spent (spent_stage_aero.planform_centroid_offset; FRONT_END_DESIGN.md
+    # §19i).  All 0 = a plain cylinder.  They shift where the stage's
+    # side-on area is centred, and with it the centre of pressure and the
+    # trim.  On ascent only the aft skirt counts: it adds flare wave drag
+    # (_transition_wave_drag); the taper and the nozzle add none.
+    #   forward_taper_length_m  length over which the front tapers to a
+    #                           point (a strap-on's or booster's nose cone),
+    #                           inside length_m
+    #   aft_skirt_length_m,     a skirt flaring from the body diameter to
+    #   aft_skirt_diameter_m    this diameter at the base, over the last
+    #                           aft_skirt_length_m of length_m
+    #   nozzle_protrusion_m     how far the nozzle extends past the base,
+    #                           beyond length_m; its exit diameter comes
+    #                           from nozzle_exit_area_m2
+    forward_taper_length_m: float = 0.0
+    aft_skirt_length_m:     float = 0.0
+    aft_skirt_diameter_m:   float = 0.0
+    nozzle_protrusion_m:    float = 0.0
+
     # Shroud jettisoned during ascent.
     # shroud_mass_kg is included in mass_initial at launch and subtracted once
     # the booster crosses shroud_jettison_alt_km.  0 = no shroud.
@@ -2533,6 +2553,10 @@ def booster_to_dict(p: BoosterParams, include_flight_plan: bool = True) -> dict:
         'interstage_length_m':    p.interstage_length_m,
         'interstage_mass_kg':     p.interstage_mass_kg,
         'interstage_jettison_s':  p.interstage_jettison_s,
+        'forward_taper_length_m': p.forward_taper_length_m,
+        'aft_skirt_length_m':     p.aft_skirt_length_m,
+        'aft_skirt_diameter_m':   p.aft_skirt_diameter_m,
+        'nozzle_protrusion_m':    p.nozzle_protrusion_m,
         'nose_shape':             p.nose_shape,
         'nose_length_m':          p.nose_length_m,
         'shroud_nose_shape':      p.shroud_nose_shape,
@@ -2814,6 +2838,10 @@ def booster_from_dict(d: dict) -> BoosterParams:
         interstage_mass_kg=float(d.get('interstage_mass_kg', 0.0)),
         interstage_jettison_s=(float(d['interstage_jettison_s'])
                                if d.get('interstage_jettison_s') is not None else None),
+        forward_taper_length_m=float(d.get('forward_taper_length_m', 0.0) or 0.0),
+        aft_skirt_length_m=float(d.get('aft_skirt_length_m', 0.0) or 0.0),
+        aft_skirt_diameter_m=float(d.get('aft_skirt_diameter_m', 0.0) or 0.0),
+        nozzle_protrusion_m=float(d.get('nozzle_protrusion_m', 0.0) or 0.0),
         nose_shape=d.get('nose_shape', ''),
         nose_length_m=float(d.get('nose_length_m', 0.0)),
         shroud_nose_shape=d.get('shroud_nose_shape', ''),
@@ -4400,9 +4428,11 @@ def _transition_wave_drag(params: BoosterParams, active_stage: BoosterParams,
         `top_diameter_m` (top, forward); a flare when the base is wider.
       * interstage — frustum from this stage's top diameter (aft) to the next
         stage's base diameter (forward); a flare when this stage is fatter.
+      * aft skirt — frustum from the stage's body diameter (forward) to
+        `aft_skirt_diameter_m` at its base, over `aft_skirt_length_m`.
 
-    Zero unless a stage sets `conical` or `has_interstage`, so a plain stack is
-    byte-identical.  Lean by design: friction over the added wetted length is
+    Zero unless a stage sets `conical`, `has_interstage` or an aft skirt, so a
+    plain stack is byte-identical.  Lean by design: friction over the added wetted length is
     below the front-end drag model's granularity (it already counts only the
     front-end body), and contractions are not credited."""
     if A_ref <= 0.0:
@@ -4421,6 +4451,10 @@ def _transition_wave_drag(params: BoosterParams, active_stage: BoosterParams,
                      else s.diameter_m)
             total += _flare_cd(d_aft, s.stage2.diameter_m,
                                s.interstage_length_m, mach, A_ref)
+        if (float(getattr(s, 'aft_skirt_diameter_m', 0.0) or 0.0) > s.diameter_m
+                and float(getattr(s, 'aft_skirt_length_m', 0.0) or 0.0) > 0.0):
+            total += _flare_cd(s.aft_skirt_diameter_m, s.diameter_m,
+                               s.aft_skirt_length_m, mach, A_ref)
         s = s.stage2
     return total
 

@@ -205,7 +205,11 @@
       "source": "",
       "thrust_peak_N": 0.0,
       "thrust_profile": [],
-      "top_diameter_m": 0.0
+      "top_diameter_m": 0.0,
+      "forward_taper_length_m": 0.0,
+      "aft_skirt_length_m": 0.0,
+      "aft_skirt_diameter_m": 0.0,
+      "nozzle_protrusion_m": 0.0
     },
     "embedded_rv": {
       "_ro": {
@@ -412,7 +416,11 @@
       "source": "",
       "thrust_peak_N": 0.0,
       "thrust_profile": [],
-      "top_diameter_m": 0.0
+      "top_diameter_m": 0.0,
+      "forward_taper_length_m": 0.0,
+      "aft_skirt_length_m": 0.0,
+      "aft_skirt_diameter_m": 0.0,
+      "nozzle_protrusion_m": 0.0
     },
     "file:AUR.booster.json": {
       "_ro": null,
@@ -563,11 +571,19 @@
         "source": "",
         "thrust_peak_N": 0.0,
         "thrust_profile": [],
-        "top_diameter_m": 0.0
+        "top_diameter_m": 0.0,
+        "forward_taper_length_m": 0.0,
+        "aft_skirt_length_m": 0.0,
+        "aft_skirt_diameter_m": 0.0,
+        "nozzle_protrusion_m": 0.0
       },
       "thrust_peak_N": 290000.0,
       "thrust_profile": [],
-      "top_diameter_m": 0.0
+      "top_diameter_m": 0.0,
+      "forward_taper_length_m": 0.0,
+      "aft_skirt_length_m": 0.0,
+      "aft_skirt_diameter_m": 0.0,
+      "nozzle_protrusion_m": 0.0
     },
     "file:Al_Hussein.booster.json": {
       "_ro": null,
@@ -659,7 +675,11 @@
       "source": "",
       "thrust_peak_N": 0.0,
       "thrust_profile": [],
-      "top_diameter_m": 0.0
+      "top_diameter_m": 0.0,
+      "forward_taper_length_m": 0.0,
+      "aft_skirt_length_m": 0.0,
+      "aft_skirt_diameter_m": 0.0,
+      "nozzle_protrusion_m": 0.0
     },
     "file:Generic_Body_Missile.booster.json": {
       "name": "Generic body missile",
@@ -737,7 +757,11 @@
       "booster_cd": 0.2,
       "booster_core_delay_s": 0.0,
       "booster_jettison_s": 0.0,
-      "_ro": null
+      "_ro": null,
+      "forward_taper_length_m": 0.0,
+      "aft_skirt_length_m": 0.0,
+      "aft_skirt_diameter_m": 0.0,
+      "nozzle_protrusion_m": 0.0
     },
     "file:Generic_ICBM.booster.json": {
       "_ro": null,
@@ -920,11 +944,19 @@
         "source": "",
         "thrust_peak_N": 0.0,
         "thrust_profile": [],
-        "top_diameter_m": 0.0
+        "top_diameter_m": 0.0,
+        "forward_taper_length_m": 0.0,
+        "aft_skirt_length_m": 0.0,
+        "aft_skirt_diameter_m": 0.0,
+        "nozzle_protrusion_m": 0.0
       },
       "thrust_peak_N": 0.0,
       "thrust_profile": [],
-      "top_diameter_m": 0.0
+      "top_diameter_m": 0.0,
+      "forward_taper_length_m": 0.0,
+      "aft_skirt_length_m": 0.0,
+      "aft_skirt_diameter_m": 0.0,
+      "nozzle_protrusion_m": 0.0
     },
     "file:Minotaur-IV_-_HTV-2.booster.json": {
       "_ro": null,
@@ -1148,15 +1180,27 @@
           "source": "",
           "thrust_peak_N": 0.0,
           "thrust_profile": [],
-          "top_diameter_m": 0.0
+          "top_diameter_m": 0.0,
+          "forward_taper_length_m": 0.0,
+          "aft_skirt_length_m": 0.0,
+          "aft_skirt_diameter_m": 0.0,
+          "nozzle_protrusion_m": 0.0
         },
         "thrust_peak_N": 0.0,
         "thrust_profile": [],
-        "top_diameter_m": 0.0
+        "top_diameter_m": 0.0,
+        "forward_taper_length_m": 0.0,
+        "aft_skirt_length_m": 0.0,
+        "aft_skirt_diameter_m": 0.0,
+        "nozzle_protrusion_m": 0.0
       },
       "thrust_peak_N": 0.0,
       "thrust_profile": [],
-      "top_diameter_m": 0.0
+      "top_diameter_m": 0.0,
+      "forward_taper_length_m": 0.0,
+      "aft_skirt_length_m": 0.0,
+      "aft_skirt_diameter_m": 0.0,
+      "nozzle_protrusion_m": 0.0
     },
     "file:No-dong.booster.json": {
       "_ro": null,
@@ -1248,7 +1292,11 @@
       "source": "",
       "thrust_peak_N": 0.0,
       "thrust_profile": [],
-      "top_diameter_m": 0.0
+      "top_diameter_m": 0.0,
+      "forward_taper_length_m": 0.0,
+      "aft_skirt_length_m": 0.0,
+      "aft_skirt_diameter_m": 0.0,
+      "nozzle_protrusion_m": 0.0
     },
     "file:STARS-1.booster.json": {
       "_ro": null,
@@ -1472,15 +1520,27 @@
           "source": "",
           "thrust_peak_N": 0.0,
           "thrust_profile": [],
-          "top_diameter_m": 0.0
+          "top_diameter_m": 0.0,
+          "forward_taper_length_m": 0.0,
+          "aft_skirt_length_m": 0.0,
+          "aft_skirt_diameter_m": 0.0,
+          "nozzle_protrusion_m": 0.0
         },
         "thrust_peak_N": 0.0,
         "thrust_profile": [],
-        "top_diameter_m": 0.0
+        "top_diameter_m": 0.0,
+        "forward_taper_length_m": 0.0,
+        "aft_skirt_length_m": 0.0,
+        "aft_skirt_diameter_m": 0.0,
+        "nozzle_protrusion_m": 0.0
       },
       "thrust_peak_N": 0.0,
       "thrust_profile": [],
-      "top_diameter_m": 0.0
+      "top_diameter_m": 0.0,
+      "forward_taper_length_m": 0.0,
+      "aft_skirt_length_m": 0.0,
+      "aft_skirt_diameter_m": 0.0,
+      "nozzle_protrusion_m": 0.0
     },
     "file:Scud-B_-R-17-.booster.json": {
       "_ro": null,
@@ -1572,7 +1632,11 @@
       "source": "",
       "thrust_peak_N": 0.0,
       "thrust_profile": [],
-      "top_diameter_m": 0.0
+      "top_diameter_m": 0.0,
+      "forward_taper_length_m": 0.0,
+      "aft_skirt_length_m": 0.0,
+      "aft_skirt_diameter_m": 0.0,
+      "nozzle_protrusion_m": 0.0
     },
     "file:Shahab-3.booster.json": {
       "_ro": null,
@@ -1664,7 +1728,11 @@
       "source": "",
       "thrust_peak_N": 0.0,
       "thrust_profile": [],
-      "top_diameter_m": 0.0
+      "top_diameter_m": 0.0,
+      "forward_taper_length_m": 0.0,
+      "aft_skirt_length_m": 0.0,
+      "aft_skirt_diameter_m": 0.0,
+      "nozzle_protrusion_m": 0.0
     },
     "file:Strypi_VIII_R.booster.json": {
       "_ro": null,
@@ -1815,11 +1883,19 @@
         "source": "",
         "thrust_peak_N": 0.0,
         "thrust_profile": [],
-        "top_diameter_m": 0.0
+        "top_diameter_m": 0.0,
+        "forward_taper_length_m": 0.0,
+        "aft_skirt_length_m": 0.0,
+        "aft_skirt_diameter_m": 0.0,
+        "nozzle_protrusion_m": 0.0
       },
       "thrust_peak_N": 243826.21951219512,
       "thrust_profile": [],
-      "top_diameter_m": 0.0
+      "top_diameter_m": 0.0,
+      "forward_taper_length_m": 0.0,
+      "aft_skirt_length_m": 0.0,
+      "aft_skirt_diameter_m": 0.0,
+      "nozzle_protrusion_m": 0.0
     },
     "file:Strypi_VIII_R_-Castor_II-.booster.json": {
       "_ro": null,
@@ -1970,11 +2046,19 @@
         "source": "",
         "thrust_peak_N": 0.0,
         "thrust_profile": [],
-        "top_diameter_m": 0.0
+        "top_diameter_m": 0.0,
+        "forward_taper_length_m": 0.0,
+        "aft_skirt_length_m": 0.0,
+        "aft_skirt_diameter_m": 0.0,
+        "nozzle_protrusion_m": 0.0
       },
       "thrust_peak_N": 218317.70093885963,
       "thrust_profile": [],
-      "top_diameter_m": 0.0
+      "top_diameter_m": 0.0,
+      "forward_taper_length_m": 0.0,
+      "aft_skirt_length_m": 0.0,
+      "aft_skirt_diameter_m": 0.0,
+      "nozzle_protrusion_m": 0.0
     },
     "file:Strypi_VII_R.booster.json": {
       "_ro": null,
@@ -2198,15 +2282,27 @@
           "source": "",
           "thrust_peak_N": 0.0,
           "thrust_profile": [],
-          "top_diameter_m": 0.0
+          "top_diameter_m": 0.0,
+          "forward_taper_length_m": 0.0,
+          "aft_skirt_length_m": 0.0,
+          "aft_skirt_diameter_m": 0.0,
+          "nozzle_protrusion_m": 0.0
         },
         "thrust_peak_N": 0.0,
         "thrust_profile": [],
-        "top_diameter_m": 0.0
+        "top_diameter_m": 0.0,
+        "forward_taper_length_m": 0.0,
+        "aft_skirt_length_m": 0.0,
+        "aft_skirt_diameter_m": 0.0,
+        "nozzle_protrusion_m": 0.0
       },
       "thrust_peak_N": 243826.21951219512,
       "thrust_profile": [],
-      "top_diameter_m": 0.0
+      "top_diameter_m": 0.0,
+      "forward_taper_length_m": 0.0,
+      "aft_skirt_length_m": 0.0,
+      "aft_skirt_diameter_m": 0.0,
+      "nozzle_protrusion_m": 0.0
     },
     "file:Taepodong-I.booster.json": {
       "_ro": null,
@@ -2385,11 +2481,19 @@
         "source": "",
         "thrust_peak_N": 0.0,
         "thrust_profile": [],
-        "top_diameter_m": 0.0
+        "top_diameter_m": 0.0,
+        "forward_taper_length_m": 0.0,
+        "aft_skirt_length_m": 0.0,
+        "aft_skirt_diameter_m": 0.0,
+        "nozzle_protrusion_m": 0.0
       },
       "thrust_peak_N": 0.0,
       "thrust_profile": [],
-      "top_diameter_m": 0.0
+      "top_diameter_m": 0.0,
+      "forward_taper_length_m": 0.0,
+      "aft_skirt_length_m": 0.0,
+      "aft_skirt_diameter_m": 0.0,
+      "nozzle_protrusion_m": 0.0
     },
     "file:Taepodong-II.booster.json": {
       "_ro": null,
@@ -2655,15 +2759,27 @@
           "source": "",
           "thrust_peak_N": 0.0,
           "thrust_profile": [],
-          "top_diameter_m": 0.0
+          "top_diameter_m": 0.0,
+          "forward_taper_length_m": 0.0,
+          "aft_skirt_length_m": 0.0,
+          "aft_skirt_diameter_m": 0.0,
+          "nozzle_protrusion_m": 0.0
         },
         "thrust_peak_N": 0.0,
         "thrust_profile": [],
-        "top_diameter_m": 0.0
+        "top_diameter_m": 0.0,
+        "forward_taper_length_m": 0.0,
+        "aft_skirt_length_m": 0.0,
+        "aft_skirt_diameter_m": 0.0,
+        "nozzle_protrusion_m": 0.0
       },
       "thrust_peak_N": 0.0,
       "thrust_profile": [],
-      "top_diameter_m": 0.0
+      "top_diameter_m": 0.0,
+      "forward_taper_length_m": 0.0,
+      "aft_skirt_length_m": 0.0,
+      "aft_skirt_diameter_m": 0.0,
+      "nozzle_protrusion_m": 0.0
     },
     "guidance_gravity_turn": {
       "_ro": null,
@@ -2755,7 +2871,11 @@
       "source": "",
       "thrust_peak_N": 0.0,
       "thrust_profile": [],
-      "top_diameter_m": 0.0
+      "top_diameter_m": 0.0,
+      "forward_taper_length_m": 0.0,
+      "aft_skirt_length_m": 0.0,
+      "aft_skirt_diameter_m": 0.0,
+      "nozzle_protrusion_m": 0.0
     },
     "guidance_loft": {
       "_ro": null,
@@ -2850,7 +2970,11 @@
       "stage_turn_stop_s": 18.0,
       "thrust_peak_N": 0.0,
       "thrust_profile": [],
-      "top_diameter_m": 0.0
+      "top_diameter_m": 0.0,
+      "forward_taper_length_m": 0.0,
+      "aft_skirt_length_m": 0.0,
+      "aft_skirt_diameter_m": 0.0,
+      "nozzle_protrusion_m": 0.0
     },
     "guidance_loft_multistage": {
       "_ro": null,
@@ -3032,14 +3156,22 @@
         "stage_turn_stop_s": 22.5,
         "thrust_peak_N": 0.0,
         "thrust_profile": [],
-        "top_diameter_m": 0.0
+        "top_diameter_m": 0.0,
+        "forward_taper_length_m": 0.0,
+        "aft_skirt_length_m": 0.0,
+        "aft_skirt_diameter_m": 0.0,
+        "nozzle_protrusion_m": 0.0
       },
       "stage_burnout_angle_deg": 45.0,
       "stage_turn_start_s": 0.0,
       "stage_turn_stop_s": 22.5,
       "thrust_peak_N": 0.0,
       "thrust_profile": [],
-      "top_diameter_m": 0.0
+      "top_diameter_m": 0.0,
+      "forward_taper_length_m": 0.0,
+      "aft_skirt_length_m": 0.0,
+      "aft_skirt_diameter_m": 0.0,
+      "nozzle_protrusion_m": 0.0
     },
     "inline_fields_no_beta": {
       "_ro": null,
@@ -3131,7 +3263,11 @@
       "source": "",
       "thrust_peak_N": 0.0,
       "thrust_profile": [],
-      "top_diameter_m": 0.0
+      "top_diameter_m": 0.0,
+      "forward_taper_length_m": 0.0,
+      "aft_skirt_length_m": 0.0,
+      "aft_skirt_diameter_m": 0.0,
+      "nozzle_protrusion_m": 0.0
     },
     "inline_ro_fields": {
       "_ro": {
@@ -3338,7 +3474,11 @@
       "source": "",
       "thrust_peak_N": 0.0,
       "thrust_profile": [],
-      "top_diameter_m": 0.0
+      "top_diameter_m": 0.0,
+      "forward_taper_length_m": 0.0,
+      "aft_skirt_length_m": 0.0,
+      "aft_skirt_diameter_m": 0.0,
+      "nozzle_protrusion_m": 0.0
     },
     "inline_rv_fields": {
       "_ro": {
@@ -3545,7 +3685,11 @@
       "source": "",
       "thrust_peak_N": 0.0,
       "thrust_profile": [],
-      "top_diameter_m": 0.0
+      "top_diameter_m": 0.0,
+      "forward_taper_length_m": 0.0,
+      "aft_skirt_length_m": 0.0,
+      "aft_skirt_diameter_m": 0.0,
+      "nozzle_protrusion_m": 0.0
     },
     "loft_angle_deg_only": {
       "_ro": null,
@@ -3637,7 +3781,11 @@
       "source": "",
       "thrust_peak_N": 0.0,
       "thrust_profile": [],
-      "top_diameter_m": 0.0
+      "top_diameter_m": 0.0,
+      "forward_taper_length_m": 0.0,
+      "aft_skirt_length_m": 0.0,
+      "aft_skirt_diameter_m": 0.0,
+      "nozzle_protrusion_m": 0.0
     },
     "modern_control": {
       "_ro": null,
@@ -3729,7 +3877,11 @@
       "source": "",
       "thrust_peak_N": 0.0,
       "thrust_profile": [],
-      "top_diameter_m": 0.0
+      "top_diameter_m": 0.0,
+      "forward_taper_length_m": 0.0,
+      "aft_skirt_length_m": 0.0,
+      "aft_skirt_diameter_m": 0.0,
+      "nozzle_protrusion_m": 0.0
     },
     "no_mass_final": {
       "_ro": null,
@@ -3821,7 +3973,11 @@
       "source": "",
       "thrust_peak_N": 0.0,
       "thrust_profile": [],
-      "top_diameter_m": 0.0
+      "top_diameter_m": 0.0,
+      "forward_taper_length_m": 0.0,
+      "aft_skirt_length_m": 0.0,
+      "aft_skirt_diameter_m": 0.0,
+      "nozzle_protrusion_m": 0.0
     },
     "nose_ld_ratio": {
       "_ro": null,
@@ -3913,7 +4069,11 @@
       "source": "",
       "thrust_peak_N": 0.0,
       "thrust_profile": [],
-      "top_diameter_m": 0.0
+      "top_diameter_m": 0.0,
+      "forward_taper_length_m": 0.0,
+      "aft_skirt_length_m": 0.0,
+      "aft_skirt_diameter_m": 0.0,
+      "nozzle_protrusion_m": 0.0
     },
     "payload_body_baked": {
       "_ro": null,
@@ -4005,7 +4165,11 @@
       "source": "",
       "thrust_peak_N": 0.0,
       "thrust_profile": [],
-      "top_diameter_m": 0.0
+      "top_diameter_m": 0.0,
+      "forward_taper_length_m": 0.0,
+      "aft_skirt_length_m": 0.0,
+      "aft_skirt_diameter_m": 0.0,
+      "nozzle_protrusion_m": 0.0
     },
     "payload_body_baked_rv_key": {
       "_ro": null,
@@ -4097,7 +4261,11 @@
       "source": "",
       "thrust_peak_N": 0.0,
       "thrust_profile": [],
-      "top_diameter_m": 0.0
+      "top_diameter_m": 0.0,
+      "forward_taper_length_m": 0.0,
+      "aft_skirt_length_m": 0.0,
+      "aft_skirt_diameter_m": 0.0,
+      "nozzle_protrusion_m": 0.0
     },
     "payload_stack_only": {
       "_ro": null,
@@ -4189,7 +4357,11 @@
       "source": "",
       "thrust_peak_N": 0.0,
       "thrust_profile": [],
-      "top_diameter_m": 0.0
+      "top_diameter_m": 0.0,
+      "forward_taper_length_m": 0.0,
+      "aft_skirt_length_m": 0.0,
+      "aft_skirt_diameter_m": 0.0,
+      "nozzle_protrusion_m": 0.0
     },
     "rv_named_loadout": {
       "_ro": null,
@@ -4281,7 +4453,11 @@
       "source": "",
       "thrust_peak_N": 0.0,
       "thrust_profile": [],
-      "top_diameter_m": 0.0
+      "top_diameter_m": 0.0,
+      "forward_taper_length_m": 0.0,
+      "aft_skirt_length_m": 0.0,
+      "aft_skirt_diameter_m": 0.0,
+      "nozzle_protrusion_m": 0.0
     },
     "two_stage_legacy": {
       "_ro": null,
@@ -4460,11 +4636,19 @@
         "source": "",
         "thrust_peak_N": 0.0,
         "thrust_profile": [],
-        "top_diameter_m": 0.0
+        "top_diameter_m": 0.0,
+        "forward_taper_length_m": 0.0,
+        "aft_skirt_length_m": 0.0,
+        "aft_skirt_diameter_m": 0.0,
+        "nozzle_protrusion_m": 0.0
       },
       "thrust_peak_N": 0.0,
       "thrust_profile": [],
-      "top_diameter_m": 0.0
+      "top_diameter_m": 0.0,
+      "forward_taper_length_m": 0.0,
+      "aft_skirt_length_m": 0.0,
+      "aft_skirt_diameter_m": 0.0,
+      "nozzle_protrusion_m": 0.0
     }
   },
   "ros": {

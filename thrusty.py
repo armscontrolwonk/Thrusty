@@ -991,6 +991,26 @@ class _StageFrame(ttk.LabelFrame):
         # WHEN the interstage drops (interstage_jettison_s) is a flight-plan
         # choice, edited under "Deployment events" in the Flight Plan editor;
         # only the adapter's length and mass (hardware) are here.
+
+        # ── Outline beyond a plain cylinder (rows 13-14) ─────────────────
+        # Hardware only; used for how the spent stage falls (its trim), not
+        # for ascent drag.  All 0 = a plain cylinder.
+        _out_f = ttk.Frame(self)
+        _out_f.grid(row=13, column=0, columnspan=2, sticky=tk.W, padx=6, pady=(2, 0))
+        ttk.Label(_out_f, text="Aft skirt  base ⌀ (m):").pack(side=tk.LEFT)
+        self._skirt_dia_var = tk.StringVar(value="0")
+        ttk.Entry(_out_f, textvariable=self._skirt_dia_var, width=7).pack(side=tk.LEFT, padx=(2, 0))
+        ttk.Label(_out_f, text="L (m):").pack(side=tk.LEFT, padx=(8, 2))
+        self._skirt_len_var = tk.StringVar(value="0")
+        ttk.Entry(_out_f, textvariable=self._skirt_len_var, width=6).pack(side=tk.LEFT)
+        _out_g = ttk.Frame(self)
+        _out_g.grid(row=14, column=0, columnspan=2, sticky=tk.W, padx=6, pady=(2, 4))
+        ttk.Label(_out_g, text="Nozzle protrudes (m):").pack(side=tk.LEFT)
+        self._noz_prot_var = tk.StringVar(value="0")
+        ttk.Entry(_out_g, textvariable=self._noz_prot_var, width=6).pack(side=tk.LEFT, padx=(2, 0))
+        ttk.Label(_out_g, text="Front taper L (m):").pack(side=tk.LEFT, padx=(8, 2))
+        self._fwd_taper_var = tk.StringVar(value="0")
+        ttk.Entry(_out_g, textvariable=self._fwd_taper_var, width=6).pack(side=tk.LEFT)
         self._on_conical()
         self._on_interstage()
 
@@ -1454,6 +1474,15 @@ class _StageFrame(ttk.LabelFrame):
             # interstage_jettison_s is flight-plan data (Flight Plan editor);
             # left at its default so a hardware save never clobbers it.
             result["interstage_jettison_s"] = None
+        for _k, _var, _lbl in (
+                ("aft_skirt_diameter_m", self._skirt_dia_var, "Aft skirt diameter"),
+                ("aft_skirt_length_m", self._skirt_len_var, "Aft skirt length"),
+                ("nozzle_protrusion_m", self._noz_prot_var, "Nozzle protrusion"),
+                ("forward_taper_length_m", self._fwd_taper_var, "Front taper length")):
+            try:
+                result[_k] = max(0.0, float(_var.get() or 0.0))
+            except ValueError:
+                raise ValueError(f"{_lbl}: expected a number, got {_var.get()!r:.40s}")
         else:
             result["interstage_length_m"] = 0.0
             result["interstage_mass_kg"]  = 0.0
@@ -1510,6 +1539,10 @@ class _StageFrame(ttk.LabelFrame):
         self._interstage_var.set(bool(d.get("has_interstage", False)))
         self._is_len_var.set(str(d.get("interstage_length_m", 0.0) or 0.0))
         self._is_mass_var.set(str(d.get("interstage_mass_kg", 0.0) or 0.0))
+        self._skirt_dia_var.set(str(d.get("aft_skirt_diameter_m", 0.0) or 0.0))
+        self._skirt_len_var.set(str(d.get("aft_skirt_length_m", 0.0) or 0.0))
+        self._noz_prot_var.set(str(d.get("nozzle_protrusion_m", 0.0) or 0.0))
+        self._fwd_taper_var.set(str(d.get("forward_taper_length_m", 0.0) or 0.0))
         self._on_conical()
         self._on_interstage()
 
@@ -2385,6 +2418,10 @@ class BoosterDialog(tk.Toplevel):
                 "top_diameter_m": getattr(node, 'top_diameter_m', 0.0),
                 "has_interstage": getattr(node, 'has_interstage', False),
                 "interstage_length_m": getattr(node, 'interstage_length_m', 0.0),
+                "aft_skirt_diameter_m": getattr(node, 'aft_skirt_diameter_m', 0.0),
+                "aft_skirt_length_m": getattr(node, 'aft_skirt_length_m', 0.0),
+                "nozzle_protrusion_m": getattr(node, 'nozzle_protrusion_m', 0.0),
+                "forward_taper_length_m": getattr(node, 'forward_taper_length_m', 0.0),
                 "interstage_mass_kg":  getattr(node, 'interstage_mass_kg', 0.0),
                 "interstage_jettison_s": getattr(node, 'interstage_jettison_s', None),
             })
@@ -2635,6 +2672,10 @@ class BoosterDialog(tk.Toplevel):
                 top_diameter_m=float(sd.get("top_diameter_m", 0.0)),
                 has_interstage=bool(sd.get("has_interstage", False)),
                 interstage_length_m=float(sd.get("interstage_length_m", 0.0)),
+                aft_skirt_diameter_m=float(sd.get("aft_skirt_diameter_m", 0.0)),
+                aft_skirt_length_m=float(sd.get("aft_skirt_length_m", 0.0)),
+                nozzle_protrusion_m=float(sd.get("nozzle_protrusion_m", 0.0)),
+                forward_taper_length_m=float(sd.get("forward_taper_length_m", 0.0)),
                 interstage_mass_kg=float(sd.get("interstage_mass_kg", 0.0)),
                 interstage_jettison_s=sd.get("interstage_jettison_s", None),
             )

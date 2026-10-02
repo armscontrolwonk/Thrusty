@@ -418,3 +418,144 @@ def test_a_marginal_finned_stage_reports_the_midpoint_with_its_half_width():
     assert d_mid == pytest.approx(0.5 * d_ends, rel=1e-3)
     assert band['half_width_km'] == pytest.approx(0.5 * d_ends / 1000.0)
     assert track['lat'][-1] == lat and track['t'][-1] == pytest.approx(t)
+
+
+# ── a stage's outline: forward taper, aft skirt, protruding nozzle ──────────
+
+# The 0.563% Shuttle SRB wind-tunnel model, inches (Johnson & Braddock,
+# DMS-DR-2111, Fig. 2): overall 9.808; nose cone 1.059; body 0.800 dia;
+# skirt 0.524 long flaring to 1.082; nozzle 0.294 beyond it, exit 0.798.
+_M449 = dict(diameter_m=0.800, length_m=9.808 - 0.294,
+             forward_taper_length_m=1.059, aft_skirt_length_m=0.524,
+             aft_skirt_diameter_m=1.082, nozzle_protrusion_m=0.294,
+             nozzle_exit_area_m2=math.pi * 0.798 ** 2 / 4.0)
+
+
+def test_a_plain_cylinder_has_no_outline_shift():
+    off, L, area = ssa.planform_centroid_offset(_stage())
+    assert off == 0.0 and L == 6.0 and area == 6.0
+    assert ssa.planform_centroid_offset(
+        _stage(aft_skirt_length_m=0.5, aft_skirt_diameter_m=0.9)) == (0.0, 6.0, 6.0)   # not wider
+
+
+def test_the_srb_models_side_on_area_is_centred_aft_of_mid_length():
+    off, L, _ = ssa.planform_centroid_offset(NS(**_M449))
+    assert L == pytest.approx(9.808)
+    # Bacchus, Kross & Moog give about 53% for the SRB's area centroid.
+    assert 0.5 + off == pytest.approx(0.53, abs=0.01)
+
+
+def test_each_outline_piece_moves_the_centroid_aft():
+    base = ssa.planform_centroid_offset(_stage())[0]
+    taper = ssa.planform_centroid_offset(_stage(forward_taper_length_m=1.0))[0]
+    skirt = ssa.planform_centroid_offset(
+        _stage(aft_skirt_length_m=0.5, aft_skirt_diameter_m=1.4))[0]
+    nozzle, L, area = ssa.planform_centroid_offset(
+        _stage(nozzle_protrusion_m=0.6, nozzle_exit_area_m2=0.5))
+    assert base == 0.0 and taper > 0 and skirt > 0
+    assert L == pytest.approx(6.6) and area > 6.0  # the nozzle adds length
+    # A slender nozzle moves the centroid aft in metres, though not as a
+    # fraction of the longer overall length.
+    assert (0.5 + nozzle) * L > 3.0
+    # A triangle of base d and length 1 in place of a 1 x d rectangle:
+    assert taper == pytest.approx((5.0 * 3.5 + 0.5 * 2.0 / 3.0) / 5.5 / 6.0 - 0.5)
+
+
+def test_the_outline_moves_the_trim_away_from_end_on():
+    plain = ssa.spent_stage_drag(_stage(), 1000.0, 'lower')
+    shaped = ssa.spent_stage_drag(
+        _stage(forward_taper_length_m=1.0, aft_skirt_length_m=0.5,
+               aft_skirt_diameter_m=1.4), 1000.0, 'lower')
+    assert any('outline' in n for n in shaped['notes'])
+    assert not any('outline' in n for n in plain['notes'])
+    # More drag at the trim: the stage sits further from end-on.
+    for M in (1.5, 2.0, 2.86):
+        assert shaped['cda_trim'](M) > plain['cda_trim'](M)
+    # Tumbling drag follows the side-on area: the taper removes more of it
+    # than this skirt adds.
+    a_plain = ssa.planform_centroid_offset(_stage())[2]
+    a_shaped = ssa.planform_centroid_offset(
+        _stage(forward_taper_length_m=1.0, aft_skirt_length_m=0.5,
+               aft_skirt_diameter_m=1.4))[2]
+    assert a_shaped < a_plain
+    assert shaped['cda_random'](2.0) < plain['cda_random'](2.0)
+
+
+def test_a_cg_at_the_area_centroid_leaves_no_trim():
+    # Shift the centre of pressure as far aft as the CG: no preferred
+    # attitude short of broadside (Bacchus et al.: CG at the centroid, 90 deg).
+    st = _stage(forward_taper_length_m=3.0, aft_skirt_length_m=1.0,
+                aft_skirt_diameter_m=2.0)
+    off = ssa.planform_centroid_offset(st)[0]
+    assert off > 0.10                                  # beyond the liquid CG, 0.60
+    d = ssa.spent_stage_drag(st, 1000.0, 'lower')
+    assert d['leading'] in (None, 'front')             # no base-first trim
+
+
+def test_an_aft_skirt_adds_flare_drag_on_ascent_and_nothing_when_absent():
+    p = _shipped_stage1('Shahab-3')
+    A = math.pi * p.diameter_m ** 2 / 4.0
+    assert bm._transition_wave_drag(p, p, 2.0, A) == 0.0
+    p.aft_skirt_diameter_m, p.aft_skirt_length_m = 1.35 * p.diameter_m, 0.65 * p.diameter_m
+    got = bm._transition_wave_drag(p, p, 2.0, A)
+    assert got == pytest.approx(bm._flare_cd(p.aft_skirt_diameter_m, p.diameter_m,
+                                             p.aft_skirt_length_m, 2.0, A))
+    assert 0.05 < got < 0.5
+    assert bm._transition_wave_drag(p, p, 0.5, A) == 0.0      # wave drag: supersonic only
+
+
+def test_outline_fields_round_trip_through_the_booster_file():
+    p = _shipped_stage1('Shahab-3')
+    p.forward_taper_length_m, p.aft_skirt_length_m = 1.1, 0.7
+    p.aft_skirt_diameter_m, p.nozzle_protrusion_m = 1.8, 0.4
+    q = bm.booster_from_dict(bm.booster_to_dict(p))
+    assert (q.forward_taper_length_m, q.aft_skirt_length_m,
+            q.aft_skirt_diameter_m, q.nozzle_protrusion_m) == (1.1, 0.7, 1.8, 0.4)
+
+
+# ── benchmark: the Shuttle SRB (BENCHMARKING.md; Part IV §19h-i) ────────────
+
+_FT, _LBM, _LBF, _PSF = 0.3048, 0.45359237, 4.4482216, 47.880259
+
+
+def _srb(outline):
+    LT, d = 149.16 * _FT, 12.17 * _FT                 # Moore et al. 2012
+    k = LT / 9.808                                    # model 449 proportions
+    geo = (dict(length_m=LT - 0.294 * k, forward_taper_length_m=1.059 * k,
+                aft_skirt_length_m=0.524 * k, aft_skirt_diameter_m=d * 1.082 / 0.800,
+                nozzle_protrusion_m=0.294 * k,
+                nozzle_exit_area_m2=math.pi * (d * 0.798 / 0.800) ** 2 / 4.0)
+           if outline else dict(length_m=LT))
+    return NS(diameter_m=d, solid_motor=True, has_fins=False, has_grid_fins=False,
+              thrust_N=2.59e6 * _LBF, thrust_peak_N=3.31e6 * _LBF, **geo)   # McDonald 1985
+
+
+def _peak_q_psf(pos, vel, mass, cda):
+    r = tr.integrate_debris(pos, vel, 0.0, max_time_s=3000.0, return_trajectory=True,
+                            cda_of_mach=cda, mass_kg=mass, return_solution=True)
+    return float(np.max(tr._flow_history(r[5], r[2])['q'])) / _PSF
+
+
+def test_the_shuttle_srb_falls_between_the_trimmed_and_tumbling_ends():
+    # Separation 154,000 ft, 4,330 fps (Moore et al. 2012, Fig. 10); 30.8 deg
+    # is the flight-path angle that gives the published apogee, 230,000 ft.
+    # Published peak dynamic pressure on the way down: 1,600 psf (Moore),
+    # 1,700 psf (McDonald 1985, Fig. 19).
+    mass = 170000 * _LBM                               # Bacchus, Kross & Moog 1985
+    pos, vel = _state(28.6, -80.6, 154000 * _FT, 4330 * _FT, 30.8)
+    peaks = {}
+    for outline in (False, True):
+        drag = ssa.spent_stage_drag(_srb(outline), mass, 'lower')
+        apo = tr._climb_to_apogee(pos, vel, mass, drag['cda_end_over_end'])
+        assert 220e3 < ecef_alt_ft(apo[0]) < 240e3 and 65.0 < apo[2] < 76.0
+        peaks[outline] = (_peak_q_psf(apo[0], apo[1], mass, drag['cda_trim']),
+                          _peak_q_psf(apo[0], apo[1], mass, drag['cda_end_over_end']))
+    for trimmed, tumbling in peaks.values():
+        assert tumbling < 1600.0 and 1700.0 < trimmed          # the band holds it
+    # The SRB's outline moves the trimmed end toward the published value.
+    assert peaks[True][0] < 0.9 * peaks[False][0]
+
+
+def ecef_alt_ft(pos):
+    from coordinates import ecef_to_geodetic
+    return ecef_to_geodetic(pos)[2] / _FT

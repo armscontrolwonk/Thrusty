@@ -277,6 +277,70 @@ def empty_cg_fraction(stage, dry_mass_kg, role='lower'):
                f"rest spread evenly")
 
 
+def planform_centroid_offset(stage):
+    """(offset, overall length, side-on area): how far aft of mid-length
+    the stage's side-on area is centred, as a fraction of its overall length
+    (positive toward the base), that length in metres, and the area in m^2.
+    A slender nozzle adds length faster than area, so its offset can be
+    negative as a fraction while the centroid still moves aft in metres.
+
+    At broadside the normal force acts at the centroid of the side-on
+    (planform) area: 0.50 of the length for a plain cylinder, further aft
+    for a body with a tapered front, a flared skirt or a nozzle sticking
+    out.  Jernell (TM X-1658) states it — a rearward planform centroid gives
+    a rearward centre of pressure — and the Shuttle SRB shows it: its
+    centroid is at about 53% (Bacchus, Kross & Moog 1985) and its measured
+    centre of pressure sits 0.03-0.06 of the length nearer the tail than
+    the flat-ended cylinder's at every angle past broadside (Johnson &
+    Braddock, DMS-DR-2111; FRONT_END_DESIGN.md §19g).  The cylinder's
+    centre-of-pressure curve is therefore shifted by this offset at every
+    angle — an inference from those two sources, checked on the SRB only.
+
+    The outline, from the stage's fields (all 0 = a plain cylinder):
+      forward_taper_length_m   the front tapers to a point over this length
+                               (a triangle), inside length_m;
+      aft_skirt_length_m, aft_skirt_diameter_m
+                               a skirt flaring from the body diameter to
+                               this diameter at the base, over the last
+                               aft_skirt_length_m of length_m;
+      nozzle_protrusion_m      a nozzle extending this far past the base,
+                               widening from half its exit diameter to the
+                               exit diameter (from nozzle_exit_area_m2; the
+                               half is an assumption, the fields give no
+                               throat).  It adds to the overall length.
+    """
+    d = float(stage.diameter_m or 0.0)
+    L = float(stage.length_m or 0.0) or 2.0 * d
+    g = lambda k: max(float(getattr(stage, k, 0.0) or 0.0), 0.0)
+    taper = min(g('forward_taper_length_m'), L)
+    sk_d = g('aft_skirt_diameter_m')
+    sk_l = min(g('aft_skirt_length_m'), L - taper) if sk_d > d else 0.0
+    prot = g('nozzle_protrusion_m')
+    d_e = math.sqrt(4.0 * g('nozzle_exit_area_m2') / math.pi)
+    if d <= 0.0:
+        return 0.0, L, 0.0
+    trapezoid = lambda length, a, b: (length * (a + b) / 2.0,
+                                      length / 3.0 * (a + 2.0 * b) / (a + b))
+    pieces = []                                   # (area, centroid from front)
+    if taper > 0.0:
+        pieces.append((0.5 * taper * d, 2.0 / 3.0 * taper))
+    cyl = L - taper - sk_l
+    pieces.append((cyl * d, taper + 0.5 * cyl))
+    if sk_l > 0.0:
+        a, x = trapezoid(sk_l, d, sk_d)
+        pieces.append((a, L - sk_l + x))
+    L_all = L
+    if prot > 0.0 and d_e > 0.0:
+        a, x = trapezoid(prot, 0.5 * d_e, d_e)
+        pieces.append((a, L + x))
+        L_all = L + prot
+    area = sum(p[0] for p in pieces)
+    if area <= 0.0:
+        return 0.0, L_all, 0.0
+    return (sum(p[0] * p[1] for p in pieces) / area / L_all - 0.5, L_all,
+            area)
+
+
 def solid_nozzle_share(thrust_N):
     """The nozzle's share of a solid motor's case + insulation + nozzle mass,
     from the ratio of Romaniw's (2013, Figs. A2-A4) fits in motor thrust (N):
@@ -338,7 +402,7 @@ def moment_about_cg(alpha_deg, mach, ld, f):
     return -cn * ((1.0 - f) - float(_cp_from_leading_face(a1, mach)))
 
 
-def attitude_model(length_m, diameter_m, mass_kg, f):
+def attitude_model(length_m, diameter_m, mass_kg, f, f_aero=None):
     """What the planar swing of a spent stage needs (trajectory.
     _attitude_verdict): its transverse moment of inertia, and the measured
     moment about its CG as a function of attitude and Mach.
@@ -347,7 +411,9 @@ def attitude_model(length_m, diameter_m, mass_kg, f):
     base (the engine or nozzle share that put the CG at f from the front:
     share = 2f - 1).  The swing is planar and undamped, as in Tobak &
     Peterson (NASA TR R-203), with the measured moment in place of their
-    sine law.
+    sine law.  f_aero is the CG position the moment is taken about when the
+    centre of pressure is shifted for the stage's outline
+    (planform_centroid_offset): f less that shift.  The inertia uses f.
 
     Returns a dict:
       I         kg m^2, about the CG
@@ -366,7 +432,8 @@ def attitude_model(length_m, diameter_m, mass_kg, f):
          + share * m * ((1.0 - f) * L) ** 2)
     machs = np.array(sorted(_table()))
     grid = np.arange(0.0, 180.5, 1.0)
-    cm_tab = np.array([[moment_about_cg(a, mm, ld, f) for a in grid]
+    fa = f if f_aero is None else f_aero
+    cm_tab = np.array([[moment_about_cg(a, mm, ld, fa) for a in grid]
                        for mm in machs])
     rad = np.radians(grid)
     v_tab = -np.concatenate(
@@ -479,10 +546,22 @@ def spent_stage_drag(stage, dry_mass_kg, role='lower'):
       notes       plain sentences on what was assumed
     """
     d = float(stage.diameter_m or 0.0)
-    L = float(stage.length_m or 0.0) or 2.0 * d
-    ld = L / d if d > 0 else DATA_LD
+    L_body = float(stage.length_m or 0.0) or 2.0 * d
+    shift, L, s_plan = planform_centroid_offset(stage)   # L: overall length
+    # The normal force follows the side-on area (Jernell), so the fineness
+    # ratio that scales it is that area over d^2: L/d for a plain cylinder.
+    ld = s_plan / (d * d) if d > 0 else DATA_LD
     area = math.pi * d * d / 4.0
     notes = []
+    # A CG fraction of the stage's own length, on the overall length, and
+    # the position the aerodynamic moment is taken about (see
+    # planform_centroid_offset: the centre of pressure moves aft by `shift`).
+    on_all = lambda f_body: f_body * L_body / L
+    if abs(shift) > 1e-9:
+        notes.append(f"outline: its side-on area is centred "
+                     f"{0.5 + shift:.3f} of its length from the front, so the "
+                     f"cylinder's centre of pressure is moved {shift:+.3f} "
+                     f"(Jernell; checked on the Shuttle SRB)")
     out = dict(cda_random=_tabulated(lambda M: random_cd(M, ld) * area),
                cda_end_over_end=_tabulated(
                    lambda M: end_over_end_cd(M, ld) * area),
@@ -490,7 +569,8 @@ def spent_stage_drag(stage, dry_mass_kg, role='lower'):
     if getattr(stage, 'has_fins', False) or getattr(stage, 'has_grid_fins', False):
         f = (empty_cg_fraction_solid(stage) if getattr(stage, 'solid_motor', False)
              else empty_cg_fraction(stage, dry_mass_kg, role))[0]
-        stab = fin_stability(stage, f) if f is not None else None
+        stab = (fin_stability(stage, on_all(f) - shift)
+                if f is not None else None)
         if stab is None or stab[0] == 'unstable':
             notes.append(
                 "finned: " + (
@@ -528,8 +608,10 @@ def spent_stage_drag(stage, dry_mass_kg, role='lower'):
     else:
         f, basis = empty_cg_fraction(stage, dry_mass_kg, role)
         notes.append(basis)
-    g = min(f, 1.0 - f)
-    lead = 'base' if f > 0.5 else 'front'
+    f = on_all(f)
+    f_aero = f - shift
+    g = min(f_aero, 1.0 - f_aero)
+    lead = 'base' if f_aero > 0.5 else 'front'
     if trim_alpha(MACH_HI, g) is None and trim_alpha(MACH_LO, g) is None:
         notes.append("CG at mid-length: no preferred attitude; flown "
                      "tumbling only")
@@ -540,10 +622,12 @@ def spent_stage_drag(stage, dry_mass_kg, role='lower'):
     out['cda_trim'] = _tabulated(cda_trim)
     out['leading'] = lead
     if dry_mass_kg and dry_mass_kg > 0:
-        out['attitude'] = attitude_model(L, d, dry_mass_kg, f)
+        out['attitude'] = attitude_model(L, d, dry_mass_kg, f, f_aero)
     a_lo, a_hi = trim_alpha(MACH_LO, g), trim_alpha(MACH_HI, g)
     notes.append(f"trims with its {lead} leading, CG {g:.2f} of its length "
-                 f"from that end: "
+                 f"from that end"
+                 + (" (after the outline shift)" if abs(shift) > 1e-9 else "")
+                 + ": "
                  f"{'end-on' if not a_lo else f'{a_lo:.0f} deg'} off end-on at "
                  f"Mach 1.5, {'end-on' if not a_hi else f'{a_hi:.0f} deg'} at "
                  f"Mach 2.86 (Jernell flat-ended cylinder)")

@@ -1133,6 +1133,53 @@ What it argues for: stage geometry beyond a plain cylinder — a flared aft
 skirt and a protruding nozzle — so the centre of pressure can be shifted
 by the planform centroid (§19g). With that, this benchmark becomes a test.
 
+### 19i. A stage's outline: taper, skirt, nozzle (2026-10-01)
+
+Built at the user's direction after §19g–h. Four hardware fields on a
+stage, all zero for a plain cylinder: `forward_taper_length_m`,
+`aft_skirt_length_m`, `aft_skirt_diameter_m`, `nozzle_protrusion_m` (owners
+in `field_registry.py`; in the stage editor; not in the spreadsheet form,
+like the fin fields). `spent_stage_aero.planform_centroid_offset` finds
+where the side-on area is centred and the centre of pressure is moved aft
+by that much; equivalently the moment is taken about a CG moved forward by
+it. The forward taper was not in the request: the SRB's offset comes
+mostly from its nose cone (the taper alone gives 2.4% of 2.7%), so the
+benchmark could not be run without it.
+
+The wind-tunnel model's drawing (DMS-DR-2111 Fig. 2) gives the outline;
+its area centroid comes out at 52.7% (Bacchus et al.: about 53%).
+
+SRB benchmark again, CG from Thrusty's own estimate, 170,000 lb:
+
+| | Published | Plain cylinder | With the outline |
+|---|---|---|---|
+| Trim off tail-first, Mach 1.5 / 2.86 | about 31° at Mach 2 (data, §19g) | 28° / 14° | 75° / 20° |
+| Peak dynamic pressure, trimmed end | 1,600–1,700 psf | 3,150 psf | 2,600 psf |
+| Peak dynamic pressure, end over end | | 680 psf | 720 psf |
+
+The normal force is scaled by the outline's side-on area, so the tumbling
+drag changes a little too.
+
+The outline moves the trimmed end a third of the way to the published
+value and no further. At Mach 3 the SRB's centre of pressure stays near
+0.58–0.60 of the length from 130° to 160°, where the shifted cylinder's
+has already fallen to 0.53–0.55: the flared skirt, leading, holds the
+centre of pressure aft more strongly than its share of the side-on area
+says. So the planform-centroid rule is a first-order correction, in the
+right direction, and the test pins only that (the published fall lies
+between the two ends; the outline moves the trimmed end toward it).
+Closing the rest needs the SRB tables digitised as a dataset of their own.
+
+**Ascent.** The aft skirt now also adds flare wave drag on the way up
+(`_transition_wave_drag`, the same cone-pressure primitive as conical
+stages and interstages); the taper and the nozzle add none. What leaving a
+skirt out costs: a 15° flare to 1.35 times the body diameter (the SRB's
+proportions) adds 0.14–0.24 to the drag coefficient above Mach 1, about as
+much as the whole body and nose; on a first stage that is 0.5–4% of range
+for the shipped ballistic vehicles (Generic ICBM −0.5%, AUR −1.9%,
+Shahab-3 −4.1% on its shipped lofted plan). A 10° flare to 1.15 times is
+0.2–0.7%. No shipped vehicle has a skirt entered.
+
 **Phase 4 — later.** A flight-plan option to drop the fins.
 
 ## 19a. Phase 1 as built (2026-09-30)

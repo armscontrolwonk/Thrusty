@@ -2179,3 +2179,38 @@ in-repo Suzuki data; what was missing was one with tight provenance.)
 Bonus datum: the paper's 4,032 K coupled peak wall temperature is consistent
 with (slightly above) our CP `peak_K` 3,900 — the catalog value reads as
 mildly conservative against a validated flight reconstruction.
+
+
+## Spent stages: the Shuttle solid rocket booster (2026-10-01)
+
+The first comparison of a spent stage's fall with a published profile.
+Test: `test_spent_stage_aero.py::test_the_shuttle_srb_falls_between_the_trimmed_and_tumbling_ends`.
+Design notes: `FRONT_END_DESIGN.md` Part IV §19g–i.
+
+**Inputs.** Separation 154,000 ft, 4,330 fps, 124 s (Moore et al. 2012,
+Fig. 10); 149.16 ft by 12.17 ft (same); 170,000 lb (Bacchus, Kross & Moog
+1985); peak vacuum thrust 3.31×10⁶ lbf for the nozzle share (McDonald
+1985); outline from the 0.563% wind-tunnel model (Johnson & Braddock 1974,
+Fig. 2). The flight-path angle at separation, 30.8°, is derived: it is the
+value that gives the published apogee.
+
+| | Published | Thrusty |
+|---|---|---|
+| Apogee | 230,000 ft at 194 s (Moore); 220,000 ft at 196 s (McDonald 1985 Fig. 19) | 233,000 ft, 72 s after separation |
+| Tumble rate at apogee | 16°/s (McDonald) | 3–13°/s from the air alone; the SRB also fired separation motors |
+| Peak dynamic pressure on the way down | 1,600 psf at 43,000 ft (Moore); 1,700 psf at 42,000 ft (McDonald) | trimmed end 2,600 psf at 38,000 ft; end-over-end end 720 psf at 63,000 ft |
+| Angle of attack at peak dynamic pressure | 170° (McDonald); 120–188° band (Ventres & Dowell 1977) | trim 105–160° over Mach 1.5–2.86 |
+| At 15,700 ft, before parachutes | 540 fps, 218 s after separation (Moore) | trimmed 330 fps at 230 s; end over end 460 fps at 240 s |
+| Range | 130–141 nmi from the pad | 110–112 nmi from the separation point |
+
+**What it shows.** The published fall lies between the trimmed and
+tumbling ends, which is what the band claims. Flown at the angle the SRB's
+own wind-tunnel data gives (31° off tail-first), with the cylinder's
+forces, peak dynamic pressure is 1,440–1,640 psf and the time to 15,700 ft
+215–218 s: the forces are sound and the trim angle is the open quantity.
+The stage outline (§19i) moves the trimmed end from 3,150 to 2,600 psf.
+Range cannot be judged: the separation point's distance from the pad is
+not in the sources read.
+
+**Not modelled.** Parachutes (below 15,700 ft), separation motors, the
+swing toward broadside below Mach 1.5.
