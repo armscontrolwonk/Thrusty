@@ -404,3 +404,32 @@ In both cases the glider flies the whole length of G and keeps going. The
 booster's 280 s is therefore kept (decision), and where the glider comes
 down inside G is left to the glider: its heat limit, its aerodynamics and
 its terminal manoeuvre, none of which are settled.
+
+## 13. Failure cases and the boxes (2026-10-02)
+
+User: safety zones include the areas where failures might fall. If the
+second stage separates and does not ignite, does it fall in a box?
+
+At first-stage burnout the candidate is 29.4 km up at 1,804 m/s, climbing
+at 29°. The unlit upper stack (second stage fuelled, fairing and glider:
+2,482 kg, 5.06 m) flown from there:
+
+| Case | Lands | Box |
+|---|---|---|
+| Second stage does not light; stack tumbling end over end | 273 km | **B** |
+| … tumbling randomly | 254 km | **B** |
+| … held nose-first | 376 km | none (61 km beyond B) |
+| Glider does not glide after a normal boost | 2,432 km | none (36 km beyond E) |
+
+Box B (173–315 km) is where an unlit upper stack falls if it tumbles, and
+a fuelled stage behind a light fairing would not stay nose-first. So box B
+has two possible explanations, and the warning cannot tell them apart: a
+second-stage ignition failure, or a fairing released at about 50 km (§11).
+The failure reading needs no change to the plan, and leaves the fairing's
+release time unsourced, as it was.
+
+A glider that fails to glide falls just past the far edge of box E, so E
+may cover that case as well as the spent second stage.
+
+Boxes D and F, to the north, are still unexplained. No failure along a 101°
+azimuth reaches them.
