@@ -40,6 +40,49 @@ First step: an inventory of what the tab shows today, line by line, marked
 as "answers question 1", "answers question 2", or "supporting detail".
 No code yet.
 
+**Inventory, 2026-10-02**, from the user's screenshots of the AUR / C-HGB
+run (C-HGB here is the user's own copy in `~/Documents/Thrusty/ro_library`:
+nose `carbon_ablator`, body `uhtc` 0.30 m thick; the shipped file has the
+reverse, nose `uhtc` and body `carbon_phenolic`).
+
+What the tab shows, in order: a flux and heat-load plot (nose only); a green
+headline "WITHIN EXPERIENCE — glide · banking"; a paragraph on the nose's
+heat load; a context paragraph on the material lineage; a "Survival map"
+(nose, body skin, windward flank against three columns); "Full analysis":
+object, mode, entry state, TPS; "Heating budget"; "Per-location margins";
+"Judgement" (repeats the first paragraph, then the record, recession, a
+recession depth band, an ablator note); "Windward-flank heating"; "Maneuver-
+load anchors" (g loads); the "TPS-class ladder"; "Method".
+
+Against the two questions:
+
+| | Q1 surface | Q2 interior | Detail | Problem |
+|---|---|---|---|---|
+| Headline "within experience" | answers | | | **Contradicts the map**: the windward flank is 2,266 K against a 1,923 K limit, amber, and the text says the body "runs beyond its soak limit on the windward side" |
+| Nose row: "no burn-through", 74% of Reentry-F | answers | | | Judged on heat load; the ladder below says this glide "needs a reusable non-ablating class" — a second contradiction |
+| Body skin: "1,744 K of 2,700 K", "0 s of 300 s" | answers | | | Same material as the windward row with a different limit (2,700 peak vs 1,923 continuous); "0 s of 300 s" means nothing to a reader |
+| Windward flank: "2,266 K of 1,923 K" | answers | | | The real finding, shown in amber under a green headline |
+| Wing / leading edge | | | | **No row.** C-HGB has no wing, but the screen does not say so |
+| Interior soak | | | | **Not answered anywhere.** The method note says bondline conduction is computed only where the body TPS "has a cited conductivity"; UHTC has none, so it is skipped silently |
+| Nose paragraph, repeated in "Judgement" | | | yes | Said twice |
+| Context, record, recession, δ band, ablator note | | | yes | |
+| Windward-flank section, laminar regime, AoA uncertainty | | | yes | |
+| Maneuver-load anchors (g) | | | | Not about temperature |
+| TPS-class ladder | | | yes | Its verdict disagrees with the headline |
+| Body "uhtc 30.0 cm" | | | | 30 cm of UHTC is not a plausible input; nothing flags it |
+| Flux / load plot | | | yes | Nose only |
+
+Proposed shape: four rows at the top, each with a state (holds /
+marginal / beyond what has flown / not computed, with the reason), the one
+number against its limit, the limit's source and the accuracy — nose,
+leading edge or wing (or "none on this object"), windward surface, interior
+after the soak. The headline is the worst row, never better. Everything
+else moves below, collapsed, without repetition; the g-load anchors move
+out of this tab. The rows should come from the per-location modules
+(`heating_by_location`), which is the open wiring item, and the interior
+row from the existing one-dimensional conduction estimate, with "not
+computed: no conductivity for <material>" shown when it cannot run.
+
 ### 10. Models to validate with our own data — OPEN LIST (2026-10-01)
 
 Each of these is a published relation, or an inference from one, that
