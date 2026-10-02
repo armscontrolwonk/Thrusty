@@ -8,7 +8,7 @@ Reference flight for the "flown" columns: launch 33°N 44°E, azimuth 60°, the 
 
 | Vehicle | Stages | Source | Notes | Ascent drag actually flown | Audit-view flags | Masses add up |
 |---|---|---|---|---|---|---|
-| AUR | 2 | **none** | 973 | nose model (cone) 100% | 0 schematic, 0 3-D | NO: -22 kg |
+| AUR | 2 | **none** | 1212 | nose model (cone) 100% | 0 schematic, 0 3-D | yes |
 | Al Hussein | 1 | **none** | 667 | nose model (cone) 100% | 1 schematic, 2 3-D | yes |
 | Generic ICBM | 2 | **none** | **none** | table stored in the file 100% | 1 schematic, 2 3-D | NO: -20000 kg |
 | Minotaur-IV + HTV-2 | 3 | **none** | **none** | nose model (cone) 56%; built-in Forden table 44% | 2 schematic, 3 3-D | yes |
@@ -24,9 +24,9 @@ Reference flight for the "flown" columns: launch 33°N 44°E, azimuth 60°, the 
 
 ## Booster: AUR
 
-File `AUR.booster.json`. source: **none**; notes: 973 characters.
+File `AUR.booster.json`. source: **none**; notes: 1212 characters.
 
-**Stage 1** (AUR): mass_initial 6991, mass_propellant 4509, mass_final 454, diameter_m 0.8763, length_m 5, burn_time_s 54, isp_s 280
+**Stage 1** (AUR): mass_initial 7013.5, mass_propellant 4509, mass_final 454, diameter_m 0.8763, length_m 5, burn_time_s 54, isp_s 280
 
 | Stored value (not the default) | |
 |---|---|
