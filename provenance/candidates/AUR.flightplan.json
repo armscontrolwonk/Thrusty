@@ -1,0 +1,34 @@
+{
+  "guidance": "pitch_program",
+  "burnout_angle_deg": 25.0,
+  "loft_angle_rate_deg_s": 3.0,
+  "launch_elevation_deg": 80.0,
+  "shroud_jettison_alt_km": 0.0,
+  "booster_jettison_s": 0.0,
+  "stages": [
+    {
+      "stage_turn_start_s": 0.0,
+      "stage_turn_stop_s": 40.0,
+      "stage_burnout_angle_deg": 25.0,
+      "coast_time_s": 0.0,
+      "stage_cutoff_s": null,
+      "stage_yaw_start_s": null,
+      "stage_yaw_stop_s": null,
+      "stage_yaw_final_az_deg": null,
+      "grid_fin_deploy_schedule": []
+    },
+    {
+      "stage_turn_start_s": 48.7,
+      "stage_turn_stop_s": 114.7,
+      "stage_burnout_angle_deg": -5.0,
+      "coast_time_s": 0.0,
+      "stage_cutoff_s": null,
+      "stage_yaw_start_s": null,
+      "stage_yaw_stop_s": null,
+      "stage_yaw_final_az_deg": null,
+      "grid_fin_deploy_schedule": []
+    }
+  ],
+  "reentry_object": "C-HGB",
+  "source": "The user's fitted plan of 28 Sep 2026 (his scenario 20260928_140208_AUR: Cape Canaveral SLC-46, azimuth 101 deg, 80 deg launch, stage 1 turn 0-40 s to 25 deg, stage 2 turn from ignition for 66 s to -5 deg, a yaw to 108 deg at 70-80 s not entered here), fitted to NAVAREA IV 221/23 (March 2023); it gave a 160 km apogee. Timings were fitted to the OLD stage-1 burn of 54 s and must be re-fitted to this candidate's thrust and burn time."
+}

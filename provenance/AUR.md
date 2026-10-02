@@ -1,4 +1,4 @@
-# AUR: provenance sheet (draft 2, 2026-10-02)
+# AUR: provenance sheet (draft 3, 2026-10-02)
 
 The first re-admission sheet under `LIBRARY_RESET_PLAN.md`. It lists every
 value stored for AUR, where it came from, and what is still open.
@@ -174,3 +174,80 @@ No `source`, no `notes`.
   published. The gate as first written ("every value has a source")
   should probably read "every value has a stated basis", with the kind
   shown. That is the user's call.
+
+## 7. Decisions of 2026-10-02 and the candidate files
+
+The user decided: cap the all-up mass at 7,400 kg and take the excess from
+the stages; the measured thrust is a sea-level figure; the grain is
+strongly regressive (double anchor); match the video, allowing that the
+visible burn includes some tail-off; the launch angle is 80°; the fairing
+is 2.7 m long.
+
+The current `booster_library/AUR.booster.json` is left as it is: under the
+reset plan it becomes a test stand-in and its numbers must not move. The
+re-admission candidate is built beside this sheet:
+
+- `provenance/candidates/AUR.booster.json`
+- `provenance/candidates/AUR.flightplan.json`
+
+| | Stand-in (current file) | Candidate | Basis |
+|---|---|---|---|
+| Fairing | 2.67 m, 22.5 kg | 2.7 m, 22.7 kg | user; Akin's relation on the new area |
+| Stage 1 propellant / burnout | 4,509 / 454 kg | 4,467.9 / 449.9 kg | scaled by 0.99089 so the stack with the 450 kg object is 7,400.0 kg; dry fraction and 7:3 split kept |
+| Stage 2 propellant / burnout | 1,842 / 186 kg | 1,825.2 / 184.3 kg | same |
+| Stack launch mass | 7,013.5 kg | 6,950.0 kg | |
+| Stage 1 peak thrust (vacuum) | 290 kN | 335.9 kN | 290 kN at sea level averaged over 2–7 s, plus ambient pressure × nozzle exit area (30.4 kN), on the double-anchor curve |
+| Stage 1 burn time | 54 s | 48.7 s | follows from 280 s and the propellant once the thrust is fixed; the visible ~55 s then includes about 6 s of tail-off |
+| Launch elevation | 90° | 80° | user |
+| Pitch plan | one turn, 0–21.7 s to 25° | 0–40 s to 25°; from second-stage ignition for 66 s to −5° | the user's own fitted scenario of 28 Sep 2026 (Cape Canaveral, azimuth 101°), which reproduced NAVAREA IV 221/23 with the old numbers |
+
+## 8. The talk notes of 29 Sep 2026 and what they change
+
+The user also supplied speaker notes for a talk (29 Sep 2026), newer than
+the draft paper. They agree with it on diameter, length, mass and payload,
+and differ on four things:
+
+1. **The thrust.** The talk gives "on the order of 50,000 lbf, a bit over
+   2 g off the pad", tracked against the SLC-46 lightning towers (two 183
+   ft towers) for scale. 50,000 lbf is 222 kN. The draft paper gives
+   "about 300 kN" over 2–7 s, scaled from the missile's own length, and the
+   user gave 290 kN in conversation. These cannot all be the same
+   measurement. What each implies, at 280 s and this propellant, on the
+   double-anchor curve:
+
+   | Sea-level thrust, 2–7 s | Vacuum peak | Burn time | Off the pad |
+   |---|---|---|---|
+   | 222 kN (talk) | 262 kN | 62.5 s | 2.2 g |
+   | 250 kN | 292 kN | 56.0 s | 2.6 g |
+   | 290 kN (candidate) | 336 kN | 48.7 s | 3.2 g |
+   | 300 kN (draft paper) | 347 kN | 47.1 s | 3.4 g |
+
+   The talk's 222 kN matches its own "a bit over 2 g", but then the motor
+   would have to burn 62 s, longer than the 55 s seen, unless the specific
+   impulse is nearer 250 s or the curve falls further than a double
+   anchor's. About 250 kN would make thrust, burn time and 280 s agree
+   with no tail-off at all. The candidate uses 290 kN as instructed.
+2. **Component lengths**, measured from a launch photograph calibrated by
+   the published diameter and length: first stage about 4.95 m, second
+   stage about 2.36 m, fairing about 2.67 m. The files have 5.0, 2.6 and
+   (now) 2.7 m. The second stage differs by 0.24 m.
+3. **Burn time**: "about 55 s" for the first stage; the second stage's end
+   is "fuzzier" because of tail-off.
+4. **The trajectory.** Fitting NAVAREA IV 221/23 (March 2023, hazard boxes
+   A–G) needs an apogee of about 160 km; 120 km "can't hit the drop zones".
+   The kinetic range is "greater than 4,000 km". So the plan to admit is
+   the 160 km fit, and the warning itself (its text and coordinates) is the
+   benchmark. The user's event log of 28 Sep 2026 with the old numbers:
+   apogee 160 km, first stage down at 111 km, second stage at 2,142 km,
+   fairing at 2,073 km, glider at 4,238 km.
+
+Flown under that pitch plan without re-fitting, the candidate gives an
+apogee of 216 km and puts the first stage at 130 km and the second at
+2,630 km: its higher thrust and shorter burn need the plan fitted again,
+which needs the warning's box coordinates.
+
+Glider, from the talk: lift-to-drag "peaks near 2 at about 10° angle of
+attack and barely changes with Mach number" (a Chinese paper on the "AHW
+optimized configuration" at Mach 5, 10 and 20), which supports the file's
+2.0; the glider levels off "near 75,000 ft, about 23 km"; the thermal
+protection, not the booster, limits the system.
