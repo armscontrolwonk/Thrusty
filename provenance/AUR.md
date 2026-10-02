@@ -433,3 +433,38 @@ may cover that case as well as the spent second stage.
 
 Boxes D and F, to the north, are still unexplained. No failure along a 101°
 azimuth reaches them.
+
+## 14. The first stage's impact point (2026-10-02)
+
+User: the first stage should fall at about 28.187328°N, 79.191704°W. That
+is 134 km from the pad on a bearing of 102.6°, inside box C. (Where the
+point comes from is still to be recorded.)
+
+The candidate plan of §9 (22°, −4°) put the first stage at 103 km, 32 km
+short. Its spent-stage flight is the tumbling one (the air spins it up and
+it does not settle); the trimmed alternative would add only 8 km. So the
+difference is in the trajectory, not the fall: the stage has to leave
+higher and faster.
+
+Re-fitted, the two burnout angles and the launch azimuth:
+
+| Stage angles | Azimuth | Apogee | First stage | Miss | Second stage | Fairing |
+|---|---|---|---|---|---|---|
+| 22°, −4° (§9) | 101° | 160 km | 103 km | 32 km | 2,316 km, box E | 2,186 km, box E |
+| 25°, −5° (28 Sep plan) | 101° | 185 km | 123 km | 12 km | 2,465 km, outside | 2,377 km, outside |
+| 26.5°, −9° | 101° | 171 km | 135 km | 3.1 km | 2,314 km, box E | 2,224 km, box E |
+| **26.5°, −9°** (candidate) | **102.5°** | **171 km** | **135 km** | **0.5 km** | **2,316 km, box E** | **2,226 km, box E** |
+
+- The first stage's range is set almost entirely by the first-stage
+  burnout angle (26.5° for 134 km); the second-stage angle then has to come
+  down to −9° to keep the second stage inside box E.
+- An azimuth of 102.5° instead of 101° puts the stage on the point
+  laterally. Boxes A, C and B bear 102–103° from the pad, which agrees.
+- The apogee rises to about 171 km. Burnout speed 5.18 km/s.
+- Launch azimuth is a setting of the run, not of the flight plan file; it
+  is recorded in the plan's `source`.
+
+If the point is an observation (a recovery position, or the centre of a
+smaller hazard area), this is the first spent-stage impact Thrusty has
+been fitted to, and it constrains the first stage's flight to a few
+kilometres.

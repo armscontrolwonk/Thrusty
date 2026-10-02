@@ -1,6 +1,6 @@
 {
   "guidance": "pitch_program",
-  "burnout_angle_deg": 22.0,
+  "burnout_angle_deg": 26.5,
   "loft_angle_rate_deg_s": 3.0,
   "launch_elevation_deg": 80.0,
   "shroud_jettison_alt_km": 0.0,
@@ -9,7 +9,7 @@
     {
       "stage_turn_start_s": 0.0,
       "stage_turn_stop_s": 40.0,
-      "stage_burnout_angle_deg": 22.0,
+      "stage_burnout_angle_deg": 26.5,
       "coast_time_s": 0.0,
       "stage_cutoff_s": null,
       "stage_yaw_start_s": null,
@@ -20,7 +20,7 @@
     {
       "stage_turn_start_s": 54.0,
       "stage_turn_stop_s": 120.0,
-      "stage_burnout_angle_deg": -4.0,
+      "stage_burnout_angle_deg": -9.0,
       "coast_time_s": 0.0,
       "stage_cutoff_s": null,
       "stage_yaw_start_s": 70.0,
@@ -30,5 +30,5 @@
     }
   ],
   "reentry_object": "C-HGB",
-  "source": "Fitted 2026-10-02 to the navigational-warning boxes (provenance/AUR_warning_boxes.json) from Cape Canaveral SLC-46 at azimuth 101 deg: 80 deg launch (stated to the Secretary of Defense), the turn timings and the yaw to 108 deg at 70-80 s from the user's scenario of 28 Sep 2026, the two burnout angles (22 and -4 deg) chosen so the first stage falls in box C and the second stage and fairing in box E. Apogee 160 km. Any pair giving an apogee of about 139-163 km does the same."
+  "source": "Fitted 2026-10-02 from Cape Canaveral SLC-46 at azimuth 102.5 deg: 80 deg launch (stated to the Secretary of Defense); turn timings and the yaw to 108 deg at 70-80 s from the user's scenario of 28 Sep 2026; burnout angles 26.5 and -9 deg chosen so the first stage falls on the point the user gave (28.187328 N, 79.191704 W, 134 km out; its source is to be recorded) and the second stage and fairing in box E of the navigational warning (provenance/AUR_warning_boxes.json). Apogee 171 km."
 }
