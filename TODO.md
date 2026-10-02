@@ -83,6 +83,25 @@ out of this tab. The rows should come from the per-location modules
 row from the existing one-dimensional conduction estimate, with "not
 computed: no conductivity for <material>" shown when it cannot run.
 
+**Decisions, 2026-10-02 (user).** A row in amber makes the headline amber:
+the headline is the worst row. The interior limit is a user-entered number
+on the reentry object, with a default. Surface verdicts use the materials
+the user enters for each location (nose, wing or leading edge, windward
+surface, TPS), not anything assumed by the code.
+
+**The default interior limit: checked.** The user suggested 80 °C from
+Hayabusa. No primary source for 80 °C was found: the Hayabusa capsule
+post-flight paper (Yamada, Inatani & Ishii, Trans. JSASS 10, ists28,
+Te_11-14, 2012) gives the onboard instruments' lower limit (above -20 °C),
+a pre-entry maximum of 5 °C set for a propellant reason, and about 400 °C at
+the aft heat shield, but no interior upper limit; JAXA's mission pages and
+the capsule maker's page give none either. The one figure found is for
+Hayabusa2, and it is a measurement, not a limit: "The temperature monitor
+attached to the sample container indicated that the container was never
+heated over 65°C" (JAXA ASRG, Guidebook for proposers, 4th Announcement of
+Opportunity for Hayabusa2 samples, July 2023, updated October 2023, p. 3).
+The default is the user's choice.
+
 ### 10. Models to validate with our own data — OPEN LIST (2026-10-01)
 
 Each of these is a published relation, or an inference from one, that
