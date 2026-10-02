@@ -633,10 +633,12 @@ def _worst(cells):
 
 
 def _row(place, tier=None, value="", limit="", basis="", reason="",
-         verdict=None):
+         verdict=None, short=None):
     """One answer.  tier None = not computed (reason says why) or, with
-    verdict given, a neutral statement such as 'none on this object'."""
+    verdict given, a neutral statement such as 'none on this object'.
+    short is the row's name in the headline (default: the first word)."""
     return dict(place=place, tier=tier,
+                short=short or place.split(' ')[0].lower(),
                 verdict=(verdict or (_VERDICT_TEXT[tier] if tier
                                      else "not computed")),
                 value=value, limit=limit, basis=basis, reason=reason)
@@ -788,52 +790,146 @@ def _edge_answer(fom, prof):
     return worst
 
 
+def _stack(arc, prof):
+    """The conduction screen through the body's outer layer and whatever
+    the object lists behind it (heating.layered_conduction), on the
+    acreage flux; cached on the arc for the inputs it used.  None when the
+    outer layer is not entered; else the result dict (evaluated or not)."""
+    mat = prof.get('body_material')
+    thick = float(prof.get('body_thickness_m', 0.0) or 0.0)
+    t = np.asarray(arc.get('t', []), float)
+    if not mat or thick <= 0.0 or t.size < 2:
+        return None
+    layers = [(str(mat), thick)] + [
+        (str(e['material']), float(e['thickness_m']))
+        for e in (prof.get('interior_layers') or [])]
+    key = (tuple(layers), float(prof.get('emissivity', 0.85) or 0.85),
+           float(prof.get('nose_radius_m', 0.0) or 0.0),
+           float(prof.get('diameter_m', 0.0) or 0.0))
+    cache = arc.setdefault('_stack_cache', {})
+    if key not in cache:
+        q, _, _ = heating.acreage_flux(
+            t, arc['rho'], arc['V'], arc['alt'],
+            nose_radius_m=key[2], body_radius_m=key[3] / 2.0)
+        cache[key] = heating.layered_conduction(t, q, layers,
+                                                emissivity=key[1])
+    return cache[key]
+
+
+def _crossing(t, T_K, limit_C):
+    over = np.nonzero(np.asarray(T_K) >= limit_C + 273.15)[0]
+    return float(np.asarray(t)[over[0]]) if over.size else None
+
+
+def _back_face_answer(arc, prof):
+    """The back of the body's outer layer after the soak, judged against
+    what sits there.  Behind a heat shield (an ablator or tile over a
+    separate structure) that is the bondline: the structure limit entered
+    for the object, else the bondline design limit.  A hot structure or a
+    metal skin IS the structure, so its back face is judged against the
+    material's own continuous limit.  With layers entered behind it, the
+    face is the joint with the first of them.  Neither is the payload: see
+    _interior_answer."""
+    mat = prof.get('body_material')
+    m = heating.TPS_MATERIALS.get(str(mat or ""))
+    hot = heating.is_hot_structure(mat)
+    place = ("Back of the hot structure" if hot
+             else "Bondline (heat shield to structure)")
+    short = "back face" if hot else "bondline"
+    if not mat:
+        return _row(place, reason="no body heat-shield material entered",
+                    short=short)
+    thick = float(prof.get('body_thickness_m', 0.0) or 0.0)
+    if thick <= 0.0:
+        return _row(place, reason="no body heat-shield thickness entered",
+                    short=short)
+    if hot:
+        limit = float((m or {}).get('continuous_K') or 0.0) - 273.15
+        lim_txt = f"{limit:,.0f} °C ({_label(mat)} continuous limit)"
+    elif float(prof.get('structure_limit_K', 0.0) or 0.0) > 0.0:
+        limit = float(prof['structure_limit_K']) - 273.15
+        lim_txt = f"{limit:,.0f} °C (structure limit entered for this object)"
+    else:
+        limit = float(heating.BONDLINE_LIMIT_C)
+        lim_txt = (f"{limit:,.0f} °C (bondline design limit, Dec & Braun, "
+                   f"NTRS 20060004824)")
+    res = _stack(arc, prof)
+    if res is None:
+        return _row(place, limit=lim_txt,
+                    reason="no reentry arc to evaluate over", short=short)
+    if not res.get('evaluated'):
+        why = res.get('reason', '')
+        if 'conductivity' in why:
+            why = (f"no cited conductivity for "
+                   f"{_label(res.get('material') or mat)} in the catalog")
+        return _row(place, limit=lim_txt, reason=why, short=short)
+    face = res['T_faces'][1]
+    crossed = _crossing(arc['t'], face, limit) is not None
+    inner = len(prof.get('interior_layers') or []) > 0
+    return _row(place,
+                'beyond' if crossed else 'experience',
+                f"{float(face.max()) - 273.15:,.0f} °C behind "
+                f"{thick * 100:.1f} cm of {_label(mat)}",
+                lim_txt,
+                basis=("one-dimensional conduction through the body layer "
+                       + ("and the layers entered behind it, in perfect "
+                          "contact, with an insulated innermost face"
+                          if inner else "with an insulated inner face")
+                       + " (Dec & Braun), to impact: an upper bound for "
+                         "that face"),
+                short=short)
+
+
 def _interior_answer(arc, prof):
+    """The payload, judged against the object's interior limit, at the
+    innermost face of the layers entered behind the body's outer layer.
+    Not computed when none are entered: the back of the outer layer is not
+    the inside (Hayabusa2's sample-container plate rose about 2 °C while
+    the shield's back face reached about 84 °C, Yamada & Yoshihara 2023
+    Fig. 19)."""
     limit = float(prof.get('interior_limit_C', 80.0) or 80.0)
     lim_src = ("Hayabusa sample container, Yada et al. 2014"
                if abs(limit - 80.0) < 1e-9 else "entered for this object")
     lim_txt = f"{limit:,.0f} °C ({lim_src})"
-    mat = prof.get('body_material')
-    if not mat:
-        return _row("Interior after the soak", limit=lim_txt,
-                    reason="no body heat-shield material entered")
-    thick = float(prof.get('body_thickness_m', 0.0) or 0.0)
-    if thick <= 0.0:
-        return _row("Interior after the soak", limit=lim_txt,
-                    reason="no body heat-shield thickness entered")
-    t = np.asarray(arc.get('t', []), float)
-    if t.size < 2:
-        return _row("Interior after the soak", limit=lim_txt,
-                    reason="no reentry arc to evaluate over")
-    q, _, _ = heating.acreage_flux(
-        t, arc['rho'], arc['V'], arc['alt'],
-        nose_radius_m=float(prof.get('nose_radius_m', 0.0) or 0.0),
-        body_radius_m=float(prof.get('diameter_m', 0.0) or 0.0) / 2.0)
-    bl = heating.bondline_screen(t, q, material=str(mat), thickness_m=thick,
-                                 emissivity=prof.get('emissivity', 0.85),
-                                 limit_C=limit)
-    if not bl.get('evaluated'):
-        why = bl.get('reason', '')
-        if 'conductivity' in why:
-            why = f"no cited conductivity for {_label(mat)} in the catalog"
-        return _row("Interior after the soak", limit=lim_txt, reason=why)
-    return _row("Interior after the soak",
-                'beyond' if bl['crossed'] else 'experience',
-                f"{bl['T_bond_peak_C']:,.0f} °C behind "
-                f"{thick * 100:.1f} cm of {_label(mat)}",
+    layers = prof.get('interior_layers') or []
+    if not layers:
+        return _row("Interior (payload)", limit=lim_txt,
+                    reason="nothing entered between the shell and the payload",
+                    short="interior")
+    res = _stack(arc, prof)
+    if res is None:
+        return _row("Interior (payload)", limit=lim_txt,
+                    reason="the body layer's material or thickness is not "
+                           "entered", short="interior")
+    if not res.get('evaluated'):
+        return _row("Interior (payload)", limit=lim_txt,
+                    reason=res.get('reason', ''), short="interior")
+    face = res['T_faces'][-1]
+    crossed = _crossing(arc['t'], face, limit) is not None
+    last = layers[-1]
+    return _row("Interior (payload)",
+                'beyond' if crossed else 'experience',
+                f"{float(face.max()) - 273.15:,.0f} °C at the inner face of "
+                f"{float(last['thickness_m']) * 100:.1f} cm of "
+                f"{_label(last['material'])}",
                 lim_txt,
-                basis="one-dimensional conduction through the body layer "
-                      "with an insulated inner face (Dec & Braun), to "
-                      "impact: an upper bound for the inside")
+                basis=(f"one-dimensional conduction through the body layer "
+                       f"and {len(layers)} layer"
+                       f"{'s' if len(layers) > 1 else ''} behind it, in "
+                       f"perfect contact, the innermost face insulated and "
+                       f"no payload mass, to impact: an upper bound. "
+                       f"Accuracy not yet established; the Hayabusa2 flight "
+                       f"record is the test case being set up"),
+                short="interior")
 
 
 def answers(result) -> list:
-    """The four answers: nose, wing or leading edge, windward surface,
-    interior after the soak.  Each row is a dict with place, tier (None =
+    """The answers: nose, wing or leading edge, windward surface, the back
+    of the body's outer layer, and the interior (payload).  Each row is a dict with place, tier (None =
     not computed or not applicable), verdict, value, limit, basis and
     reason.  Presentation over numbers already computed, except the
-    interior row, which runs the existing one-dimensional conduction screen
-    against the object's own interior limit."""
+    back-face row, which runs the existing one-dimensional conduction
+    screen against the limit of whatever sits behind the layer."""
     fom = result.get('heating_fom') or {}
     arc = result.get('heating_arc') or {}
     prof = arc.get('profile') or {}
@@ -851,6 +947,7 @@ def answers(result) -> list:
     return [_nose_answer(nose, coverage, prof),
             _edge_answer(fom, prof),
             _windward_answer(fom, body_loc, prof),
+            _back_face_answer(arc, prof),
             _interior_answer(arc, prof)]
 
 
@@ -1208,36 +1305,6 @@ def build_report(result) -> dict:
         # AoA at 10 g and never saw this block).
         _not_thermal = _maneuver_context(prof.get('pullup_g_max', 0.0))
 
-    # ---- Interior (bondline) screen — all forms -----------------------------
-    # The "does the inside survive" axis: 1-D conduction through the body TPS
-    # to the structure bondline (heating.bondline_screen).  Crossing the design
-    # limit is BEYOND DESIGN ENVELOPE (yellow) — a sizing criterion, not a
-    # demonstrated-death bound — so it escalates survive→beyond, never to fail.
-    _bl = (fom or {}).get('bondline')
-    # Shown in the detail only when the user entered the layer's thickness;
-    # the interior answer (answers()) is what the headline and lead use.
-    if not float(prof.get('body_thickness_m', 0.0) or 0.0) > 0.0:
-        _bl = None
-    if _bl and _bl.get('evaluated'):
-        j.append("─── Bondline (structure behind the layer) ──────────────────")
-        _bmat = heating.TPS_MATERIALS.get(str(prof.get('body_material') or ""))
-        _blabel = (_bmat.get('label') if _bmat else None) or prof.get('body_material') or "body TPS"
-        if _bl['crossed']:
-            j.append(f"  Bondline reaches {_bl['T_bond_peak_C']:,.0f} °C behind "
-                     f"the {_blabel} layer ({_bl['thickness_m']*100:.1f} cm) — "
-                     f"past the {_bl['limit_C']:.0f} °C structure limit at "
-                     f"t≈{_bl['t_cross_s']:,.0f} s. The skin may hold, but the "
-                     f"structure behind it cooks: BEYOND DESIGN ENVELOPE.")
-            j.append("  Fix: thicker TPS, a lower-load trajectory, or an "
-                     "insulating sub-layer.")
-        else:
-            j.append(f"  Bondline peaks {_bl['T_bond_peak_C']:,.0f} °C behind "
-                     f"the {_blabel} layer ({_bl['thickness_m']*100:.1f} cm) — "
-                     f"within the {_bl['limit_C']:.0f} °C structure limit "
-                     f"({_bl['margin']:.0%} of it).")
-        for w in _bl.get('warnings', []):
-            j.append(f"  {w}")
-
     # ---- NRC ladder (gliders) + method line ---------------------------------
     tail = []
     # Not about temperature: the maneuver-load context, kept at the end.
@@ -1287,9 +1354,9 @@ def build_report(result) -> dict:
     # by its own trigger (descriptors()), never a Form letter standing in for
     # behaviour the plan may not carry.
     headline = f"{tier_label}   —   {' · '.join(descriptors(result))}"
-    _bad = [a['place'].split(' ')[0].lower() for a in _answers
+    _bad = [a['short'] for a in _answers
             if a['tier'] in ('beyond', 'fail')]
-    _unk = [a['place'].split(' ')[0].lower() for a in _answers
+    _unk = [a['short'] for a in _answers
             if a['tier'] is None and a['verdict'] == 'not computed']
     if _bad:
         headline += "   ·   " + " and ".join(_bad) + " past limit"
@@ -1393,16 +1460,18 @@ def build_report(result) -> dict:
         else:
             because.append(f"Nose and body both hold the full {dur:,.0f}-s "
                            f"glide within the demonstrated record.")
-    # Interior-survivability sentence in the LEAD when the bondline is the (or
-    # a) reason for a 'beyond' verdict — the skin can survive while the
-    # structure behind it cooks, which a nose/skin verdict alone would miss.
-    _int = next((a for a in answers(result)
-                 if a['place'].startswith('Interior')), None)
-    if _int and _int['tier'] in ('beyond', 'fail'):
+    # The back of the body layer in the LEAD when it is past its limit: the
+    # skin can hold while the structure behind it cooks, which a nose/skin
+    # verdict alone would miss.  Said of the structure, not the payload.
+    _bf = next((a for a in answers(result)
+                if a['short'] in ('bondline', 'back face')), None)
+    if _bf and _bf['tier'] in ('beyond', 'fail'):
+        _where = ("the bondline" if _bf['short'] == 'bondline'
+                  else "the back of the hot structure")
         because.append(
-            f"The heat also reaches the inside: {_int['value']}, past the "
-            f"{_int['limit']} limit — the skin may hold, but the interior "
-            f"does not.")
+            f"The heat also reaches {_where}: {_bf['value']}, past the "
+            f"{_bf['limit']} limit — the skin may hold, but the structure "
+            f"behind it does not.")
         if not fix:
             fix = "thicker body TPS, a lower-load trajectory, or an insulating sub-layer"
     lead += ["", " ".join(because)]

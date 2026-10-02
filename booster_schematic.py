@@ -184,6 +184,108 @@ def _lifting_body_shape(ax, x0, y0, depth, length, color, edge):
     ax.add_patch(Polygon(pts, closed=True, fc=color, ec=edge, lw=1.3, zorder=3))
 
 
+# Wall layers in a cross-section, by the catalog's material group.
+LAYER_FILL = {"ablative": "#8b5a2b", "insulative": "#efe2a8",
+              "metal": "#a7adb4", "hot_structure": "#4b4f57"}
+LAYER_FILL_OTHER = "#c9b8d9"
+INTERIOR_FILL = "white"
+
+
+def _closed(profile, x0, y0, sgn=+1):
+    """A half-section profile [(r, z)...] as a polygon closed along the
+    axis, placed at (x0, y0) on the right (sgn +1) or left (-1) side."""
+    return [(x0 + sgn * r, y0 + z) for r, z in profile]
+
+
+def _ro_sectioned(ax, sec, x0, y0, color, edge):
+    """The object from ro_section: the left half its outside, the right half
+    cut open to show each wall layer, outside in, and the space inside.
+    With no layers entered, both halves are the outside."""
+    prof = sec["outline"]
+    left = _closed(prof, x0, y0, -1)
+    if not sec["layers"]:
+        right = _closed(prof, x0, y0, +1)
+        pts = left + list(reversed(right))
+        ax.add_patch(Polygon(pts, closed=True, fc=color, ec=edge, lw=1.3,
+                             zorder=3))
+        return
+    ax.add_patch(Polygon(left, closed=True, fc=color, ec=edge, lw=1.3,
+                         zorder=3))
+    for lay in sec["layers"]:
+        ax.add_patch(Polygon(_closed(lay["outer"], x0, y0), closed=True,
+                             fc=LAYER_FILL.get(lay["group"], LAYER_FILL_OTHER),
+                             ec=edge, lw=0.6, zorder=3))
+    if sec["interior"] is not None:
+        ax.add_patch(Polygon(_closed(sec["interior"], x0, y0), closed=True,
+                             fc=INTERIOR_FILL, ec=edge, lw=0.6, zorder=3))
+    ax.plot([x0, x0], [y0, y0 + sec["L"]], color=edge, lw=0.6, ls="-.",
+            zorder=4)
+
+
+def section_caption(sec):
+    """One line per wall layer, outside in, for a caption or legend."""
+    return [f"{lay['thickness_m'] * 100:.1f} cm {lay['label']}"
+            for lay in sec["layers"]]
+
+
+def draw_ro_section(ax, ro, title=None):
+    """The reentry object's cross-section, large: the outside on the left,
+    the wall layers and the space inside them on the right, each layer
+    labelled with its thickness and material, from ro_section (the module
+    the 3-D export reads).  Says plainly what is not entered."""
+    import ro_section
+    ax.clear()
+    ax.set_aspect("equal")
+    ax.axis("off")
+    sec = ro_section.section(ro)
+    D, L = sec["D"], sec["L"]
+    if D <= 0:
+        ax.text(0.5, 0.5, "diameter not entered", ha="center", va="center",
+                transform=ax.transAxes, color=LABEL_MUT)
+        return sec
+    if sec["form"] == "axisymmetric":
+        _ro_sectioned(ax, sec, 0.0, 0.0, NOSE, BODY_E)
+    elif sec["form"] == "wedge":
+        _lifting_body_shape(ax, 0.0, 0.0, D, L, NOSE, BODY_E)
+    else:
+        _lifting_body_shape(ax, 0.0, 0.0, D / 2.0, L, NOSE, BODY_E)
+    R = D / 2.0
+    total = sum(lay["thickness_m"] for lay in sec["layers"])
+    x_bar = R * 1.35
+    w_bar = 0.12 * max(D, L)
+    if total > 0:
+        # The wall, magnified: every layer to scale against the others, the
+        # outer face at the top, with the magnification stated.
+        H = 0.75 * L
+        mag = H / total
+        y = 0.9 * L
+        for lay in sec["layers"]:
+            h = lay["thickness_m"] * mag
+            ax.add_patch(Rectangle((x_bar, y - h), w_bar, h,
+                                   fc=LAYER_FILL.get(lay["group"],
+                                                     LAYER_FILL_OTHER),
+                                   ec=BODY_E, lw=0.6, zorder=3))
+            ax.text(x_bar + w_bar * 1.15, y - h / 2.0,
+                    f"{lay['thickness_m'] * 100:.1f} cm {lay['label']}",
+                    fontsize=8, color=LABEL_MUT, va="center")
+            y -= h
+        ax.text(x_bar, 0.9 * L + 0.03 * L, f"wall, outside at top (×{mag:.0f})",
+                fontsize=7.5, color=LABEL_MUT, va="bottom")
+        ax.text(x_bar + w_bar * 1.15, y - 0.04 * L, "inside", fontsize=8,
+                color=LABEL_MUT, va="top")
+    notes = []
+    if not sec["layers"] and sec["form"] == "axisymmetric":
+        notes.append("no wall layers entered (body layer thickness 0)")
+    notes += sec["flags"]
+    lines = [title or (getattr(ro, "name", "") or "reentry object"),
+             f"⌀{D:g} × {L:g} m"] + notes
+    ax.text(-R, -0.08 * L, "\n".join(lines), fontsize=8, color=LABEL_MUT,
+            va="top", ha="left")
+    ax.set_xlim(-R * 1.1, x_bar + w_bar + 0.75 * max(D, L))
+    ax.set_ylim(-0.08 * L - 0.12 * L * (len(lines)), L * 1.05)
+    return sec
+
+
 def _draw_reentry_object(ax, ro, view_right, yl, veh_right=0.0):
     """Draw the reentry object to scale in the lower-RIGHT corner, base on the
     y = 0 ground line, from its own stored geometry, with its text to the right.
@@ -277,20 +379,16 @@ def _draw_reentry_object(ax, ro, view_right, yl, veh_right=0.0):
     # a clear margin right of the stack even if the label then runs tight.
     x0 = max(x0, veh_right + 0.4 + wing_ext + R_view)
 
+    import ro_section
+    sec = ro_section.section(ro)
     if lifting:
         _lifting_body_shape(ax, x0, 0.0, depth, L, NOSE, BODY_E)
-    elif bic is not None:
-        _biconic_shape(ax, x0, 0.0, D, L, bic[1], bic[0], rn, NOSE, BODY_E)
     else:
-        # Draw the DECLARED nose profile (Von Kármán / ogive / Haack / parabola)
-        # — the same analytic curve the 3-D export revolves — not a generic
-        # cone.  A plain cone (or unset shape) keeps _reentry_shape, which also
-        # honours the spherical nose-radius blunting.
-        _shape = (getattr(ro, "shape", "") or "").lower()
-        if _shape and _shape != "cone":
-            _nose_patch(ax, x0, 0.0, D, L, NOSE, BODY_E, _shape)
-        else:
-            _reentry_shape(ax, x0, 0.0, D, L, rn, NOSE, BODY_E)
+        # The outline and wall layers from ro_section — the module the 3-D
+        # export revolves — so the tangent sphere-cone, the biconic and each
+        # analytic nose curve are drawn as exported; the right half is cut
+        # open to show the layers when they are entered.
+        _ro_sectioned(ax, sec, x0, 0.0, NOSE, BODY_E)
 
     if planform:
         # Faithful panel: root follows the flank from the base to the root
@@ -344,6 +442,10 @@ def _draw_reentry_object(ax, ro, view_right, yl, veh_right=0.0):
         th1 = math.degrees(math.atan2(Dbrk / 2.0, Lf))
         th2 = math.degrees(math.atan2((D - Dbrk) / 2.0, L - Lf))
         lines.append(f"biconic {th1:.1f}°/{th2:.1f}°")
+    if sec["layers"]:
+        lines.append("wall: " + " · ".join(section_caption(sec)))
+    elif ro_section.LIFTING_NOT_SECTIONED in sec["flags"]:
+        lines.append(ro_section.LIFTING_NOT_SECTIONED)
     if planform:
         lines.append(f"wings S={S_eff:.3g} m² · AR {AR_eff:.2g} (derived)")
     elif glyph:

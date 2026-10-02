@@ -36,10 +36,12 @@ def test_thin_layer_long_soak_cooks_interior():
     assert r["t_cross_s"] is not None and r["t_cross_s"] < 800.0
 
 
-def test_uncited_material_not_evaluated():
-    # Bare carbon-carbon carries no cited through-thickness k → the screen
-    # honestly declines rather than guessing.  (PICA moved off this list when
-    # TPSX id 43 supplied its measured k.)
+def test_uncited_material_not_evaluated(monkeypatch):
+    # A material with no cited through-thickness k → the screen honestly
+    # declines rather than guessing.  Every catalog entry now carries a TPSX
+    # value (test_tpsx_crosscheck.py), so the gap is made here on purpose.
+    monkeypatch.setitem(heating.TPS_MATERIALS, "carbon_carbon",
+                        {**heating.TPS_MATERIALS["carbon_carbon"], "k_W_mK": None})
     t, q = _flat(1.0, 500.0)
     r = heating.bondline_screen(t, q, material="carbon_carbon", thickness_m=0.05)
     assert r["evaluated"] is False
@@ -106,12 +108,12 @@ def _green_ballistic():
     return integrate_trajectory(p, 0.0, 0.0, 90.0, max_time_s=6000.0, dt_output=2.0)
 
 
-def test_report_interior_escalates_a_green_case_to_beyond():
+def test_report_bondline_escalates_a_green_case_to_beyond():
     # Take a genuinely WITHIN-EXPERIENCE result and give its body a thin
-    # layer with an entered thickness and a low interior limit: the report
-    # must escalate green -> yellow on the interior answer alone and say the
-    # skin holds but the inside cooks (TODO item 11: the headline is the
-    # worst answer).
+    # layer with an entered thickness and a low structure limit: the report
+    # must escalate green -> yellow on the bondline answer alone and say the
+    # skin holds but the structure behind it cooks (TODO item 11: the
+    # headline is the worst answer).
     import thresholds
     thresholds.reset(); thresholds.apply()
     r = _green_ballistic()
@@ -119,19 +121,19 @@ def test_report_interior_escalates_a_green_case_to_beyond():
 
     r["heating_arc"]["profile"].update(body_material="carbon_phenolic",
                                        body_thickness_m=0.003,
-                                       interior_limit_C=20.0)
+                                       structure_limit_K=293.15)
     rep = sr.build_report(r)
     assert rep["tier"] == "beyond"
     assert "BEYOND DESIGN ENVELOPE" in rep["headline"]
-    assert "interior past limit" in rep["headline"]
-    assert "interior does not" in rep["body"]
+    assert "bondline past limit" in rep["headline"]
+    assert "the structure behind it does not" in rep["body"]
     thresholds.reset(); thresholds.apply()
 
 
 def test_a_crossed_bondline_alone_no_longer_drives_the_headline():
     # The old screen ran on a default 2 cm layer when none was entered and
-    # judged it against a 250 deg C structure limit; the interior answer now
-    # owns the verdict, from the user's own thickness and limit.
+    # judged it against a 250 deg C structure limit; the bondline answer now
+    # owns the verdict, from the user's own thickness.
     r = _green_ballistic()
     t, q = _flat(1.0, 800.0)
     r["heating_fom"]["bondline"] = heating.bondline_screen(

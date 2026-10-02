@@ -130,7 +130,10 @@ def test_a_face_whose_flank_angle_is_not_defined_says_so():
     assert any('flank angle' in m for m in r['missing'])
 
 
-def test_a_solid_nose_without_a_catalog_conductivity_names_it():
+def test_a_solid_nose_without_a_catalog_conductivity_names_it(monkeypatch):
+    # Every catalog entry now carries a TPSX k; remove one to test the gap.
+    monkeypatch.setitem(heating.TPS_MATERIALS, 'titanium',
+                        {**heating.TPS_MATERIALS['titanium'], 'k_W_mK': None})
     r = _one(_object(nose_tps_material='titanium', heating_locations=[
         {'kind': 'nose_cap', 'construction': 'solid',
          'solid_length_m': 0.1}]))

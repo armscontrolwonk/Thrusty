@@ -21,6 +21,9 @@ Sheet layout
   Sheet 3 "Heating locations" — the object's heating_locations list, one row
                         per place, one column per key an entry may carry.
                         Absent in older workbooks, which import with none.
+  Sheet 4 "Interior layers" — the object's interior_layers list, outside in,
+                        one row per layer.  Absent in older workbooks, which
+                        import with none.
 
 Public API
 ----------
@@ -411,6 +414,63 @@ def _read_locations_sheet(wb) -> list:
     return clean_heating_locations(out)
 
 
+_LAYER_SHEET = 'Interior layers'
+_LAYER_HEAD_ROW = 3              # column headers; layers start on the row below
+_LAYER_ROWS = 8                  # blank, formatted rows offered for new layers
+
+
+def _build_layers_sheet(ws, ro) -> None:
+    """One row per layer behind the body's outer layer, outside in."""
+    import field_registry as fr
+    import heating
+    from booster_xlsx import _col_headers
+    cols = list(fr.RO_LAYER_KEYS)
+    ws.cell(row=1, column=1, value='Interior layers — what sits behind the '
+            'body layer (Body TPS material and thickness), from the outside '
+            'in: structure, insulation.  Material is a catalog key (see '
+            'Reference); thickness in metres.')
+    _col_headers(ws, _LAYER_HEAD_ROW,
+                 [(j, k) for j, k in enumerate(cols, start=1)])
+    for j, k in enumerate(cols, start=1):
+        ws.column_dimensions[ws.cell(row=1, column=j).column_letter].width = (
+            30 if k == 'source' else 18)
+    entries = list(getattr(ro, 'interior_layers', []) or [])
+    for i in range(len(entries) + _LAYER_ROWS):
+        row = _LAYER_HEAD_ROW + 1 + i
+        e = entries[i] if i < len(entries) else {}
+        _inputs(ws, row, list(range(1, len(cols) + 1)),
+                [(_ZWSP + v if isinstance(v, str) and v.startswith('=')
+                  else v) for v in (e.get(k) for k in cols)])
+        _dropdown(ws, row, cols.index('material') + 1,
+                  list(heating.TPS_MATERIALS))
+
+
+def _read_layers_sheet(wb) -> list:
+    """The interior_layers list from its sheet; [] when there is none.
+    Checked by clean_interior_layers, as in a .ro.json file."""
+    from booster_models import clean_interior_layers
+    if _LAYER_SHEET not in wb.sheetnames:
+        return []
+    ws = wb[_LAYER_SHEET]
+    heads = [str(ws.cell(row=_LAYER_HEAD_ROW, column=j).value or '').strip()
+             for j in range(1, ws.max_column + 1)]
+    out = []
+    for row in range(_LAYER_HEAD_ROW + 1, ws.max_row + 1):
+        e = {}
+        for j, k in enumerate(heads, start=1):
+            v = ws.cell(row=row, column=j).value
+            if isinstance(v, str):
+                v = v.lstrip(_ZWSP).strip()
+            if k and v is not None and v != '':
+                e[k] = v
+        if e.get('material'):
+            out.append(e)
+        elif e:
+            raise ValueError(f"{_LAYER_SHEET}, row {row}: a layer with no "
+                             f"material")
+    return clean_interior_layers(out)
+
+
 # ---------------------------------------------------------------------------
 # Reader
 # ---------------------------------------------------------------------------
@@ -505,6 +565,7 @@ def import_ro_xlsx(path: str):
         nose_tps_custom=nose_cust,
         body_tps_custom=body_cust,
         heating_locations=_read_locations_sheet(wb),
+        interior_layers=_read_layers_sheet(wb),
         source=_rstr(ws, _R['source'], _VAL_COL),
         notes=_rstr(ws, _R['notes'], _VAL_COL),
     )
@@ -522,6 +583,7 @@ def export_ro_xlsx(path: str, ro) -> None:
     _build_ro_sheet(ws, ro)
     _build_ro_reference_sheet(wb.create_sheet('Reference'))
     _build_locations_sheet(wb.create_sheet(_LOC_SHEET), ro)
+    _build_layers_sheet(wb.create_sheet(_LAYER_SHEET), ro)
     wb.save(path)
 
 

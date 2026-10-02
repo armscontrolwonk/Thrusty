@@ -227,12 +227,13 @@ def test_the_serialisers_agree_with_the_registry():
         f"or say in field_registry what they really are — this is how "
         f"ro_mass_kg, body_payload_kg and thrust_N were found to be loadout "
         f"bookkeeping and a derived value rather than hardware.")
-    # heating_locations is written only when the list is non-empty (so an
-    # object listing none saves as it did before the field existed); the
-    # probe lists one place so that the field is exercised.
+    # heating_locations and interior_layers are written only when the list
+    # is non-empty (so an object listing none saves as it did before the
+    # field existed); the probe lists one of each so the fields are exercised.
     ro = ROParams(name="x", mass_kg=1.0, beta_kg_m2=1.0, shape="cone",
                   diameter_m=0.5, length_m=1.0,
-                  heating_locations=[{'kind': 'nose_cap', 'name': 'nose'}])
+                  heating_locations=[{'kind': 'nose_cap', 'name': 'nose'}],
+                  interior_layers=[{'material': 'tabi', 'thickness_m': 0.02}])
     assert not (RO_HARDWARE - set(ro_to_dict(ro))), (
         f"ro_to_dict does not write hardware fields "
         f"{sorted(RO_HARDWARE - set(ro_to_dict(ro)))}")
@@ -240,6 +241,9 @@ def test_the_serialisers_agree_with_the_registry():
         ro.heating_locations
     ro.heating_locations = []
     assert 'heating_locations' not in ro_to_dict(ro)
+    assert ro_from_dict(ro_to_dict(ro)).interior_layers == ro.interior_layers
+    ro.interior_layers = []
+    assert 'interior_layers' not in ro_to_dict(ro)
 
 
 # ── the shipped files ───────────────────────────────────────────────────────

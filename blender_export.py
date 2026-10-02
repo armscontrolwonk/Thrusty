@@ -95,19 +95,9 @@ from stage_outline import (nose_profile as _nose_profile,   # one source: stage_
 
 
 def _sphere_cone_profile(R, L, rn):
-    """Spherically-blunted cone, base (R, 0) → dome apex: straight flank to
-    the sphere-cone tangency circle, then the true spherical cap.  Falls
-    back to the sharp cone when rn is unset or oversize."""
-    if rn <= 1e-9 or rn >= 0.9 * R or L <= rn:
-        return [(R, 0.0), (0.0, L)]
-    th = math.atan2(R, L)                        # cone half-angle
-    zc = L - rn / math.sin(th)                   # sphere centre (on axis)
-    pts = [(R, 0.0), (rn * math.cos(th), zc + rn * math.sin(th))]
-    n = 10
-    for i in range(1, n + 1):
-        t = th + (math.pi / 2 - th) * i / n
-        pts.append((rn * math.cos(t), zc + rn * math.sin(t)))
-    return pts
+    """The tangent sphere-cone (ro_section.sphere_cone_profile)."""
+    import ro_section
+    return ro_section.sphere_cone_profile(R, L, rn)
 
 
 def _f(v, default=0.0):
@@ -643,6 +633,9 @@ def _ro_elements(ro, x_off, revolves, plates, flags):
     if form not in ("wedge", "half_cone"):
         form = "axisymmetric"
     pos = (x_off, 0.0, 0.0)
+    import ro_section
+    if form != "axisymmetric" and ro_section.wall_layers(ro):
+        flags.append(ro_section.LIFTING_NOT_SECTIONED)
 
     if form == "wedge":
         span = _f(getattr(ro, "body_span_m", 0.0))
@@ -660,27 +653,34 @@ def _ro_elements(ro, x_off, revolves, plates, flags):
                         pos, "half"))
         return
 
+    # The outline and the wall layers from ro_section, the module the
+    # schematic and the cross-section draw from: what is drawn is exported.
+    sec = ro_section.section(ro)
+    profile = sec["outline"]
+    flags.extend(f for f in sec["flags"] if f not in flags)
     bic = None
     if getattr(ro, "biconic", False):
         Lf = _f(getattr(ro, "fore_length_m", 0.0))
         Dbrk = _f(getattr(ro, "break_diameter_m", 0.0))
         if 0 < Lf < L and 0 < Dbrk < D:
             bic = (Lf, Dbrk)
-    shape = str(getattr(ro, "shape", "") or "cone").lower()
-    if bic is not None:
-        Lf, Dbrk = bic
-        La, R1 = L - Lf, Dbrk / 2.0
-        fore = _sphere_cone_profile(R1, Lf, min(rn, 0.9 * R1))
-        profile = ([(0.0, 0.0), (R, 0.0), (R1, La)]
-                   + [(r, La + zz) for r, zz in fore[1:]])
-    elif "cone" in shape and "blunt" not in shape:
-        profile = [(0.0, 0.0)] + _sphere_cone_profile(R, L, rn)
+    if not sec["layers"]:
+        revolves.append(("RO_Body", profile, pos, "full"))
     else:
-        if rn > 0:
-            flags.append(f"RO nose radius not blended into '{shape}' "
-                         "profile (drawn per the analytic shape)")
-        profile = [(0.0, 0.0)] + _nose_profile(shape, R, L)
-    revolves.append(("RO_Body", profile, pos, "full"))
+        # One closed shell per layer, outside in; RO_Body is the outer
+        # layer, so its outer surface is the object's.  RO_Interior is the
+        # space left inside, a separate solid so it can be shown or hidden.
+        for k, lay in enumerate(sec["layers"]):
+            name = ("RO_Body" if k == 0 else
+                    f"RO_Layer_{k + 1}_{lay['material']}")
+            revolves.append((name, ro_section.band(lay["outer"],
+                                                   lay["inner"]),
+                             pos, "full"))
+        flags.append("RO wall: " + " · ".join(
+            f"{lay['thickness_m'] * 100:.1f} cm {lay['label']}"
+            for lay in sec["layers"]))
+        if sec["interior"] is not None:
+            revolves.append(("RO_Interior", sec["interior"], pos, "full"))
 
     # faithful wing panels only from a stored planform (same rule as 2-D)
     w_rc = _f(getattr(ro, "wing_root_chord_m", 0.0))

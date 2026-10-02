@@ -240,7 +240,16 @@ RO_FIELD_OWNER = {
     # The places on the airframe where heating is judged, as a list of
     # entries.  The entries' own keys are declared in RO_LOCATION_KEYS below.
     'heating_locations':               HARDWARE,
+    # What sits behind the body's outer layer, outside in, as a list of
+    # entries; their keys are RO_LAYER_KEYS below.
+    'interior_layers':                 HARDWARE,
 }
+
+# ── the entries of an object's `interior_layers` list ───────────────────────
+# One layer each: a catalog material (its conductivity must be cited, so no
+# bespoke material), a thickness, and where the number came from.  The outer
+# layer is not listed here: it is body_tps_material at body_tps_thickness_m.
+RO_LAYER_KEYS = ('material', 'thickness_m', 'source')
 
 # ── the entries of an object's `heating_locations` list ─────────────────────
 # Each entry names ONE place on the airframe.  Nothing is stored twice, so an

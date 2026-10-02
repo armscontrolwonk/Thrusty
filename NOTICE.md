@@ -47,6 +47,8 @@ The gazetteer and terrain files are derived products; `gazetteer_build.py` and
 | `benchmarks/form_a/*.csv`, `benchmarks/verification/*.csv`, `benchmarks/swerve/*.csv` | Numeric values digitised from figures in published papers and NASA/NACA technical reports (Sutton & Graves 1971; the REENTRY-F, Stardust and Hayabusa flight reports; Finke, IDA P-2395; the SWERVE corridor). Full citations in `METHODS.md` §16 and `HEATING_TPS_REFERENCES.md` | Extracted data points, cited to their sources. Government reports are public domain; the digitised values from journal articles are factual data, reproduced for verification |
 | `benchmarks/form_a/*.png`, `benchmarks/verification/*.png` | Figure scans from the NASA/NACA and IDA reports above, kept beside their digitisations | U.S. Government works, public domain |
 | `validation/datcom/` | Input and output of USAF Digital DATCOM | Public domain (U.S. Government work) |
+| `benchmarks/verification/hayabusa2_remm_fig19.csv` | Temperatures read from Fig. 19 of Yamada & Yoshihara, *Post-Flight Analysis of Recovered Components of Hayabusa2 Sample Return Capsule*, J. Evolving Space Activities 1 (2023) 16 | The article is CC BY-NC-ND 4.0. Only measured values read from the figure are kept (factual data, cited); the figure itself is not reproduced |
+| `data/tpsx/property/`, `data/tpsx/curves.json` | NASA Ames TPSX property pages (each material's values against temperature and pressure), archived and parsed by `tpsx_curves.py` | NASA work, as for `data/tpsx/` above |
 
 ## Artwork (not third-party, but separately reserved)
 

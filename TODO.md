@@ -132,6 +132,81 @@ was designed to be preserved under 80 °C within the reentry capsule".
 - The nose paragraph is no longer repeated; the g-load anchors move to a
   "Not thermal" section at the end.
 
+**Conductivities, 2026-10-02.** The interior row could not run for most
+hot structures because the catalog had no conductivity for them. The
+TPSX archive in `data/tpsx/` had the values all along. Every material now
+carries one, through the thickness where TPSX gives a direction, pinned to
+the archive in `test_tpsx_crosscheck.py`: UHTC 98.7 W/m·K (id 28,
+ZrB2/SiC, MANLABS, measured 100–2000 °C; HfB2/SiC id 30 is 79.1; Squire &
+Marschall 2010 Table 1 give 130 → 71 W/m·K from 295 to 2000 K for an HfB2
+composite), RCC 3.89 (id 24), C/SiC 4.01 (id 26), LI-900 0.0476 (id 1),
+aluminium 177 (id 60), Ti-6Al-4V 6.92 (id 261), 304 stainless 14.9 (id 57),
+ablative and bare C/C 110 (id 36). Judgement calls, open for the user:
+- *C/C hot structure (HTV-2)* takes ACC (id 25, 3.63, 2-D woven), the
+  closest woven C/C in TPSX. It is not a measured aeroshell value; id 36
+  is 110, so the interior answer for this material is uncertain by more
+  than an order of magnitude.
+- TPSX values are near room temperature. LI-900's k rises several-fold
+  when hot (this runs cool), and the metals' and carbons' k change too. A
+  temperature-dependent k would be a change to the one-dimensional screen.
+- The screen does not melt a metal: a thin aluminium skin can read far past
+  its melt point. The verdict is still "beyond its limit".
+
+**Step 1 built, 2026-10-02: the back face and the payload are two rows.**
+The interior row had judged the back face of the body's outer layer against
+the 80 °C payload limit. For a heat shield that face is the bondline, not the
+inside (Hayabusa's container held 80 °C while its aft shield ran near
+400 °C); for a hot structure or a metal skin there is no bondline at all, and
+once those materials had conductivities every hot structure read amber
+against the payload limit. Now:
+- *Bondline (heat shield to structure)*, or *Back of the hot structure*: the
+  same one-dimensional screen, judged against the structure limit entered for
+  the object (new editor field, °C; stored as `structure_limit_K`, already
+  hardware) or, if none, the 250 °C bondline design limit (Dec & Braun); a
+  hot structure or metal against its own continuous limit.
+- *Interior (payload)*: "not computed: nothing entered between the shell and
+  the payload", with the object's interior limit shown. The headline says so
+  on every run until step 2 exists.
+- The duplicate bondline block in the detail (the old 2 cm default) is gone.
+
+**Step 2 built, 2026-10-02: the wall stack** (METHODS §13.18).
+- `interior_layers` on the object (hardware, `field_registry.RO_LAYER_KEYS`):
+  material and thickness, outside in, behind the body layer; in the object
+  editor as a table, in the spreadsheet as its own sheet (the sheet is
+  untested here: no Python on this machine has openpyxl).
+- `heating.layered_conduction`: one-dimensional stack, perfect contact,
+  innermost face insulated, no payload mass: an upper bound.  Conductivity
+  and specific heat from TPSX tables against temperature (user, 2026-10-02:
+  "use the curves"), archived under `data/tpsx/property/` by
+  `tpsx_curves.py`; the highest tabulated pressure for porous insulators;
+  held at the table's end outside it, and said.  `bondline_screen` is now
+  its one-layer case.  Four insulators added from TPSX: AFRSI, TABI, Nomex
+  felt, silica aerogel.
+- Report: the bondline row reads the joint behind the body layer; the
+  interior row the innermost face against the interior limit, with "accuracy
+  not yet established".
+- `ro_section.py`: the one outline and the layer offsets.  The schematic's
+  corner object is now drawn from it (this also fixed a mismatch: the
+  schematic drew a blunted cone's cap untangent to the flank while the
+  export revolved the true tangent sphere-cone); the object editor shows a
+  live cross-section with the wall magnified and labelled; the 3-D export
+  has one shell per layer and `RO_Interior`.  Lifting bodies are not
+  sectioned, said in both.
+
+**Step 3, next (user, 2026-10-02: "payload mass next").** A lumped payload
+behind the innermost face: its mass and material, and the routes to it from
+the wall: radiation across the gap (emissivities), conduction through the
+gas in the gap (the pressure from the trajectory; the gap is not a vacuum
+low in the descent, when the soak arrives), and conduction through mounts
+(material, cross-section, length, count).  Then the soak after landing until
+recovery, and a heat-shield jettison time (plan data, by the four-inputs
+rule).  Hayabusa2 (Yamada & Yoshihara 2023, Fig. 19, digitised) is the test
+case: the shield's back face, the titanium plate behind it and the
+instrument plate, to heat-shield release; it needs the capsule's entry
+state and mass and its shield material's properties (MISSING_DOCS 23).
+Sources for the gap and mounts still to be read: Yamada et al. 2003 (ISAS
+heat-shield design report), Covington 2004 (NTRS 20070014634).
+
 **Still open:** the nose and windward rows still come from the screening
 correlations (Sutton-Graves and the windward amplification), not the
 per-location Tauber relations; the per-material accuracy statement is a

@@ -4536,17 +4536,23 @@ inward conduction).  The one non-conservative omission — no recession thinning
 of the layer — is flagged when the body TPS thickness is unset (screened at a
 2 cm default).
 
-Honesty gate: the screen evaluates **only for an ablative body with a cited
-through-thickness conductivity** — carbon phenolic (char k ≈ 1.5 W/m·K, Cabrera
-& West 2026 Table A4 / Sutton) and silica phenolic (virgin k ≈ 0.35 W/m·K,
-Handbook of Materials Science via Finke; char k uncited, so near-limit margins
-are flagged soft).  PICA, SIRCA, and the metals/hot-structures return
-"bondline not evaluated" rather than a guessed number — the same discipline as
-the ablator load records.  Method + conservatism validation: Dec & Braun
-reproduce CMA within ~11% in-depth (BENCHMARKING "Method-stack validation");
-`test_bondline.py` pins the four physical regimes (thick/short safe,
-thin/long cooks, steady-state bound, uncited-declines) and the report
-escalation.
+Honesty gate: the screen evaluates only for a material with a cited
+through-thickness conductivity.  Since 2026-10-02 every catalog material
+has one (TPSX values, pinned in `test_tpsx_crosscheck.py`), and where TPSX
+tabulates conductivity and specific heat against temperature the screen
+follows the table (§13.18).  A material without a cited value still returns
+"not evaluated" rather than a guessed number.  Method + conservatism
+validation: Dec & Braun reproduce CMA within ~11% in-depth (BENCHMARKING
+"Method-stack validation"); `test_bondline.py` pins the four physical
+regimes (thick/short safe, thin/long cooks, steady-state bound,
+uncited-declines) and the report escalation.
+
+In the report (TODO item 11) the back face of this layer is its own row:
+**Bondline** for a layer over a separate structure, judged against the
+structure limit entered for the object or else `BONDLINE_LIMIT_C`; **Back of
+the hot structure** for a metal or hot structure, which has no bondline,
+judged against the material's own continuous limit.  Neither is the payload
+(§13.18).
 
 ### 13.11 Boundary-layer transition gate (`heating.transition_factor`)
 
@@ -5171,6 +5177,61 @@ evaluated from the catalog; conduction in a solid leading edge is not
 modelled.
 
 ---
+
+
+### 13.18 The wall stack and the interior (`heating.layered_conduction`, `ro_section.py`)
+
+The question "is the inside cooked by a long, hot soak?" is answered at the
+innermost face of the wall, not at the back of the heat shield.  Hayabusa2
+shows why the two differ: its forebody shield's back face reached about
+84 °C by heat-shield release while the instrument plate standing for the
+sample container rose about 2 °C (Yamada & Yoshihara 2023, Fig. 19;
+`benchmarks/verification/hayabusa2_remm_fig19.csv`).
+
+*Inputs.*  The wall is the body's outer layer (`body_tps_material` at
+`body_tps_thickness_m`) followed by `interior_layers`, from the outside in:
+each a catalog material and a thickness.  A layer's material must be in the
+catalog, because its conductivity must be cited.
+
+*Method.*  One-dimensional transient conduction through the stack (finite
+volumes, implicit in temperature, properties taken at the start of each
+substep), with the same radiating outer face as §13.10 and the innermost
+face insulated.  Layers touch perfectly (no contact resistance).  Both
+assumptions put the inside on the hot side, so the result is an upper
+bound; the Hayabusa2 design analysis made the same insulated-back-face
+assumption, "which should have resulted in higher temperature estimation
+than the actual" (Yamada & Yoshihara 2023, §4.4).  There is no payload
+mass yet: the heat that reaches the innermost face stays there.
+
+*Properties.*  Conductivity and specific heat follow the TPSX tables
+(`data/tpsx/curves.json`, built by `tpsx_curves.py` from the archived
+property pages) where the catalog names one (`heating.TPSX_CURVES`), and are
+held at the table's end value outside it; the result says when a layer ran
+past its table.  Porous insulators are tabulated against gas pressure too;
+the highest tabulated pressure is used, the most conductive.  Materials
+without a table use their single cited value: carbon phenolic keeps its
+char conductivity (the Narmco 4028 table is virgin material to 675 K),
+and the carbon-carbon ablative entry and PICA have no table in TPSX.
+Density is constant.
+
+*Report.*  The interior row reads the innermost face against the object's
+interior limit (`interior_limit_C`); with no layers entered it is "not
+computed".  Its accuracy is not yet established: Hayabusa2 is the test case
+being set up, which also needs the capsule's entry state and its shield
+material's properties (MISSING_DOCS 23).
+
+*Geometry.*  `ro_section.py` is the one outline of the object and of its
+wall: each layer is the region between two inward offsets of the wall, with
+the thickness measured normal to it, ending at the base plane.  The
+schematic's corner drawing, the object editor's cross-section and the 3-D
+export (one closed shell per layer, `RO_Body` outermost, then
+`RO_Layer_k_<material>`, then `RO_Interior`) all read it.  The lifting forms
+are not sectioned, and both the drawing and the export say so.
+
+*Not modelled (next step).*  The payload's own heat capacity and the routes
+from the wall to it: radiation across a gap, conduction through the gas in
+the gap, and conduction through mounts; and the soak after landing until
+recovery.
 
 ## 14. Outputs, events, and milestones
 

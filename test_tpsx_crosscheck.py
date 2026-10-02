@@ -65,3 +65,32 @@ def test_c_sic_limits_match_tpsx_id26():
     m = heating.TPS_MATERIALS["c_sic"]
     assert m["continuous_K"] == _tpsx(26, "Multiple Use Temperature Limit") == 1920.0
     assert m["peak_K"] == _tpsx(26, "Single Use Temperature Limit") == 1980.0
+
+
+# Conductivities for the interior-after-the-soak row (TODO item 11): each
+# catalog material's k is the TPSX entry named in its k_source, through the
+# thickness where TPSX gives a direction.
+_K_FROM_TPSX = {
+    "aluminum": (60, "Thermal Conductivity (Isotropic)"),
+    "titanium": (261, "Thermal Conductivity (Isotropic)"),
+    "steel": (57, "Thermal Conductivity (Isotropic)"),
+    "rcc": (24, "Thermal Conductivity (Thru-the-Thickness)"),
+    "c_sic": (26, "Thermal Conductivity (Thru-the-Thickness)"),
+    "cc_hot_structure": (25, "Thermal Conductivity (Isotropic)"),
+    "uhtc": (28, "Thermal Conductivity (Isotropic)"),
+    "silica_tile": (1, "Thermal Conductivity (Thru-the-Thickness)"),
+    "carbon_ablator": (36, "Thermal Conductivity (Isotropic)"),
+    "carbon_carbon": (36, "Thermal Conductivity (Isotropic)"),
+}
+
+
+def test_every_catalog_material_has_a_cited_conductivity():
+    for key, m in heating.TPS_MATERIALS.items():
+        assert m.get("k_W_mK", 0) > 0 and m.get("k_source"), key
+
+
+def test_wired_conductivities_match_their_tpsx_entries():
+    for key, (mid, prop) in _K_FROM_TPSX.items():
+        m = heating.TPS_MATERIALS[key]
+        assert m["k_W_mK"] == _tpsx(mid, prop), key
+        assert f"TPSX id {mid}," in m["k_source"], key

@@ -4422,12 +4422,65 @@ class ROEditorDialog(tk.Toplevel):
         ttk.Label(_il_in, text=" °C  the hottest the inside may get "
                                "(80 = Hayabusa sample container)").pack(side=tk.LEFT)
 
+        ttk.Label(tps_frm, text="Structure limit:").grid(
+            row=7, column=0, sticky=tk.W, padx=(0, 8), pady=2)
+        _sl = (f"{ro.structure_limit_K - 273.15:g}"
+               if (ro and ro.structure_limit_K > 0) else "0")
+        self._struct_lim_var = tk.StringVar(value=_sl)
+        _sl_in = ttk.Frame(tps_frm); _sl_in.grid(row=7, column=1, sticky=tk.W, pady=2)
+        ttk.Entry(_sl_in, textvariable=self._struct_lim_var, width=10).pack(side=tk.LEFT)
+        ttk.Label(_sl_in, text=" °C  behind the heat shield (0 = not entered: "
+                               "the 250 °C bondline design limit)").pack(side=tk.LEFT)
+
         self._nose_mat_cb.bind("<<ComboboxSelected>>",
                                lambda _e: self._update_custom_state("nose"))
         self._body_mat_cb.bind("<<ComboboxSelected>>",
                                lambda _e: self._update_custom_state("body"))
         self._update_custom_state("nose")
         self._update_custom_state("body")
+
+        # ── Layers behind the body layer, outside in (interior_layers) ──────
+        _lay_box = ttk.LabelFrame(
+            right, text="Layers behind the body layer (outside in)",
+            padding=(8, 2, 8, 6))
+        _lay_box.pack(fill=tk.X, pady=(8, 0))
+        self._layer_frm = ttk.Frame(_lay_box)
+        self._layer_frm.pack(fill=tk.X)
+        _lh = ttk.Frame(self._layer_frm)
+        _lh.pack(fill=tk.X)
+        for _txt, _w in (("Material", 34), ("Thickness (m)", 12),
+                         ("Source", 16)):
+            ttk.Label(_lh, text=_txt, width=_w,
+                      foreground="gray40").pack(side=tk.LEFT)
+        self._layer_rows = []
+        for _e in (getattr(ro, 'interior_layers', None) or []) if ro else []:
+            self._add_layer_row(_e)
+        ttk.Button(_lay_box, text="Add layer",
+                   command=lambda: self._add_layer_row({})).pack(
+            anchor=tk.W, pady=(4, 0))
+        ttk.Label(_lay_box, foreground="gray40", wraplength=420,
+                  justify=tk.LEFT,
+                  text="Structure, insulation: what sits between the body "
+                       "layer and the inside.  The innermost face is judged "
+                       "against the interior limit.").pack(anchor=tk.W)
+
+        # ── Cross-section: drawn from the same outline the 3-D export uses ──
+        _sec_box = ttk.LabelFrame(cols, text="Cross-section",
+                                  padding=(6, 4, 6, 6))
+        _sec_box.grid(row=0, column=2, sticky="nw", padx=(18, 0))
+        self._sec_fig = Figure(figsize=(4.4, 3.6), dpi=90)
+        self._sec_ax = self._sec_fig.add_subplot(111)
+        self._sec_fig.subplots_adjust(left=0.01, right=0.99, top=0.99,
+                                      bottom=0.01)
+        self._sec_canvas = FigureCanvasTkAgg(self._sec_fig, master=_sec_box)
+        self._sec_canvas.get_tk_widget().pack()
+        ttk.Button(_sec_box, text="Redraw",
+                   command=self._redraw_section).pack(anchor=tk.E)
+        for _v in (self._dia_var, self._len_var, self._nose_var,
+                   self._body_thick_var, self._body_mat_var,
+                   self._shape_var):
+            _v.trace_add("write", lambda *_a: self._schedule_section())
+        self.after_idle(self._redraw_section)
 
         # ── Provenance — where these numbers came from / how firm they are ──
         _prov_box = ttk.LabelFrame(right, text="Provenance", padding=(8, 2, 8, 6))
@@ -5297,12 +5350,18 @@ class ROEditorDialog(tk.Toplevel):
             emiss = float(self._emiss_var.get())
             body_thick = float(self._body_thick_var.get())
             int_lim = float(self._int_lim_var.get())
+            struct_lim_C = float(self._struct_lim_var.get())
         except ValueError:
             messagebox.showerror(
                 "Invalid input",
-                "Emissivity, body layer thickness and interior limit must be "
-                "numbers.",
+                "Emissivity, body layer thickness, interior limit and "
+                "structure limit must be numbers.",
                 parent=self)
+            return None
+        try:
+            interior_layers = self._layers_from_rows()
+        except ValueError as exc:
+            messagebox.showerror("Invalid layer", str(exc), parent=self)
             return None
 
         # A body's mass, diameter and length are the booster's: the fields
@@ -5343,6 +5402,8 @@ class ROEditorDialog(tk.Toplevel):
             body_tps_material=body_key,
             body_tps_thickness_m=body_thick,
             interior_limit_C=int_lim,
+            structure_limit_K=(struct_lim_C + 273.15 if struct_lim_C > 0 else 0.0),
+            interior_layers=interior_layers,
             nose_tps_custom=nose_custom,
             body_tps_custom=body_custom,
             source=self._source_var.get().strip(),
@@ -5365,8 +5426,7 @@ class ROEditorDialog(tk.Toplevel):
             # unchanged, or a save would erase it from the file.
             _carry['heating_locations'] = [
                 dict(e) for e in self._orig_ro.heating_locations]
-            for _k in ('structure_material', 'structure_limit_K',
-                       'tps_material'):
+            for _k in ('structure_material', 'tps_material'):
                 _carry[_k] = getattr(self._orig_ro, _k)
             ro_new = _dc.replace(ro_new, **_carry)
         return ro_new
@@ -5656,6 +5716,88 @@ class ROEditorDialog(tk.Toplevel):
                     "planform and S / AR derive; without one, type S / AR "
                     "directly (flagged tab).  Pull-up g-limit and re-entry "
                     "βₛ are in the Reentry Plan editor."))
+
+    # ---- interior layers table + cross-section ---------------------------
+    def _add_layer_row(self, e):
+        """One row of the layers table: material, thickness, source, remove."""
+        row = ttk.Frame(self._layer_frm)
+        row.pack(fill=tk.X, pady=1)
+        choices = [d for d in self._mat_choices
+                   if d not in (self._MAT_NONE_LABEL, self._MAT_CUSTOM_LABEL)]
+        mat = tk.StringVar(value=self._display_for_key(e.get('material', ''))
+                           if e.get('material') else "")
+        th = tk.StringVar(value=(f"{float(e['thickness_m']):g}"
+                                 if e.get('thickness_m') else ""))
+        src = tk.StringVar(value=str(e.get('source', '') or ''))
+        ttk.Combobox(row, textvariable=mat, values=choices, state="readonly",
+                     width=32).pack(side=tk.LEFT)
+        ttk.Entry(row, textvariable=th, width=11).pack(side=tk.LEFT, padx=4)
+        ttk.Entry(row, textvariable=src, width=16).pack(side=tk.LEFT)
+        entry = (row, mat, th, src)
+
+        def _remove():
+            row.destroy()
+            self._layer_rows.remove(entry)
+            self._schedule_section()
+        ttk.Button(row, text="✕", width=2, command=_remove).pack(
+            side=tk.LEFT, padx=(4, 0))
+        for v in (mat, th):
+            v.trace_add("write", lambda *_a: self._schedule_section())
+        self._layer_rows.append(entry)
+        if hasattr(self, '_sec_ax'):
+            self._schedule_section()
+
+    def _layers_from_rows(self, strict=True):
+        """interior_layers from the table.  strict: checked by
+        clean_interior_layers (raises ValueError); else rows that are not
+        yet complete are skipped (for the live drawing)."""
+        out = []
+        for _row, mat, th, src in self._layer_rows:
+            e = {'material': self._mat_map.get(mat.get(), ""),
+                 'thickness_m': th.get().strip()}
+            if src.get().strip():
+                e['source'] = src.get().strip()
+            if not strict:
+                try:
+                    out += mm.clean_interior_layers([e])
+                except ValueError:
+                    pass
+                continue
+            if e['material'] or e['thickness_m']:
+                out.append(e)
+        return mm.clean_interior_layers(out) if strict else out
+
+    def _schedule_section(self):
+        if getattr(self, '_sec_pending', None):
+            self.after_cancel(self._sec_pending)
+        self._sec_pending = self.after(250, self._redraw_section)
+
+    def _redraw_section(self):
+        """Redraw the cross-section from the live fields (drawing only: the
+        outline and layers come from ro_section, as for the 3-D export)."""
+        self._sec_pending = None
+        if not hasattr(self, '_sec_ax'):
+            return
+        import booster_schematic as bsch
+        try:
+            pr = self._preview_ro()
+            pr.body_form = self._body_form_key()
+            pr.body_tps_material = self._mat_map.get(
+                self._body_mat_var.get(), "")
+            try:
+                pr.body_tps_thickness_m = float(self._body_thick_var.get())
+            except ValueError:
+                pr.body_tps_thickness_m = 0.0
+            pr.interior_layers = self._layers_from_rows(strict=False)
+            name = self._name_var.get() if hasattr(self, '_name_var') else ""
+            bsch.draw_ro_section(self._sec_ax, pr, title=name or None)
+        except Exception as exc:                      # never break the dialog
+            self._sec_ax.clear()
+            self._sec_ax.axis("off")
+            self._sec_ax.text(0.5, 0.5, f"cannot draw: {exc}", ha="center",
+                              va="center", transform=self._sec_ax.transAxes,
+                              fontsize=8)
+        self._sec_canvas.draw_idle()
 
     def _preview_ro(self):
         """A lightweight ROParams from the LIVE editor fields (no validation

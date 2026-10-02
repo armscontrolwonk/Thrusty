@@ -69,21 +69,33 @@ NOTHING_SURVIVES_K = 4000.0       # T_eq above all usable materials → the
 TPS_MATERIALS = {
     # --- structural metals (heat-sink / bare hot structure) ---
     "aluminum":        dict(peak_K=775,  continuous_K=450,  melt_K=775,  c_J_kgK=900,  label="Aluminum",
-                            group="metal", is_ablator=False, density_kg_m3=2700, H_eff_MJ_kg=None, oxidation_dwell_s=None),
+                            group="metal", is_ablator=False, density_kg_m3=2700, H_eff_MJ_kg=None, oxidation_dwell_s=None,
+                            k_W_mK=177.0,
+                            k_source="TPSX id 60, Al 2024-T6: 177 W/m·K isotropic, room temperature"),
     "titanium":        dict(peak_K=1900, continuous_K=870,  melt_K=1900, c_J_kgK=520,  label="Titanium",
-                            group="metal", is_ablator=False, density_kg_m3=4500, H_eff_MJ_kg=None, oxidation_dwell_s=None),
+                            group="metal", is_ablator=False, density_kg_m3=4500, H_eff_MJ_kg=None, oxidation_dwell_s=None,
+                            k_W_mK=6.92,
+                            k_source="TPSX id 261, Ti-6Al-4V: 6.92 W/m·K isotropic, room temperature (rises with temperature)"),
     "steel":           dict(peak_K=1700, continuous_K=1100, melt_K=1700, c_J_kgK=500,  label="Steel",
-                            group="metal", is_ablator=False, density_kg_m3=7800, H_eff_MJ_kg=None, oxidation_dwell_s=None),
+                            group="metal", is_ablator=False, density_kg_m3=7800, H_eff_MJ_kg=None, oxidation_dwell_s=None,
+                            k_W_mK=14.9,
+                            k_source="TPSX id 57, AISI 304 stainless: 14.9 W/m·K isotropic, room temperature (rises with temperature)"),
     # --- non-ablating hot structures (the material IS the structure) ---
     "rcc":             dict(peak_K=1922, continuous_K=1811, melt_K=None, c_J_kgK=1200, label="Coated carbon-carbon (RCC)",
-                            group="hot_structure", is_ablator=False, density_kg_m3=1600, H_eff_MJ_kg=None, oxidation_dwell_s=None),
+                            group="hot_structure", is_ablator=False, density_kg_m3=1600, H_eff_MJ_kg=None, oxidation_dwell_s=None,
+                            k_W_mK=3.89,
+                            k_source="TPSX id 24, RCC (19-ply, coated): 3.89 W/m·K through the thickness (6.07 in-plane), room temperature"),
     # C/SiC limits per TPSX id 26: multiple-use 1920 K (continuous), single-
     # use 1980 K (peak) — replaces the flat screening 1970/1970 estimate with
     # NASA's own database values (crawl archived in data/tpsx/).
     "c_sic":           dict(peak_K=1980, continuous_K=1920, melt_K=None, c_J_kgK=1200, label="C/SiC (coated CMC)",
-                            group="hot_structure", is_ablator=False, density_kg_m3=2000, H_eff_MJ_kg=None, oxidation_dwell_s=None),
+                            group="hot_structure", is_ablator=False, density_kg_m3=2000, H_eff_MJ_kg=None, oxidation_dwell_s=None,
+                            k_W_mK=4.01,
+                            k_source="TPSX id 26, 2-D C/SiC: 4.01 W/m·K through the thickness (11.7 in-plane), room temperature"),
     "cc_hot_structure":dict(peak_K=2170, continuous_K=2170, melt_K=None, c_J_kgK=1200, label="C/C hot structure (HTV-2)",
-                            group="hot_structure", is_ablator=False, density_kg_m3=1800, H_eff_MJ_kg=None, oxidation_dwell_s=None),
+                            group="hot_structure", is_ablator=False, density_kg_m3=1800, H_eff_MJ_kg=None, oxidation_dwell_s=None,
+                            k_W_mK=3.63,
+                            k_source="TPSX id 25, ACC (2-D woven PAN carbon-carbon): 3.63 W/m·K, room temperature — the closest woven C/C in TPSX, not a measured HTV-2 aeroshell value; the ablative C/C entry (id 36) is 110 W/m·K, so the interior answer for this material is uncertain by more than an order of magnitude"),
     # uhtc: retuned per SURVIVABILITY_REPORT_DESIGN.md §11.4 (was continuous_K 1900, dwell 120 s
     # hard line).  continuous_K = 1923 K (1650 °C) — the borosilicate-glass PROTECTIVENESS
     # ceiling, ≥5 sources (Monteverde 2012, Peters 2024, Fahrenholtz & Hilmas, Marschall, Li).
@@ -93,10 +105,35 @@ TPS_MATERIALS = {
     # extrapolation, it does not assert failure (§11.1).  peak_K 2700 ≈ the demonstrated sharp
     # ZrB2-SiC tip peak (2450 °C, CFD-sourced).  Anchor dataset: survivability_report.UHTC_ANCHORS.
     "uhtc":            dict(peak_K=2700, continuous_K=1923, melt_K=3500, c_J_kgK=600,  label="UHTC (ZrB2/HfB2-SiC)",
-                            group="hot_structure", is_ablator=False, density_kg_m3=6000, H_eff_MJ_kg=None, oxidation_dwell_s=300),
+                            group="hot_structure", is_ablator=False, density_kg_m3=6000, H_eff_MJ_kg=None, oxidation_dwell_s=300,
+                            k_W_mK=98.7,
+                            k_source="TPSX id 28, ZrB2/SiC (MANLABS, AFML-TR-68-190): 98.7 W/m·K ±5%, measured 100–2000 °C in argon; HfB2/SiC (id 30) is 79.1, and Squire & Marschall 2010 Table 1 give 130 (295 K) to 71 (2000 K) for an HfB2 composite — UHTC conductivity depends on how the part was made"),
     # --- reusable insulator (a layer over a separate structure) ---
     "silica_tile":     dict(peak_K=1811, continuous_K=1533, melt_K=None, c_J_kgK=1000, label="Silica tile (LI-900)",
-                            group="insulative", is_ablator=False, density_kg_m3=144, H_eff_MJ_kg=None, oxidation_dwell_s=None),
+                            group="insulative", is_ablator=False, density_kg_m3=144, H_eff_MJ_kg=None, oxidation_dwell_s=None,
+                            k_W_mK=0.0476,
+                            k_source="TPSX id 1, LI-900: 0.0476 W/m·K through the thickness, measured, room temperature (rises several-fold when hot, so this runs cool)"),
+    # Blankets and an aerogel for the layers inside a body (TODO item 11,
+    # step 2).  Every number is the TPSX entry's own: density, specific heat,
+    # single-use limit (peak_K), multiple-use limit (continuous_K) and the
+    # standard-conditions conductivity; the conductivity curves are in
+    # TPSX_CURVES below.
+    "afrsi":           dict(peak_K=1090, continuous_K=922,  melt_K=None, c_J_kgK=741,  label="AFRSI blanket",
+                            group="insulative", is_ablator=False, density_kg_m3=96.1, H_eff_MJ_kg=None, oxidation_dwell_s=None,
+                            k_W_mK=0.0329,
+                            k_source="TPSX id 12, AFRSI blanket: 0.0329 W/m·K through the thickness, standard conditions"),
+    "tabi":            dict(peak_K=1700, continuous_K=1480, melt_K=None, c_J_kgK=741,  label="TABI blanket",
+                            group="insulative", is_ablator=False, density_kg_m3=112, H_eff_MJ_kg=None, oxidation_dwell_s=None,
+                            k_W_mK=0.0395,
+                            k_source="TPSX id 17, TABI blanket: 0.0395 W/m·K, standard conditions"),
+    "nomex_felt":      dict(peak_K=644,  continuous_K=506,  melt_K=None, c_J_kgK=1310, label="Nomex felt (FRSI)",
+                            group="insulative", is_ablator=False, density_kg_m3=86.5, H_eff_MJ_kg=None, oxidation_dwell_s=None,
+                            k_W_mK=0.0406,
+                            k_source="TPSX id 18, FRSI blanket (Nomex felt): 0.0406 W/m·K, standard conditions"),
+    "silica_aerogel":  dict(peak_K=1270, continuous_K=873,  melt_K=None, c_J_kgK=755,  label="Silica aerogel",
+                            group="insulative", is_ablator=False, density_kg_m3=100, H_eff_MJ_kg=None, oxidation_dwell_s=None,
+                            k_W_mK=0.0099,
+                            k_source="TPSX id 32, silica aerogel: 0.0099 W/m·K, standard conditions"),
     # --- ablators (sacrificial layer; recede) ---
     # Ablator verdicts compare the flown heat LOAD against a demonstrated flight
     # record (like the UHTC dwell floor), NOT a computed recession point-value:
@@ -116,14 +153,22 @@ TPS_MATERIALS = {
     # (a C-HGB-class carbon nose at ~97% of the Reentry-F load read false-red).
     "carbon_ablator":  dict(peak_K=3900, continuous_K=2000, melt_K=3900, c_J_kgK=1500, label="Ablative carbon-carbon",
                             group="ablative", is_ablator=True, density_kg_m3=1450, H_eff_MJ_kg=15, oxidation_dwell_s=None,
+                            k_W_mK=110.0,
+                            k_source="TPSX id 36, carbon-carbon ablative heatshield (Aerotherm 1989): 110 W/m·K isotropic, room temperature",
                             demonstrated_load_MJ_m2=3870, H_eff_bound_MJ_kg=175,
                             demonstrated_load_source="Reentry-F graphite nosetip flew Q ≈ 3.87 GJ/m² (NASA CR-154044 / LWP-460, pixel-traced, ±20%; family-level record)"),
     "carbon_carbon":   dict(peak_K=3900, continuous_K=2000, melt_K=3900, c_J_kgK=1500, label="Bare carbon-carbon (nose)",
                             group="ablative", is_ablator=True, density_kg_m3=1800, H_eff_MJ_kg=40, oxidation_dwell_s=None,
+                            k_W_mK=110.0,
+                            k_source="TPSX id 36, carbon-carbon ablative heatshield (Aerotherm 1989): 110 W/m·K isotropic, room temperature",
                             demonstrated_load_MJ_m2=3870, H_eff_bound_MJ_kg=175,
                             demonstrated_load_source="Reentry-F graphite nosetip flew Q ≈ 3.87 GJ/m² (NASA CR-154044 / LWP-460, pixel-traced, ±20%)"),
     # k_W_mK: through-thickness thermal conductivity for the bondline screen
     # (§13.10) — wired ONLY where citable; None = bondline not evaluated.
+    # Since 2026-10-02 every entry carries one: the hot structures, metals,
+    # tile and C/C take the TPSX value named in their k_source (pinned in
+    # test_tpsx_crosscheck.py).  TPSX quotes these near room temperature;
+    # the k_source says where a material's k moves strongly when hot.
     #   carbon_phenolic 1.5  — CHAR value at ~1900 K (Cabrera & West 2026
     #       Table A4, Sutton's data: 1.502 W/mK at 1923 K; virgin runs
     #       0.48–0.77, Table A3) — char > virgin, conservative-HIGH for
@@ -194,6 +239,82 @@ def materials_by_group():
     for key, m in TPS_MATERIALS.items():
         out.setdefault(m.get("group", "ablative"), []).append((key, m["label"]))
     return out
+
+
+# Property curves against temperature from TPSX (data/tpsx/curves.json, built
+# by tpsx_curves.py from the archived property pages).  (TPSX id, property
+# name) per catalog key.  Where a key is absent the conduction screen uses the
+# single k_W_mK / c_J_kgK above:
+#   carbon_phenolic keeps its CHAR k (Cabrera & West); Narmco 4028's TPSX
+#     curve is virgin material to 675 K, the wrong state for a heated shield.
+#   carbon_carbon, carbon_ablator (id 36) and pica (id 43): TPSX gives no table.
+#   silica_phenolic (id 162): the table is the single standard value.
+TPSX_CURVES = {
+    "aluminum":         dict(k=(60, "Thermal Conductivity (Isotropic)"),  c=(60, "Specific Heat")),
+    "titanium":         dict(k=(261, "Thermal Conductivity (Isotropic)"), c=(261, "Specific Heat")),
+    "steel":            dict(k=(57, "Thermal Conductivity (Isotropic)"),  c=(57, "Specific Heat")),
+    "rcc":              dict(k=(24, "Thermal Conductivity (Thru-the-Thickness)"), c=(24, "Specific Heat")),
+    "c_sic":            dict(k=(26, "Thermal Conductivity (Thru-the-Thickness)"), c=(26, "Specific Heat")),
+    "cc_hot_structure": dict(k=(25, "Thermal Conductivity (Isotropic)")),
+    "uhtc":             dict(k=(28, "Thermal Conductivity (Isotropic)"),  c=(28, "Specific Heat")),
+    "silica_tile":      dict(k=(1, "Thermal Conductivity (Thru-the-Thickness)"), c=(1, "Specific Heat")),
+    "sirca":            dict(k=(41, "Thermal Conductivity (Isotropic)"),  c=(41, "Specific Heat")),
+    "afrsi":            dict(k=(12, "Thermal Conductivity (Thru-the-Thickness)"), c=(12, "Specific Heat")),
+    "tabi":             dict(k=(17, "Thermal Conductivity (Isotropic)"),  c=(17, "Specific Heat")),
+    "nomex_felt":       dict(k=(18, "Thermal Conductivity (Isotropic)"),  c=(18, "Specific Heat")),
+    "silica_aerogel":   dict(k=(32, "Thermal Conductivity (Isotropic)"),  c=(32, "Specific Heat")),
+}
+_CURVE_CACHE = {}
+
+
+def material_curve(material_key, which):
+    """(T_K, value, note) for a material's TPSX curve, which = 'k' or 'c';
+    None if the catalog names none.  Porous insulators are tabulated by gas
+    pressure too: the highest tabulated pressure is used (the most
+    conductive, the cautious side for whatever sits behind the layer).
+    Where TPSX repeats a temperature, the largest k (or the mean c) is
+    kept.  The note says which entry, which pressure and what range."""
+    spec = TPSX_CURVES.get(str(material_key or ""), {}).get(which)
+    if not spec:
+        return None
+    key = (spec, which)
+    if key in _CURVE_CACHE:
+        return _CURVE_CACHE[key]
+    import json, os
+    if "_all" not in _CURVE_CACHE:
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            "data", "tpsx", "curves.json")
+        _CURVE_CACHE["_all"] = json.load(open(path))
+    mid, prop = spec
+    tab = _CURVE_CACHE["_all"].get(str(mid), {}).get(prop)
+    if not tab or not tab["rows"]:
+        _CURVE_CACHE[key] = None
+        return None
+    cols = tab["columns"]
+    vi = 0
+    ti = next(i for i, c in enumerate(cols) if c.startswith("Temperature"))
+    pi = next((i for i, c in enumerate(cols) if c.startswith("Pressure")), None)
+    rows = [r for r in tab["rows"]
+            if isinstance(r[vi], float) and isinstance(r[ti], float)]
+    p_used = None
+    if pi is not None:
+        ps = [r[pi] for r in rows if isinstance(r[pi], float)]
+        if ps:
+            p_used = max(ps)
+            rows = [r for r in rows if r[pi] == p_used]
+    by_T = {}
+    for r in rows:
+        by_T.setdefault(r[ti], []).append(r[vi])
+    T = np.array(sorted(by_T))
+    if T.size < 2:
+        _CURVE_CACHE[key] = None
+        return None
+    agg = max if which == "k" else (lambda v: sum(v) / len(v))
+    V = np.array([agg(by_T[x]) for x in T])
+    note = (f"TPSX id {mid} {prop.lower()} curve, {T[0]:,.0f}–{T[-1]:,.0f} K"
+            + (f" at {p_used:,.0f} Pa" if p_used else ""))
+    _CURVE_CACHE[key] = (T, V, note)
+    return _CURVE_CACHE[key]
 
 
 def is_hot_structure(material_key):
@@ -787,14 +908,154 @@ def radiative_flux(rho, V, nose_radius_m):
 BONDLINE_LIMIT_C = 250.0
 
 
+def _layer_props(material):
+    """(material dict, k(T), c(T), notes) for one layer, or (None, reason)."""
+    mat = TPS_MATERIALS.get(str(material or ""))
+    if not mat:
+        return None, "material/thickness unset"
+    k0 = float(mat.get("k_W_mK") or 0.0)
+    if k0 <= 0.0:
+        return None, "no cited through-thickness conductivity for this material"
+    rho = float(mat.get("density_kg_m3") or 0.0)
+    c0 = float(mat.get("c_J_kgK") or 0.0)
+    if rho <= 0 or c0 <= 0:
+        return None, "material density/heat capacity unset"
+    notes, rng = [], {}
+    kc = material_curve(material, "k")
+    cc = material_curve(material, "c")
+    if kc:
+        k_of = (lambda T, _c=kc: np.interp(T, _c[0], _c[1]))
+        notes.append(f"k from the {kc[2]}")
+        rng["k"] = (float(kc[0][0]), float(kc[0][-1]))
+    else:
+        k_of = (lambda T, _k=k0: np.full_like(T, _k))
+        notes.append(f"k = {k0:g} W/m·K, one value"
+                     + (f" — {mat['k_source']}" if mat.get("k_source") else ""))
+    if cc:
+        c_of = (lambda T, _c=cc: np.interp(T, _c[0], _c[1]))
+        notes.append(f"c from the {cc[2]}")
+        rng["c"] = (float(cc[0][0]), float(cc[0][-1]))
+    else:
+        c_of = (lambda T, _c=c0: np.full_like(T, _c))
+        notes.append(f"c = {c0:g} J/kg·K, one value")
+    return dict(mat=mat, rho=rho, k=k_of, c=c_of, notes=notes, range=rng,
+                label=mat.get("label") or str(material)), None
+
+
+def layered_conduction(t, q_w, layers, *, emissivity=0.85, T0_K=300.0,
+                       n_per_layer=24, dt_max_s=1.0):
+    """One-dimensional transient conduction through a stack of layers.
+
+    layers: [(material key, thickness_m), ...] from the outer surface in.
+    The outer face takes the absorbed flux and radiates (εq̇ − εσT⁴,
+    linearised about the previous step); the innermost face is insulated,
+    so nothing leaves the stack and every inner temperature is an upper
+    bound.  Layers touch perfectly (no contact resistance, the cautious
+    side).  k and c follow each material's TPSX curve where the catalog
+    names one (material_curve; held at the table's end value outside it),
+    else the catalog's single value; density is constant.  Finite volumes,
+    implicit in temperature, properties taken at the start of each substep.
+
+    Returns dict(evaluated, faces, T_faces (n_faces × len(t), K),
+    T_surf_peak_K, warnings, notes) where face 0 is the outer surface,
+    face i the joint behind layer i, and the last face the innermost; or
+    dict(evaluated=False, reason=...)."""
+    t = np.asarray(t, float); q_w = np.asarray(q_w, float)
+    props = []
+    for mat, th in layers:
+        if not th or th <= 0.0:
+            return dict(evaluated=False, reason="material/thickness unset")
+        pr, why = _layer_props(mat)
+        if pr is None:
+            return dict(evaluated=False, reason=why, material=mat)
+        props.append((pr, float(th)))
+    if not props or t.size < 2:
+        return dict(evaluated=False, reason="material/thickness unset")
+    eps = max(float(emissivity or 0.85), 1e-3)
+
+    n = int(n_per_layer)
+    lay = np.repeat(np.arange(len(props)), n)            # layer of each cell
+    dx = np.concatenate([np.full(n, th / n) for _, th in props])
+    rho = np.concatenate([np.full(n, pr['rho']) for pr, _ in props])
+    N = dx.size
+    T = np.full(N, float(T0_K))
+    T_hi = np.full(len(props), float(T0_K))               # hottest per layer
+
+    def kc(Tc):
+        k = np.empty(N); c = np.empty(N)
+        for li, (pr, _) in enumerate(props):
+            sl = slice(li * n, (li + 1) * n)
+            k[sl] = pr['k'](Tc[sl]); c[sl] = pr['c'](Tc[sl])
+        return k, c
+
+    def faces(Tc, k):
+        out = [Tc[0]]
+        for li in range(1, len(props)):
+            a, b = li * n - 1, li * n
+            Ga, Gb = 2.0 * k[a] / dx[a], 2.0 * k[b] / dx[b]
+            out.append((Ga * Tc[a] + Gb * Tc[b]) / (Ga + Gb))
+        out.append(Tc[-1])
+        return out
+
+    k, c = kc(T)
+    hist = np.empty((len(props) + 1, t.size))
+    hist[:, 0] = faces(T, k)
+    for i in range(1, t.size):
+        dt_seg = float(t[i] - t[i - 1])
+        if dt_seg > 0:
+            nsub = max(1, int(np.ceil(dt_seg / dt_max_s)))
+            dt = dt_seg / nsub
+            for j_ in range(nsub):
+                frac = (j_ + 0.5) / nsub
+                q_now = q_w[i - 1] + frac * (q_w[i] - q_w[i - 1])
+                k, c = kc(T)
+                C = rho * c * dx / dt                    # J/m²K per step
+                G = 1.0 / (dx[:-1] / (2 * k[:-1]) + dx[1:] / (2 * k[1:]))
+                Ts = T[0]
+                a = np.zeros(N); cu = np.zeros(N)
+                a[1:] = -G; cu[:-1] = -G
+                b = C.copy()
+                b[:-1] += G; b[1:] += G
+                b[0] += 4.0 * eps * SIGMA * Ts ** 3
+                d = C * T
+                d[0] += eps * q_now + 3.0 * eps * SIGMA * Ts ** 4
+                for m in range(1, N):                    # Thomas algorithm
+                    w = a[m] / b[m - 1]
+                    b[m] -= w * cu[m - 1]
+                    d[m] -= w * d[m - 1]
+                T[-1] = d[-1] / b[-1]
+                for m in range(N - 2, -1, -1):
+                    T[m] = (d[m] - cu[m] * T[m + 1]) / b[m]
+                for li in range(len(props)):
+                    T_hi[li] = max(T_hi[li], float(T[li * n:(li + 1) * n].max()))
+        hist[:, i] = faces(T, k)
+
+    warnings, notes = [], []
+    for li, (pr, th) in enumerate(props):
+        notes.append(f"{pr['label']} ({th * 100:.1f} cm): "
+                     + "; ".join(pr['notes']))
+        for which, (lo, hi) in pr['range'].items():
+            if T_hi[li] > hi:
+                warnings.append(
+                    f"{pr['label']} reaches {T_hi[li]:,.0f} K, past the end "
+                    f"of its TPSX {which} table ({hi:,.0f} K): held at the "
+                    f"last tabulated value.")
+    names = (["outer surface"]
+             + [f"behind {pr['label']}" for pr, _ in props])
+    return dict(evaluated=True, faces=names, T_faces=hist,
+                T_surf_peak_K=float(hist[0].max()),
+                layer_peak_K=[float(x) for x in T_hi],
+                warnings=warnings, notes=notes)
+
+
 def bondline_screen(t, q_w, *, material, thickness_m, emissivity=0.85,
                     T0_K=300.0, limit_C=None, n_nodes=24, dt_max_s=1.0):
     """Screening 1-D transient conduction through the body TPS layer → does
     the structure behind it (the bondline) stay below the design limit?
 
     Dec & Braun's (NTRS 20060004824) "approximate option," further simplified
-    to screening tier: implicit finite-difference conduction with constant
-    (k, ρ, c), a surface energy balance q̇_net = α·q̇ − εσT_s⁴ (radiation
+    to screening tier: implicit finite-difference conduction (k and c from the
+    TPSX curves where the catalog names one, else constant; ρ constant), a surface energy balance q̇_net = α·q̇ − εσT_s⁴ (radiation
     linearized about the previous step), and an insulated back face (their
     worst case).  Deliberate omissions, direction labeled:
       + no pyrolysis-gas energy absorption (Dec & Braun quantify this as
@@ -811,70 +1072,29 @@ def bondline_screen(t, q_w, *, material, thickness_m, emissivity=0.85,
     if limit_C is None:
         limit_C = BONDLINE_LIMIT_C           # resolve live (thresholds.apply)
     mat = TPS_MATERIALS.get(str(material or ""))
-    k = float(mat.get("k_W_mK") or 0.0) if mat else 0.0
-    if not mat or k <= 0.0 or not thickness_m or thickness_m <= 0.0:
+    if not mat or not thickness_m or thickness_m <= 0.0:
         return dict(evaluated=False, reason=(
             "no cited through-thickness conductivity for this material"
-            if mat and k <= 0.0 else "material/thickness unset"))
-    rho_m = float(mat.get("density_kg_m3") or 0.0)
-    c_m = float(mat.get("c_J_kgK") or 0.0)
-    if rho_m <= 0 or c_m <= 0:
-        return dict(evaluated=False, reason="material density/heat capacity unset")
-
-    t = np.asarray(t, float); q_w = np.asarray(q_w, float)
-    eps = max(float(emissivity or 0.85), 1e-3)
-    L = float(thickness_m)
-    n = int(n_nodes)
-    dx = L / n
+            if mat and not mat.get("k_W_mK") else "material/thickness unset"))
+    t = np.asarray(t, float)
+    res = layered_conduction(t, q_w, [(material, float(thickness_m))],
+                             emissivity=emissivity, T0_K=T0_K,
+                             n_per_layer=n_nodes, dt_max_s=dt_max_s)
+    if not res.get("evaluated"):
+        return dict(evaluated=False, reason=res.get("reason", ""))
+    back = res["T_faces"][-1]
     limit_K = float(limit_C) + 273.15
-
-    T = np.full(n, float(T0_K))
-    s_coef = 1.0 / (rho_m * c_m * dx)        # (K per J/m² per node)
-    T_bond_pk = T_surf_pk = float(T0_K)
-    t_cross = None
-
-    # March the trajectory intervals with substeps; implicit conduction
-    # (Thomas solve), radiation linearized about the previous surface temp.
-    for i in range(1, t.size):
-        dt_seg = float(t[i] - t[i - 1])
-        if dt_seg <= 0:
-            continue
-        nsub = max(1, int(np.ceil(dt_seg / dt_max_s)))
-        dt = dt_seg / nsub
-        r = k * dt / (rho_m * c_m * dx * dx)
-        for j_ in range(nsub):
-            frac = (j_ + 0.5) / nsub
-            q_now = q_w[i - 1] + frac * (q_w[i] - q_w[i - 1])
-            Ts = T[0]
-            rad_diag = 4.0 * eps * SIGMA * Ts ** 3 * dt * s_coef
-            # tridiagonal assembly
-            a = np.full(n, -r); b = np.full(n, 1.0 + 2.0 * r); c_u = np.full(n, -r)
-            b[0] = 1.0 + r + rad_diag
-            b[-1] = 1.0 + r
-            d = T.copy()
-            d[0] += dt * s_coef * (eps * q_now + 3.0 * eps * SIGMA * Ts ** 4)
-            # Thomas algorithm
-            for m in range(1, n):
-                w = a[m] / b[m - 1]
-                b[m] -= w * c_u[m - 1]
-                d[m] -= w * d[m - 1]
-            T[-1] = d[-1] / b[-1]
-            for m in range(n - 2, -1, -1):
-                T[m] = (d[m] - c_u[m] * T[m + 1]) / b[m]
-        T_surf_pk = max(T_surf_pk, float(T[0]))
-        if float(T[-1]) > T_bond_pk:
-            T_bond_pk = float(T[-1])
-        if t_cross is None and T[-1] >= limit_K:
-            t_cross = float(t[i])
+    over = np.nonzero(back >= limit_K)[0]
+    t_cross = float(t[over[0]]) if over.size else None
+    T_bond_pk = float(back.max())
+    T_surf_pk = res["T_surf_peak_K"]
 
     warnings = [
         "Inert-wall screening conduction (Dec & Braun approximate option, "
         "sans pyrolysis/decomposition): no pyrolysis-gas energy absorption "
         "(~11% conservative on insulation per NTRS 20060004824), no ablation "
         "heat consumption at the surface, no recession thinning of the layer.",
-    ]
-    if mat.get("k_source"):
-        warnings.append(f"k = {k:g} W/m·K — {mat['k_source']}.")
+    ] + [n_ + "." for n_ in res["notes"]] + res["warnings"]
     if T_surf_pk > float(mat.get("peak_K") or 1e9):
         warnings.append(
             "Surface modeled inert past its ablation temperature — bondline "
@@ -885,7 +1105,7 @@ def bondline_screen(t, q_w, *, material, thickness_m, emissivity=0.85,
         T_bond_peak_C=T_bond_pk - 273.15, T_surf_peak_K=T_surf_pk,
         limit_C=float(limit_C), margin=(T_bond_pk - 273.15) / float(limit_C),
         crossed=bool(t_cross is not None), t_cross_s=t_cross,
-        k_W_mK=k, thickness_m=L,
+        k_W_mK=float(mat.get("k_W_mK") or 0.0), thickness_m=float(thickness_m),
         basis=("1-D implicit FD conduction, insulated back face, radiative "
                "surface balance — bondline vs the ablative-TPS sizing "
                "criterion (Dec & Braun NTRS 20060004824)"),

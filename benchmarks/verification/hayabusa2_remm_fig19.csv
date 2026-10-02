@@ -1,0 +1,45 @@
+# Hayabusa2 sample return capsule, temperatures recorded in flight by REMM
+# Source: Yamada, T. & Yoshihara, K., "Post-Flight Analysis of Recovered Components of Hayabusa2
+#   Sample Return Capsule", Journal of Evolving Space Activities 1, Article 16 (2023), doi 10.57350/jesa.16, Fig. 19.
+#   The article is CC BY-NC-ND 4.0; only values read from its figure are kept here, not the figure.
+# Digitised by Thrusty 2026-10-02 by colour from a 6x render: 6.0 px per degC, 5.73 px per s; read to about +/-1 degC
+#   and +/-1 s. Blank = the curve is hidden (T3 below 140 s shares its grey with the axis) or crosses another curve.
+# t_remm_s: time from REMM activation; entry interface (200 km) is t = 50 s, peak deceleration t = 133 s, aftbody
+#   heat-shield release t = 302.0 s and parachute t = 302.7 s (Table 4); the record ends at the release.
+# Channels (Fig. 19 legend; Fig. 18 cross-section B-B): forebody heat shield cone part 25.5 mm thick,
+#   T1 forebody shield at the stagnation point 11 mm deep, T2 titanium plate surface (plate 3 mm),
+#   T3 forebody shield cone 11 mm deep, T4 back surface of the cone part, T5 support ablator 11 mm deep,
+#   T6 support ablator back surface, T7 'Color-C bottom', T8 inside instrument plate (stands for the sample
+#   container, text p. 7-8), T9 back surface of the electronics. All degC.
+t_remm_s,T1_C,T2_C,T3_C,T4_C,T5_C,T6_C,T7_C,T8_C,T9_C
+0,25.9,24.0,,10.3,-2.8,-4.4,-0.3,6.2,4.9
+10,26.8,24.2,,10.5,-2.3,-4.5,-0.6,6.7,5.0
+20,26.8,24.0,,10.5,-2.2,-4.6,-0.2,6.7,5.0
+30,26.8,24.0,,10.4,-2.3,-4.5,-0.4,6.7,5.0
+40,26.6,23.9,,10.3,-2.2,-4.6,-0.2,6.7,5.0
+50,26.4,23.7,,10.3,-2.2,-4.5,-0.2,6.7,5.0
+60,26.4,23.7,,10.3,-2.2,-4.6,-0.2,6.7,5.0
+70,26.3,23.7,,10.3,-2.2,-4.5,-0.2,6.7,5.0
+80,26.2,23.4,,10.1,-2.2,-4.6,-0.2,6.7,5.0
+90,26.1,23.3,,10.1,-2.2,-4.5,-0.2,6.7,5.0
+100,26.1,23.2,,10.1,-2.2,-4.6,-0.2,6.7,5.0
+110,26.0,23.3,,10.1,-2.2,-4.5,-0.2,6.7,5.0
+120,25.9,23.3,,10.1,-2.1,-4.5,1.4,6.6,4.9
+130,26.2,23.3,,10.2,-1.9,-4.5,,6.7,5.0
+140,25.9,23.3,12.1,10.2,-1.8,-4.2,15.3,6.4,4.7
+150,,23.1,17.9,10.3,-1.4,-4.2,27.5,,5.0
+160,,23.6,28.1,10.5,-0.8,-3.8,38.2,6.1,4.3
+170,27.1,24.0,40.6,10.8,0.5,-2.8,45.8,6.1,4.3
+180,28.8,24.8,56.1,12.6,1.7,-1.2,49.8,6.1,4.4
+190,31.6,26.2,70.9,15.2,,0.8,51.0,6.1,4.3
+200,35.8,28.3,83.8,18.8,9.4,1.9,50.0,6.2,4.4
+210,41.2,31.9,95.6,24.0,10.9,,47.8,6.1,4.3
+220,48.2,35.7,105.5,29.5,13.5,9.3,44.9,6.1,4.3
+230,53.6,39.1,114.3,36.3,16.1,10.7,41.7,,4.5
+240,60.8,46.5,122.0,43.5,18.0,12.8,37.9,6.3,4.5
+250,68.6,,128.3,50.5,20.1,14.8,34.6,6.4,4.7
+260,75.9,54.9,133.9,57.8,21.6,16.5,31.2,6.8,5.1
+270,83.4,61.4,138.2,64.7,23.0,17.9,27.8,7.3,5.5
+280,90.4,67.7,142.2,71.8,22.5,19.1,24.4,7.3,5.7
+290,97.2,73.4,144.8,78.3,24.7,18.8,21.2,7.6,6.0
+300,103.2,78.2,147.8,84.1,25.2,21.4,18.6,7.9,6.2

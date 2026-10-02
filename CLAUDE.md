@@ -115,6 +115,8 @@ observed test-flight impact zones for analytic comparison.
 | `heating_by_location.py` | Heating at each place an object's `heating_locations` list names; supplies no number the file does not give. Not yet wired into the verdicts |
 | `spent_stage_aero.py` | A spent stage after separation: drag by attitude (random tumbling, end over end, trimmed, front-first) from Jernell's flat-ended cylinder and Klett, the moment and inertia for its swing, and whether fins hold it front-first. `trajectory._fly_band` flies it and reports one impact point: the end the physics picks (trimmed, end over end, front-first), else the midpoint with its half-width on the timeline row |
 | `stage_outline.py` | The one outline of a spent stage or strap-on (own nose, aft skirt, protruding nozzle). The schematic, the 3-D export and the physics all read it, so what is drawn is what is flown and an unset field shows as what is flown in its absence |
+| `ro_section.py` | The one outline of a reentry object and of the layers in its wall (body layer, then `interior_layers`). The schematic, the object editor's cross-section and the 3-D export all read it |
+| `tpsx_curves.py` | Builds `data/tpsx/curves.json` (TPSX property tables against temperature) from archived property pages; `heating.material_curve` reads it |
 | `slv_performance.py` | Schilling payload-to-orbit estimator |
 | `METHODS.md` | Governing equations and citations for every model |
 | `BENCHMARKING.md` | Validation against published figures |

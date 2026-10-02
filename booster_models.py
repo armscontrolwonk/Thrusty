@@ -682,9 +682,11 @@ class ROParams:
     # BOTH locations (via nose_material()/body_material()), so existing RVs are
     # unchanged.  body_tps_thickness_m is the designed body-layer thickness (or, for
     # a bare hot structure, the skin/wall thickness feeding the transient heat-sink).
-    # structure_material / structure_limit_K carry the bondline verdict; for a
-    # hot-structure body (heating.is_hot_structure) the bondline collapses onto the
-    # body material's own limit.  NOT yet consumed by the FOM — wired in Phase 2.
+    # structure_limit_K is what the back of a heat-shield layer is judged
+    # against (survivability_report._back_face_answer; 0 = not entered, the
+    # bondline design limit); for a hot-structure body (heating.is_hot_structure)
+    # the back face is judged against the body material's own limit instead.
+    # structure_material is not yet consumed.
     nose_tps_material:      str   = ""
     body_tps_material:      str   = ""
     body_tps_thickness_m:   float = 0.0
@@ -712,6 +714,15 @@ class ROParams:
     # is resolved from the fields above by heating_by_location.resolve_locations.
     # Empty = the file lists none.  Hardware.
     heating_locations:      list  = field(default_factory=list)
+    # What sits behind the body's outer layer (body_tps_material at
+    # body_tps_thickness_m), from the outside in: structure, insulation.  A
+    # list of entries {'material': catalog key, 'thickness_m': m, 'source':
+    # where the number came from}; field_registry.RO_LAYER_KEYS.  The
+    # conduction screen runs through the outer layer and these in turn
+    # (heating.layered_conduction); the innermost face is judged against
+    # interior_limit_C.  Drawn in the schematic's half-section and exported
+    # as shells (ro_section.py).  Empty = nothing entered.  Hardware.
+    interior_layers:        list  = field(default_factory=list)
     # Provenance: where this vehicle's numbers came from and how firm they are.
     # `source` is a short citation; `notes` is free-form (e.g. "mass 300 kg is a
     # trajectory-fit value, no primary source").  Round-tripped by
@@ -864,6 +875,48 @@ def clean_heating_locations(entries) -> list:
     return out
 
 
+def clean_interior_layers(entries) -> list:
+    """Check and normalise an object's ``interior_layers`` list.
+
+    Each entry is {'material', 'thickness_m'} with an optional 'source'.
+    Refuses a key outside field_registry.RO_LAYER_KEYS, a material that is
+    not in the heating catalog (a layer's conductivity must be cited, so a
+    bespoke material is not allowed here), and a thickness that is not a
+    positive number.  Returns a new list of plain dicts, keys in registry
+    order."""
+    import heating as _h
+    if not isinstance(entries, (list, tuple)):
+        raise ValueError("interior_layers must be a list of entries")
+    out = []
+    for i, e in enumerate(entries):
+        where = f"interior_layers[{i}]"
+        if not isinstance(e, dict):
+            raise ValueError(f"{where} must be an entry (a JSON object)")
+        for k in e:
+            if k not in _fr.RO_LAYER_KEYS:
+                raise ValueError(f"{where} carries {k!r}; a layer may carry "
+                                 f"only {', '.join(_fr.RO_LAYER_KEYS)}")
+        mat = str(e.get('material', '') or '')
+        if mat not in _h.TPS_MATERIALS:
+            raise ValueError(f"{where}: material {mat!r} is not in the "
+                             f"materials catalog")
+        try:
+            if isinstance(e.get('thickness_m'), bool):
+                raise ValueError
+            th = float(e.get('thickness_m'))
+        except (TypeError, ValueError):
+            raise ValueError(f"{where}: thickness_m {e.get('thickness_m')!r} "
+                             f"is not a number (give it in plain metres, "
+                             f"without a unit)") from None
+        if not math.isfinite(th) or th <= 0.0:
+            raise ValueError(f"{where}: thickness_m must be a positive number")
+        c = {'material': mat, 'thickness_m': th}
+        if e.get('source'):
+            c['source'] = str(e['source'])
+        out.append(c)
+    return out
+
+
 def ro_to_dict(ro: ROParams, include_reentry_plan: bool = True) -> dict:
     """Serialise an ROParams to a JSON-compatible dict.
 
@@ -939,6 +992,8 @@ def ro_to_dict(ro: ROParams, include_reentry_plan: bool = True) -> dict:
     # saves exactly as it did before the field existed.
     if ro.heating_locations:
         d['heating_locations'] = [dict(e) for e in ro.heating_locations]
+    if ro.interior_layers:
+        d['interior_layers'] = [dict(e) for e in ro.interior_layers]
     if not include_reentry_plan:
         for _k in _REENTRY_PLAN_KEYS:
             d.pop(_k, None)
@@ -1053,6 +1108,8 @@ def ro_from_dict(d: dict) -> ROParams:
         body_tps_custom=(d.get('body_tps_custom') or None),
         heating_locations=clean_heating_locations(
             d.get('heating_locations') or []),
+        interior_layers=clean_interior_layers(
+            d.get('interior_layers') or []),
         source=str(d.get('source', '')),
         notes=str(d.get('notes', '')),
     )
