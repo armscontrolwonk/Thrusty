@@ -311,3 +311,37 @@ This is a fit of the plan to the warning, which is what a flight plan is
 admitted on. It is also the first comparison of Thrusty's spent-stage
 impacts with reported drop zones; it becomes a test once the candidate is
 admitted and the warning's text is recorded.
+
+## 10. The glider and box G (2026-10-02)
+
+The user's three saved scenarios: two identical Cape Canaveral runs of 28
+Sep 2026 (SLC-46, azimuth 101°, 80° launch, yaw to 108° at 70–80 s, glider
+on the damped phugoid law with the drag polar, banks of +45° at 600–700 s
+and −45° at 700–800 s) and a Guam run of 29 Sep (azimuth 300°, a different
+pitch plan). The Cape runs are the fit to the warning.
+
+The candidate flown with those banks and the shipped C-HGB object, for
+three values of the first stage's vacuum peak (burn 54 s, double anchor):
+
+| Vacuum peak | Effective specific impulse | Plan (stage angles) | Apogee | Stage 2 | Fairing | Glider |
+|---|---|---|---|---|---|---|
+| 302.9 kN (candidate) | 280 s | 22°, −4° | 160 km | 2,312 km, box E | 2,182 km, box E | 4,948 km: 480 km beyond box G |
+| 290 kN | 268 s | 25°, −5° | 161 km | 2,207 km, box E | 2,090 km, box E | 4,607 km: 140 km beyond box G |
+| 280 kN | 259 s | 25°, −5° | 145 km | 2,022 km, box E | 1,861 km, box E | 4,406 km, 12.2°N 41.8°W: inside box G |
+
+Without the banks the glider flies 300 km further in each case.
+
+- The stage boxes (C, E) are met across this range of thrust by adjusting
+  the pitch plan. They do not fix the thrust.
+- Box G does discriminate, but only together with the glider's
+  aerodynamics and its turns, and the object's ballistic coefficient and
+  lift-to-drag ratio are placeholders. With the banks as the user set
+  them, the glider lands in G only when the first stage delivers about 7%
+  less impulse than 280 s implies.
+- The user's own run of 28 Sep reached 4,238 km, inside G, with a first
+  stage that delivered 4% less (290 kN peak over 54 s).
+- So the warning supports "too much thrust" (user, 2026-10-02), on the
+  condition that the glider model is right. Lowering the stored 280 s, or
+  the peak, to make the glider land in G would be fitting a hardware number
+  to a trajectory. That is allowed only if the value is recorded as
+  *modelled: fitted to the warning*, and it is the user's decision.
