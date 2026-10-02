@@ -375,3 +375,32 @@ stage", which is three zones: C, B and E on this reading. It is an
 inference from the boxes, not a sourced jettison time. Dropping the
 fairing early adds about 0.06 km/s at burnout, so the pitch plan would need
 re-fitting and the glider's overshoot of box G grows.
+
+## 12. The glider's heading and box G (2026-10-02)
+
+User: the glider's overshoot of box G is not a reason to cut the booster's
+energy, because its range may be set by heat load and not by kinetic
+energy; and the glider must manoeuvre to enter the box in line with the
+box's orientation.
+
+Checked on the candidate:
+
+| | Box G's long axis | No turns | With the user's banks |
+|---|---|---|---|
+| Bearing / heading at the near edge (48.75°W) | 115.5° | 120° | 115° |
+| Latitude there (box spans 15–17°N) | | 16.25°N | 16.09°N |
+| Heading at the far edge (41.5°W) | | 122° | 117° |
+| Latitude there (box spans 11.5–13.5°N) | | 12.04°N | 12.64°N |
+
+Box G is 873 km long and about 221 km wide; box E's long axis bears 114.8°,
+and the line from E's far end to G's near end bears 116.8°. Without turns
+the glider crosses G about 5° off the box's axis, drifting from its upper
+half to its lower edge. With the user's banks (+45° at 600–700 s, −45° at
+700–800 s) it enters on the axis, at 115°, and stays near the centre line.
+So the boxes do imply a turn of about 5°, as the user says, and his bank
+schedule supplies it.
+
+In both cases the glider flies the whole length of G and keeps going. The
+booster's 280 s is therefore kept (decision), and where the glider comes
+down inside G is left to the glider: its heat limit, its aerodynamics and
+its terminal manoeuvre, none of which are settled.
