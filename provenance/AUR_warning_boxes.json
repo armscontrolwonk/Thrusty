@@ -1,0 +1,148 @@
+{
+ "_source": "Transcribed from the user's Google Earth file 'Dark Eagle NOTAM.kmz' (created 2024-12-15; Drive id 1KXjLjwcyUqm5Kua33BJ-YU_2sXevuyEY). The user's talk notes identify the warning fitted as NAVAREA IV 221/23 (March 2023) and his draft paper says the warnings for the AUR tests were essentially identical; which warning this file transcribes, and its text, are to be confirmed. Navigational warnings are issued by the U.S. National Geospatial-Intelligence Agency.",
+ "launch_site": {
+  "lat": 28.45836,
+  "lon": -80.52843,
+  "name": "Cape Canaveral SLC-46"
+ },
+ "boxes_lon_lat": {
+  "A": [
+   [
+    -80.565,
+    28.54833
+   ],
+   [
+    -80.03333,
+    28.46667
+   ],
+   [
+    -80.03333,
+    28.3
+   ],
+   [
+    -80.51667,
+    28.38333
+   ],
+   [
+    -80.5745,
+    28.42667
+   ]
+  ],
+  "B": [
+   [
+    -78.83333,
+    28.03333
+   ],
+   [
+    -78.78333,
+    28.18333
+   ],
+   [
+    -77.4,
+    27.91667
+   ],
+   [
+    -77.45,
+    27.66667
+   ]
+  ],
+  "C": [
+   [
+    -80.03333,
+    28.45
+   ],
+   [
+    -79.15,
+    28.4
+   ],
+   [
+    -78.78333,
+    28.18333
+   ],
+   [
+    -78.83333,
+    28.03333
+   ],
+   [
+    -79.2,
+    28.0
+   ],
+   [
+    -80.03333,
+    28.3
+   ]
+  ],
+  "D": [
+   [
+    -63,
+    27
+   ],
+   [
+    -59,
+    28
+   ],
+   [
+    -59,
+    27
+   ],
+   [
+    -63,
+    26
+   ]
+  ],
+  "E": [
+   [
+    -63,
+    23.5
+   ],
+   [
+    -58.5,
+    21.5
+   ],
+   [
+    -58.5,
+    20.5
+   ],
+   [
+    -63,
+    22.5
+   ]
+  ],
+  "F": [
+   [
+    -49,
+    28.75
+   ],
+   [
+    -49,
+    30.75
+   ],
+   [
+    -44,
+    32
+   ],
+   [
+    -44,
+    30
+   ]
+  ],
+  "G": [
+   [
+    -48.75,
+    17
+   ],
+   [
+    -41.5,
+    13.5
+   ],
+   [
+    -41.5,
+    11.5
+   ],
+   [
+    -48.75,
+    15
+   ]
+  ]
+ }
+}

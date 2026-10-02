@@ -21,6 +21,12 @@ copyright in the United States (17 U.S.C. § 105).
 The gazetteer and terrain files are derived products; `gazetteer_build.py` and
 `dem_build.py` reproduce them from the sources above.
 
+## Navigational warnings
+
+| Files | Source | Terms |
+|---|---|---|
+| `provenance/AUR_warning_boxes.json` | Hazard-area coordinates of a navigational warning for an AUR flight test from Cape Canaveral, transcribed from the maintainer's Google Earth file; warnings are issued by the U.S. National Geospatial-Intelligence Agency (the warning's number and text are to be confirmed; see the file's `_source`) | U.S. Government work, not subject to copyright in the United States |
+
 ## Aerodynamic reference data
 
 | Files | Source | Terms |

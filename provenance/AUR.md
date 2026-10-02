@@ -180,8 +180,9 @@ No `source`, no `notes`.
 The user decided: cap the all-up mass at 7,400 kg and take the excess from
 the stages; the measured thrust is a sea-level figure; the grain is
 strongly regressive (double anchor); match the video, allowing that the
-visible burn includes some tail-off; the launch angle is 80°; the fairing
-is 2.7 m long.
+visible burn includes some tail-off, but six seconds of it is too much
+and the thrust was too high; the launch angle is 80°; the fairing is 2.7 m
+long; use the photographed stage lengths.
 
 The current `booster_library/AUR.booster.json` is left as it is: under the
 reset plan it becomes a test stand-in and its numbers must not move. The
@@ -189,17 +190,23 @@ re-admission candidate is built beside this sheet:
 
 - `provenance/candidates/AUR.booster.json`
 - `provenance/candidates/AUR.flightplan.json`
+- `provenance/AUR_warning_boxes.json` (what the plan is fitted to)
 
 | | Stand-in (current file) | Candidate | Basis |
 |---|---|---|---|
+| Stage lengths | 5.0 m, 2.6 m | 4.95 m, 2.36 m | measured on the launch photograph (talk notes) |
 | Fairing | 2.67 m, 22.5 kg | 2.7 m, 22.7 kg | user; Akin's relation on the new area |
 | Stage 1 propellant / burnout | 4,509 / 454 kg | 4,467.9 / 449.9 kg | scaled by 0.99089 so the stack with the 450 kg object is 7,400.0 kg; dry fraction and 7:3 split kept |
 | Stage 2 propellant / burnout | 1,842 / 186 kg | 1,825.2 / 184.3 kg | same |
 | Stack launch mass | 7,013.5 kg | 6,950.0 kg | |
-| Stage 1 peak thrust (vacuum) | 290 kN | 335.9 kN | 290 kN at sea level averaged over 2–7 s, plus ambient pressure × nozzle exit area (30.4 kN), on the double-anchor curve |
-| Stage 1 burn time | 54 s | 48.7 s | follows from 280 s and the propellant once the thrust is fixed; the visible ~55 s then includes about 6 s of tail-off |
+| Stage 1 burn time | 54 s | 54 s | about 55 s seen, less a second or so of tail-off |
+| Stage 1 peak thrust (vacuum) | 290 kN | 302.9 kN | follows from 54 s, 280 s and the propellant on the double-anchor curve |
+| … as it would be measured | | about 260 kN at sea level over 2–7 s; 2.8 g off the pad | between the two video figures, 222 kN and 290–300 kN |
 | Launch elevation | 90° | 80° | user |
-| Pitch plan | one turn, 0–21.7 s to 25° | 0–40 s to 25°; from second-stage ignition for 66 s to −5° | the user's own fitted scenario of 28 Sep 2026 (Cape Canaveral, azimuth 101°), which reproduced NAVAREA IV 221/23 with the old numbers |
+| Pitch plan | one turn, 0–21.7 s to 25° | 0–40 s to 22°; 54–120 s to −4°; yaw to 108° at 70–80 s | fitted to the warning boxes: §9 |
+
+The three lengths sum to 10.01 m against the published 10.2 m; the
+difference (0.19 m) is not assigned to anything.
 
 ## 8. The talk notes of 29 Sep 2026 and what they change
 
@@ -251,3 +258,56 @@ attack and barely changes with Mach number" (a Chinese paper on the "AHW
 optimized configuration" at Mach 5, 10 and 20), which supports the file's
 2.0; the glider levels off "near 75,000 ft, about 23 km"; the thermal
 protection, not the booster, limits the system.
+
+## 9. The fit to the navigational warning (2026-10-02)
+
+Boxes from the user's Google Earth file (`AUR_warning_boxes.json`),
+measured from the launch site:
+
+| Box | Distance | Bearing to centre |
+|---|---|---|
+| A | 6–52 km | 102° |
+| C | 49–174 km | 102° |
+| B | 173–315 km | 103° |
+| E | 1,837–2,396 km | 105° |
+| G | 3,489–4,468 km | 106° |
+| D | 1,734–2,126 km | 90° |
+| F | 3,055–3,541 km | 78° |
+
+A, C, B, E and G lie along one track. D and F lie well north of it; what
+they are for is not known here.
+
+The candidate flown from SLC-46 at azimuth 101°, with the user's turn
+timings and yaw, scanning the two burnout angles:
+
+| Burnout angles (stage 1, stage 2) | Apogee | First stage | Second stage | Fairing |
+|---|---|---|---|---|
+| 20°, −5° | 133 km | 92 km, in C | 2,051 km, in E | 1,837 km, outside |
+| 20°, −4° | 139 km | 92 km, in C | 2,123 km, in E | 1,924 km, in E |
+| 20°, −1° | 160 km | 92 km, in C | 2,346 km, in E | 2,183 km, in E |
+| **22°, −4°** (candidate) | **160 km** | **103 km, in C** | **2,316 km, in E** | **2,186 km, in E** |
+| 23°, −5° | 163 km | 109 km, in C | 2,316 km, in E | 2,200 km, in E |
+| 22°, −3° | 167 km | 103 km, in C | 2,378 km, outside | 2,256 km, in E |
+| 25°, −5° (the 28 Sep plan) | 185 km | 123 km, in C | 2,476 km, outside | 2,388 km, outside |
+
+- **All three pieces fall in their boxes for an apogee between about 139
+  and 163 km.** That agrees with the talk's "about 160 km" and with its
+  finding that 120 km cannot hit the boxes.
+- The first stage falls in box C (49–174 km), not B. The draft paper's
+  "about 300 km" for the first stage is box B's far edge; nothing here
+  lands in B.
+- How the spent stages are flown: the first stage (released at about
+  29 km) is spun up by the air to several hundred degrees a second and
+  keeps tumbling, so its end-over-end point is reported; the second stage
+  settles, so its trimmed point is reported.
+- The glider flies about 5,200–5,300 km on the shipped C-HGB object and
+  plan with no turns, past box G's far edge (4,468 km). The user's run of
+  28 Sep reached 4,238 km with ±45° banks. The object's ballistic
+  coefficient and lift-to-drag ratio are placeholders (§3), so this says
+  little yet.
+- Burnout speed 5.2–5.3 km/s (the talk: "about 5 km/s or Mach 15").
+
+This is a fit of the plan to the warning, which is what a flight plan is
+admitted on. It is also the first comparison of Thrusty's spent-stage
+impacts with reported drop zones; it becomes a test once the candidate is
+admitted and the warning's text is recorded.
