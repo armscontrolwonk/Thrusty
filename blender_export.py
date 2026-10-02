@@ -88,37 +88,10 @@ def _load_figure_mesh():
     return _figure_mesh_cache or None
 
 
-def _nose_profile(shape, R, L):
-    """(r, z) nose profile from base (r=R, z=0) to tip (r=0, z=L) — the
-    true analytic curve for the declared shape."""
-    s = (shape or "cone").lower()
-    n = _PROFILE_N
-    if "karman" in s or "haack" in s:
-        # Haack series, x measured from the tip: C=0 → Von Kármán (LD),
-        # C=1/3 → LV-Haack (= Sears-Haack body nose in this code base).
-        C = 1.0 / 3.0 if ("lv" in s or "sears" in s) else 0.0
-        pts = []
-        for i in range(n + 1):
-            x = L * (1.0 - i / n)
-            th = math.acos(max(-1.0, min(1.0, 1.0 - 2.0 * x / L)))
-            r = R / math.sqrt(math.pi) * math.sqrt(
-                max(0.0, th - math.sin(2.0 * th) / 2.0
-                    + C * math.sin(th) ** 3))
-            pts.append((r, L - x))
-        return pts
-    if "ogive" in s:
-        rho = (R * R + L * L) / (2.0 * R)       # tangent-ogive radius
-        return [(math.sqrt(max(0.0, rho * rho - (L - x) ** 2)) + R - rho,
-                 L - x)
-                for x in (L * (1.0 - i / n) for i in range(n + 1))]
-    if "parabola" in s:
-        # parabolic series K'=1: r = R(2ξ − ξ²), ξ measured from the tip
-        return [(R * (2.0 * xi - xi * xi), L * (1.0 - xi))
-                for xi in (1.0 - i / n for i in range(n + 1))]
-    if "blunt" in s:
-        return [(R * math.cos(math.pi / 2 * i / n),
-                 L * math.sin(math.pi / 2 * i / n)) for i in range(n + 1)]
-    return [(R, 0.0), (0.0, L)]                  # straight cone
+from stage_outline import (nose_profile as _nose_profile,   # one source: stage_outline
+                           outline as _stage_outline, profile as _outline_profile,
+                           strapon_piece as _strapon_piece,
+                           NOZZLE_NECK_FRACTION as _NECK)
 
 
 def _sphere_cone_profile(R, L, rn):
@@ -170,10 +143,32 @@ def vehicle_elements(p):
         if not _f(getattr(s, "length_m", 0.0)):
             flags.append(f"S{i+1} length unset — 1 m used")
         d_top = _stage_top_diameter(s)
-        revolves.append((f"S{i+1}",
-                         [(0.0, 0.0), (d / 2, 0.0), (d_top / 2, L),
-                          (0.0, L)],
-                         (0.0, 0.0, z), "full"))
+        # The stage's outline beyond a cylinder (stage_outline: the numbers
+        # the schematic draws and the spent-stage physics flies).
+        _o = _stage_outline(s)
+        _prof = [(0.0, 0.0)]
+        if _o.skirt_len > 0.0:
+            _prof += [(_o.skirt_d / 2, 0.0), (d / 2, _o.skirt_len)]
+        else:
+            _prof.append((d / 2, 0.0))
+            if (_f(getattr(s, "aft_skirt_length_m", 0.0)) > 0
+                    or _f(getattr(s, "aft_skirt_diameter_m", 0.0)) > 0):
+                flags.append(f"S{i+1} aft skirt incomplete or not wider than "
+                             f"the body — not drawn or flown")
+        _prof += [(d_top / 2, L), (0.0, L)]
+        revolves.append((f"S{i+1}", _prof, (0.0, 0.0, z), "full"))
+        if _o.nozzle_len > 0.0:
+            _re = _o.nozzle_d / 2
+            revolves.append((f"S{i+1}_NozzleCone",
+                             [(0.0, -_o.nozzle_len), (_re, -_o.nozzle_len),
+                              (_NECK * _re, 0.0), (0.0, 0.0)],
+                             (0.0, 0.0, z), "full"))
+            if int(getattr(s, "n_nozzles", 1) or 1) > 1:
+                flags.append(f"S{i+1} nozzle cluster drawn and flown as one "
+                             f"nozzle of the total exit area")
+        elif _f(getattr(s, "nozzle_protrusion_m", 0.0)) > 0:
+            flags.append(f"S{i+1} nozzle protrusion set but no exit area — "
+                         f"not drawn or flown")
         if getattr(s, "has_fins", False) and _f(getattr(s, "fin_span_m", 0.0)) > 0:
             finned = (s, z)
         if getattr(s, "has_grid_fins", False) and int(getattr(s, "n_grid_fins", 0) or 0) > 0:
@@ -324,15 +319,30 @@ def vehicle_elements(p):
     if strap:
         s, zb, Lc = strap
         n_b = int(s.n_boosters)
-        bd = _f(getattr(s, "booster_diam_m", 0.0)) or 0.3
-        bL = _f(getattr(s, "booster_length_m", 0.0))
-        if bL <= 0:
-            bL = min(0.45 * Lc, 18 * bd)
-            flags.append("strap-on length unset — nominal used")
+        # One outline (stage_outline), as in the 2-D schematic and as flown:
+        # nothing invented.  No nose entered -> flat front; no length
+        # entered -> 2 x diameter.
+        piece = _strapon_piece(s)
+        _o = _stage_outline(piece) if piece is not None else None
+        bd = _o.d if _o is not None else 0.3
+        bL = _o.L if _o is not None else 2.0 * bd
+        if piece is not None and piece.length_unset:
+            flags.append("strap-on length unset — 2 × diameter drawn and flown")
+        if _o is not None and _o.nose_len <= 0.0:
+            flags.append("strap-on nose (shape and length unset — flat front "
+                         "drawn and flown; ascent drag from the entered Cd "
+                         f"{_f(getattr(s, 'booster_cd', 0.0)):g})")
+        if (_o is not None and _o.nozzle_len <= 0.0
+                and _f(getattr(s, "booster_nozzle_protrusion_m", 0.0)) > 0):
+            flags.append("strap-on nozzle protrusion set but no exit area — "
+                         "not drawn or flown")
         cR = _f(s.diameter_m) / 2.0
         Rb = bd / 2.0
         c_dist = cR + Rb + 0.05
-        profile = [(0.0, 0.0), (Rb, 0.0), (Rb, bL), (0.0, bL + 1.4 * bd)]
+        # revolve profile (r, z up from the base), rear to front
+        profile = ([(r, bL - x) for (x, r) in reversed(_outline_profile(piece))]
+                   if piece is not None
+                   else [(0.0, 0.0), (Rb, 0.0), (Rb, bL), (0.0, bL)])
         # Simple anti-collision rule: when the same stack carries FINS,
         # clock the strap-on ring by half a fin spacing so the boosters
         # sit in the GAPS between fins instead of overlapping them

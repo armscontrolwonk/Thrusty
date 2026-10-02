@@ -279,66 +279,30 @@ def empty_cg_fraction(stage, dry_mass_kg, role='lower'):
 
 def planform_centroid_offset(stage):
     """(offset, overall length, side-on area): how far aft of mid-length
-    the stage's side-on area is centred, as a fraction of its overall length
+    the piece's side-on area is centred, as a fraction of its overall length
     (positive toward the base), that length in metres, and the area in m^2.
     A slender nozzle adds length faster than area, so its offset can be
     negative as a fraction while the centroid still moves aft in metres.
 
     At broadside the normal force acts at the centroid of the side-on
     (planform) area: 0.50 of the length for a plain cylinder, further aft
-    for a body with a tapered front, a flared skirt or a nozzle sticking
-    out.  Jernell (TM X-1658) states it — a rearward planform centroid gives
-    a rearward centre of pressure — and the Shuttle SRB shows it: its
-    centroid is at about 53% (Bacchus, Kross & Moog 1985) and its measured
-    centre of pressure sits 0.03-0.06 of the length nearer the tail than
-    the flat-ended cylinder's at every angle past broadside (Johnson &
-    Braddock, DMS-DR-2111; FRONT_END_DESIGN.md §19g).  The cylinder's
+    for a body with a nose, a flared skirt or a nozzle sticking out.
+    Jernell (TM X-1658) states it — a rearward planform centroid gives a
+    rearward centre of pressure — and the Shuttle SRB shows it: its centroid
+    is at about 53% (Bacchus, Kross & Moog 1985) and its measured centre of
+    pressure sits 0.03-0.06 of the length nearer the tail than the
+    flat-ended cylinder's at every angle past broadside (Johnson & Braddock,
+    DMS-DR-2111; FRONT_END_DESIGN.md §19g).  The cylinder's
     centre-of-pressure curve is therefore shifted by this offset at every
     angle — an inference from those two sources, checked on the SRB only.
 
-    The outline, from the stage's fields (all 0 = a plain cylinder):
-      forward_taper_length_m   the front tapers to a point over this length
-                               (a triangle), inside length_m;
-      aft_skirt_length_m, aft_skirt_diameter_m
-                               a skirt flaring from the body diameter to
-                               this diameter at the base, over the last
-                               aft_skirt_length_m of length_m;
-      nozzle_protrusion_m      a nozzle extending this far past the base,
-                               widening from half its exit diameter to the
-                               exit diameter (from nozzle_exit_area_m2; the
-                               half is an assumption, the fields give no
-                               throat).  It adds to the overall length.
-    """
-    d = float(stage.diameter_m or 0.0)
-    L = float(stage.length_m or 0.0) or 2.0 * d
-    g = lambda k: max(float(getattr(stage, k, 0.0) or 0.0), 0.0)
-    taper = min(g('forward_taper_length_m'), L)
-    sk_d = g('aft_skirt_diameter_m')
-    sk_l = min(g('aft_skirt_length_m'), L - taper) if sk_d > d else 0.0
-    prot = g('nozzle_protrusion_m')
-    d_e = math.sqrt(4.0 * g('nozzle_exit_area_m2') / math.pi)
-    if d <= 0.0:
-        return 0.0, L, 0.0
-    trapezoid = lambda length, a, b: (length * (a + b) / 2.0,
-                                      length / 3.0 * (a + 2.0 * b) / (a + b))
-    pieces = []                                   # (area, centroid from front)
-    if taper > 0.0:
-        pieces.append((0.5 * taper * d, 2.0 / 3.0 * taper))
-    cyl = L - taper - sk_l
-    pieces.append((cyl * d, taper + 0.5 * cyl))
-    if sk_l > 0.0:
-        a, x = trapezoid(sk_l, d, sk_d)
-        pieces.append((a, L - sk_l + x))
-    L_all = L
-    if prot > 0.0 and d_e > 0.0:
-        a, x = trapezoid(prot, 0.5 * d_e, d_e)
-        pieces.append((a, L + x))
-        L_all = L + prot
-    area = sum(p[0] for p in pieces)
-    if area <= 0.0:
+    The outline is stage_outline.profile(stage): the same one the schematic
+    and the 3-D export draw."""
+    from stage_outline import side_area_and_centroid
+    area, x_c, L_all = side_area_and_centroid(stage)
+    if area <= 0.0 or L_all <= 0.0:
         return 0.0, L_all, 0.0
-    return (sum(p[0] * p[1] for p in pieces) / area / L_all - 0.5, L_all,
-            area)
+    return x_c / L_all - 0.5, L_all, area
 
 
 def solid_nozzle_share(thrust_N):

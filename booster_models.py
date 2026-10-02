@@ -177,22 +177,19 @@ class BoosterParams:
     interstage_mass_kg:     float = 0.0
     interstage_jettison_s:  Optional[float] = None
 
-    # Outline of the stage beyond a plain cylinder, for how it falls once
-    # spent (spent_stage_aero.planform_centroid_offset; FRONT_END_DESIGN.md
-    # §19i).  All 0 = a plain cylinder.  They shift where the stage's
+    # Outline of the stage beyond a plain cylinder (stage_outline.py, the one
+    # description the schematic, the 3-D export and the physics read;
+    # FRONT_END_DESIGN.md §19i-j).  All 0 = a plain cylinder.  A spent
+    # stage's front is flat: its nose_shape describes the vehicle's front.  They shift where the stage's
     # side-on area is centred, and with it the centre of pressure and the
     # trim.  On ascent only the aft skirt counts: it adds flare wave drag
-    # (_transition_wave_drag); the taper and the nozzle add none.
-    #   forward_taper_length_m  length over which the front tapers to a
-    #                           point (a strap-on's or booster's nose cone),
-    #                           inside length_m
+    # (_transition_wave_drag); the nozzle adds none.
     #   aft_skirt_length_m,     a skirt flaring from the body diameter to
     #   aft_skirt_diameter_m    this diameter at the base, over the last
     #                           aft_skirt_length_m of length_m
     #   nozzle_protrusion_m     how far the nozzle extends past the base,
     #                           beyond length_m; its exit diameter comes
     #                           from nozzle_exit_area_m2
-    forward_taper_length_m: float = 0.0
     aft_skirt_length_m:     float = 0.0
     aft_skirt_diameter_m:   float = 0.0
     nozzle_protrusion_m:    float = 0.0
@@ -296,7 +293,19 @@ class BoosterParams:
     booster_nozzle_area_m2: float = 0.0    # nozzle exit area for P correction (m²)
     booster_diam_m:         float = 0.0    # outer diameter per booster (m)
     booster_length_m:       float = 0.0    # length per booster (0 → 2×diameter)
-    booster_cd:             float = 0.20   # zero-lift Cd (0.20 = tangent ogive)
+    booster_cd:             float = 0.20   # zero-lift Cd, used ONLY while no
+                                           # nose is entered below
+    # The strap-on's outline (stage_outline.strapon_piece): one description
+    # for the schematic, the 3-D export, ascent drag and the spent casing's
+    # fall.  A nose exists only when BOTH shape and length are entered; it
+    # lies inside booster_length_m, and ascent drag is then computed from it
+    # (booster_cd is ignored).  With none entered the strap-on is drawn and
+    # flown flat-fronted, at booster_cd on ascent.
+    booster_nose_shape:           str   = ""
+    booster_nose_length_m:        float = 0.0
+    booster_aft_skirt_length_m:   float = 0.0
+    booster_aft_skirt_diameter_m: float = 0.0
+    booster_nozzle_protrusion_m:  float = 0.0
     # Seconds after T=0 (strap-on ignition / liftoff) before stage-1 core ignites.
     # 0 = all ignite together (Soyuz).  >0 = sequential (LVM3, Titan IIIC).
     booster_core_delay_s:   float = 0.0
@@ -2553,7 +2562,6 @@ def booster_to_dict(p: BoosterParams, include_flight_plan: bool = True) -> dict:
         'interstage_length_m':    p.interstage_length_m,
         'interstage_mass_kg':     p.interstage_mass_kg,
         'interstage_jettison_s':  p.interstage_jettison_s,
-        'forward_taper_length_m': p.forward_taper_length_m,
         'aft_skirt_length_m':     p.aft_skirt_length_m,
         'aft_skirt_diameter_m':   p.aft_skirt_diameter_m,
         'nozzle_protrusion_m':    p.nozzle_protrusion_m,
@@ -2595,6 +2603,11 @@ def booster_to_dict(p: BoosterParams, include_flight_plan: bool = True) -> dict:
         'booster_diam_m':         p.booster_diam_m,
         'booster_length_m':       p.booster_length_m,
         'booster_cd':             p.booster_cd,
+        'booster_nose_shape':           p.booster_nose_shape,
+        'booster_nose_length_m':        p.booster_nose_length_m,
+        'booster_aft_skirt_length_m':   p.booster_aft_skirt_length_m,
+        'booster_aft_skirt_diameter_m': p.booster_aft_skirt_diameter_m,
+        'booster_nozzle_protrusion_m':  p.booster_nozzle_protrusion_m,
         'booster_core_delay_s':   p.booster_core_delay_s,
         'booster_jettison_s':     p.booster_jettison_s,
     }
@@ -2838,7 +2851,6 @@ def booster_from_dict(d: dict) -> BoosterParams:
         interstage_mass_kg=float(d.get('interstage_mass_kg', 0.0)),
         interstage_jettison_s=(float(d['interstage_jettison_s'])
                                if d.get('interstage_jettison_s') is not None else None),
-        forward_taper_length_m=float(d.get('forward_taper_length_m', 0.0) or 0.0),
         aft_skirt_length_m=float(d.get('aft_skirt_length_m', 0.0) or 0.0),
         aft_skirt_diameter_m=float(d.get('aft_skirt_diameter_m', 0.0) or 0.0),
         nozzle_protrusion_m=float(d.get('nozzle_protrusion_m', 0.0) or 0.0),
@@ -2880,6 +2892,11 @@ def booster_from_dict(d: dict) -> BoosterParams:
         booster_diam_m=float(d.get('booster_diam_m', 0.0)),
         booster_length_m=float(d.get('booster_length_m', 0.0)),
         booster_cd=float(d.get('booster_cd', 0.20)),
+        booster_nose_shape=str(d.get('booster_nose_shape', '') or ''),
+        booster_nose_length_m=float(d.get('booster_nose_length_m', 0.0) or 0.0),
+        booster_aft_skirt_length_m=float(d.get('booster_aft_skirt_length_m', 0.0) or 0.0),
+        booster_aft_skirt_diameter_m=float(d.get('booster_aft_skirt_diameter_m', 0.0) or 0.0),
+        booster_nozzle_protrusion_m=float(d.get('booster_nozzle_protrusion_m', 0.0) or 0.0),
         booster_core_delay_s=float(d.get('booster_core_delay_s', 0.0)),
         booster_jettison_s=float(d.get('booster_jettison_s', 0.0)),
         stage_turn_start_s=(float(d['stage_turn_start_s'])
@@ -4663,11 +4680,47 @@ def booster_drag_vector(top_params: BoosterParams, vel_ecef: np.ndarray,
     speed = np.linalg.norm(vel_ecef)
     if speed < 1e-6:
         return np.zeros(3)
-    _, _, rho, _ = atmosphere(altitude_m)
+    T, _, rho, a_sound = atmosphere(altitude_m)
     q        = 0.5 * rho * speed ** 2
-    A_total  = n * np.pi * (d / 2.0) ** 2
-    drag_mag = top_params.booster_cd * q * A_total
+    A_one    = np.pi * (d / 2.0) ** 2
+    A_total  = n * A_one
+    cd = strapon_cd(top_params, speed / a_sound, rho=rho, speed=speed, T=T)
+    drag_mag = cd * q * A_total
     return -drag_mag * (vel_ecef / speed)
+
+
+def strapon_cd(top_params: BoosterParams, mach: float, rho: float = None,
+               speed: float = None, T: float = None) -> float:
+    """Zero-lift drag coefficient of one strap-on, on its own cross-section.
+
+    When the strap-on has a nose entered (stage_outline.strapon_piece: shape
+    AND length), the coefficient is built from that outline by the same
+    method as the core vehicle's front end — `_cd_nose_shape` for the nose,
+    body friction and base (the base charged only over the annulus outside
+    the nozzle exit, as it fires whenever this drag is applied), plus
+    `_flare_cd` for an aft skirt — and `booster_cd` is ignored, so the shape
+    drawn is the shape flown.  With no nose entered it is `booster_cd`, the
+    number in the file, and the schematic says so."""
+    from stage_outline import strapon_piece, outline
+    piece = strapon_piece(top_params)
+    if piece is None:
+        return 0.0
+    o = outline(piece)
+    if o.nose_len <= 0.0:
+        return float(top_params.booster_cd)
+    A_one = np.pi * (o.d / 2.0) ** 2
+    re_l = 5e6
+    if rho is not None and speed is not None and T is not None:
+        mu = _mu_air(T)
+        if mu > 0.0:
+            re_l = rho * speed * o.L / mu
+    a_exit = float(piece.nozzle_exit_area_m2)
+    bar = max(0.0, 1.0 - a_exit / A_one) if a_exit > 0.0 else 1.0
+    cd = _cd_nose_shape(o.nose_shape, o.nose_len / o.d, mach, re_l=re_l,
+                        ld_body=o.L / o.d, base_area_ratio=bar)
+    if o.skirt_len > 0.0:
+        cd += _flare_cd(o.skirt_d, o.d, o.skirt_len, mach, A_one)
+    return float(cd)
 
 
 # ---------------------------------------------------------------------------

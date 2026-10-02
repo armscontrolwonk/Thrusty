@@ -1135,9 +1135,11 @@ by the planform centroid (§19g). With that, this benchmark becomes a test.
 
 ### 19i. A stage's outline: taper, skirt, nozzle (2026-10-01)
 
-Built at the user's direction after §19g–h. Four hardware fields on a
-stage, all zero for a plain cylinder: `forward_taper_length_m`,
-`aft_skirt_length_m`, `aft_skirt_diameter_m`, `nozzle_protrusion_m` (owners
+Built at the user's direction after §19g–h (the front taper described
+here was replaced the next day by a strap-on's own nose: §19j). Four
+hardware fields on a stage, all zero for a plain cylinder:
+`forward_taper_length_m`, `aft_skirt_length_m`, `aft_skirt_diameter_m`,
+`nozzle_protrusion_m` (owners
 in `field_registry.py`; in the stage editor; not in the spreadsheet form,
 like the fin fields). `spent_stage_aero.planform_centroid_offset` finds
 where the side-on area is centred and the centre of pressure is moved aft
@@ -1179,6 +1181,52 @@ much as the whole body and nose; on a first stage that is 0.5–4% of range
 for the shipped ballistic vehicles (Generic ICBM −0.5%, AUR −1.9%,
 Shahab-3 −4.1% on its shipped lofted plan). A 10° flare to 1.15 times is
 0.2–0.7%. No shipped vehicle has a skirt entered.
+
+### 19j. One outline, drawn and flown (2026-10-02)
+
+The user's rule, restated for this work: the schematic and the 3-D export
+are the only ways a person can audit the input data, so they must always
+show what is flown, including what has not been entered. §19i broke it
+(the outline was flown and not drawn), and strap-ons had three unlinked
+shapes before it: a typed drag number for ascent, a cone 1.4 diameters
+long invented by the drawing code and added on top of the stated length,
+and a flat-ended cylinder for the spent casing.
+
+Now there is one description, `stage_outline.py` (pure geometry, imports
+nothing from Thrusty; the nose curves moved there from `blender_export`):
+
+- `outline(piece)` and `profile(piece)`: radius against distance from the
+  front. `booster_schematic` and `blender_export` draw it;
+  `spent_stage_aero.planform_centroid_offset` integrates it;
+  `booster_models.strapon_cd` builds ascent drag from it.
+- **Stages**: aft skirt and nozzle protrusion. The front taper of §19i is
+  removed: a spent stage's front is flat, and a stage's `nose_shape`
+  describes the front of the whole vehicle, so the outline never reads it.
+- **Strap-ons**: `booster_nose_shape`, `booster_nose_length_m`,
+  `booster_aft_skirt_length_m`, `booster_aft_skirt_diameter_m`,
+  `booster_nozzle_protrusion_m`. A nose exists only when both shape and
+  length are entered, and lies inside the stated length (the subtractive
+  convention of §4).
+- **Ascent drag** (user, yes): with a nose entered it is computed from the
+  outline and `booster_cd` is ignored; with none, `booster_cd` is used.
+- **Nothing invented** (user, yes): with no nose entered the strap-on is
+  drawn flat-fronted, as flown; with no length entered it is drawn at twice
+  its diameter, as flown (the schematic used to draw a different nominal
+  length from the one flown). Both views flag it. A skirt not wider than
+  the body, or a nozzle protrusion with no exit area, is flagged "not drawn
+  or flown". A nozzle cluster is drawn and flown as one nozzle of the total
+  exit area, and flagged.
+
+What this shows at once on the shipped files: the Strypi strap-ons have no
+length entered, so they are 0.46 m stubs in the drawing — which is what
+the spent-casing model has been flying.
+
+Open: whether an interstage leaves separately from the stage below it
+(user, 2026-10-02: "we will eventually have to decide"). Today its mass
+rides until `interstage_jettison_s` or the stage's separation, and the
+spent stage's outline does not include it. The nozzle's neck at half its
+exit diameter is an assumption. The strap-on label in the schematic can
+overlap the scale bar when it runs to several lines.
 
 **Phase 4 — later.** A flight-plan option to drop the fins.
 

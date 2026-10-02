@@ -1008,9 +1008,6 @@ class _StageFrame(ttk.LabelFrame):
         ttk.Label(_out_g, text="Nozzle protrudes (m):").pack(side=tk.LEFT)
         self._noz_prot_var = tk.StringVar(value="0")
         ttk.Entry(_out_g, textvariable=self._noz_prot_var, width=6).pack(side=tk.LEFT, padx=(2, 0))
-        ttk.Label(_out_g, text="Front taper L (m):").pack(side=tk.LEFT, padx=(8, 2))
-        self._fwd_taper_var = tk.StringVar(value="0")
-        ttk.Entry(_out_g, textvariable=self._fwd_taper_var, width=6).pack(side=tk.LEFT)
         self._on_conical()
         self._on_interstage()
 
@@ -1477,8 +1474,7 @@ class _StageFrame(ttk.LabelFrame):
         for _k, _var, _lbl in (
                 ("aft_skirt_diameter_m", self._skirt_dia_var, "Aft skirt diameter"),
                 ("aft_skirt_length_m", self._skirt_len_var, "Aft skirt length"),
-                ("nozzle_protrusion_m", self._noz_prot_var, "Nozzle protrusion"),
-                ("forward_taper_length_m", self._fwd_taper_var, "Front taper length")):
+                ("nozzle_protrusion_m", self._noz_prot_var, "Nozzle protrusion")):
             try:
                 result[_k] = max(0.0, float(_var.get() or 0.0))
             except ValueError:
@@ -1542,7 +1538,6 @@ class _StageFrame(ttk.LabelFrame):
         self._skirt_dia_var.set(str(d.get("aft_skirt_diameter_m", 0.0) or 0.0))
         self._skirt_len_var.set(str(d.get("aft_skirt_length_m", 0.0) or 0.0))
         self._noz_prot_var.set(str(d.get("nozzle_protrusion_m", 0.0) or 0.0))
-        self._fwd_taper_var.set(str(d.get("forward_taper_length_m", 0.0) or 0.0))
         self._on_conical()
         self._on_interstage()
 
@@ -1909,6 +1904,20 @@ class BoosterDialog(tk.Toplevel):
         ttk.Label(self._booster_frame, text="Cd guide: 0.10 ogive · 0.20 cone · 0.40 hemi · 1.0 flat",
                   foreground="gray50").grid(
             row=11, column=0, columnspan=2, sticky=tk.W, padx=(6, 6), pady=(0, 4))
+        # The strap-on's outline — one description for the schematic, the
+        # 3-D export, ascent drag and the spent casing.  With a nose entered
+        # (shape AND length) ascent drag comes from it and the Cd above is
+        # ignored; with none, the strap-on is drawn and flown flat-fronted.
+        ttk.Label(self._booster_frame, text="Nose shape:").grid(
+            row=12, column=0, sticky=tk.W, padx=(6, 2), pady=2)
+        self._b_nose_shape_var = tk.StringVar(value="")
+        ttk.Combobox(self._booster_frame, textvariable=self._b_nose_shape_var,
+                     values=[""] + list(NOSE_SHAPES), state="readonly",
+                     width=16).grid(row=12, column=1, sticky=tk.W, padx=(0, 6), pady=2)
+        self._b_nose_len_var    = _be_entry(13, "Nose length (m):",          "0", "m  (inside Length; replaces Cd)")
+        self._b_skirt_dia_var   = _be_entry(14, "Aft skirt base ⌀ (m):",     "0", "m")
+        self._b_skirt_len_var   = _be_entry(15, "Aft skirt length (m):",     "0", "m")
+        self._b_noz_prot_var    = _be_entry(16, "Nozzle protrudes (m):",     "0", "m", pady=(2, 6))
 
         # Stage frames (1 always visible; 2-4 toggled).
         # A dedicated container ensures dynamically-packed stages always appear
@@ -2421,7 +2430,6 @@ class BoosterDialog(tk.Toplevel):
                 "aft_skirt_diameter_m": getattr(node, 'aft_skirt_diameter_m', 0.0),
                 "aft_skirt_length_m": getattr(node, 'aft_skirt_length_m', 0.0),
                 "nozzle_protrusion_m": getattr(node, 'nozzle_protrusion_m', 0.0),
-                "forward_taper_length_m": getattr(node, 'forward_taper_length_m', 0.0),
                 "interstage_mass_kg":  getattr(node, 'interstage_mass_kg', 0.0),
                 "interstage_jettison_s": getattr(node, 'interstage_jettison_s', None),
             })
@@ -2502,6 +2510,11 @@ class BoosterDialog(tk.Toplevel):
             self._b_diam_var.set(f"{getattr(p, 'booster_diam_m', 0.0):.2f}")
             self._b_length_var.set(f"{getattr(p, 'booster_length_m', 0.0):.2f}")
             self._b_cd_var.set(f"{getattr(p, 'booster_cd', 0.20):.2f}")
+            self._b_nose_shape_var.set(getattr(p, 'booster_nose_shape', '') or '')
+            self._b_nose_len_var.set(f"{getattr(p, 'booster_nose_length_m', 0.0):g}")
+            self._b_skirt_dia_var.set(f"{getattr(p, 'booster_aft_skirt_diameter_m', 0.0):g}")
+            self._b_skirt_len_var.set(f"{getattr(p, 'booster_aft_skirt_length_m', 0.0):g}")
+            self._b_noz_prot_var.set(f"{getattr(p, 'booster_nozzle_protrusion_m', 0.0):g}")
         self._update_booster_frame()
 
         # Apply show/hide state for all sections
@@ -2675,7 +2688,6 @@ class BoosterDialog(tk.Toplevel):
                 aft_skirt_diameter_m=float(sd.get("aft_skirt_diameter_m", 0.0)),
                 aft_skirt_length_m=float(sd.get("aft_skirt_length_m", 0.0)),
                 nozzle_protrusion_m=float(sd.get("nozzle_protrusion_m", 0.0)),
-                forward_taper_length_m=float(sd.get("forward_taper_length_m", 0.0)),
                 interstage_mass_kg=float(sd.get("interstage_mass_kg", 0.0)),
                 interstage_jettison_s=sd.get("interstage_jettison_s", None),
             )
@@ -2736,6 +2748,10 @@ class BoosterDialog(tk.Toplevel):
                 _b_diam        = float(self._b_diam_var.get())
                 _b_length      = float(self._b_length_var.get())
                 _b_cd          = float(self._b_cd_var.get())
+                _b_nose_len    = max(0.0, float(self._b_nose_len_var.get() or 0.0))
+                _b_skirt_dia   = max(0.0, float(self._b_skirt_dia_var.get() or 0.0))
+                _b_skirt_len   = max(0.0, float(self._b_skirt_len_var.get() or 0.0))
+                _b_noz_prot    = max(0.0, float(self._b_noz_prot_var.get() or 0.0))
             except ValueError as exc:
                 raise ValueError(f"Booster field: {exc}") from exc
             if _b_burn <= 0:
@@ -2755,6 +2771,11 @@ class BoosterDialog(tk.Toplevel):
             node.booster_diam_m         = _b_diam
             node.booster_length_m       = _b_length
             node.booster_cd             = _b_cd
+            node.booster_nose_shape           = self._b_nose_shape_var.get().strip()
+            node.booster_nose_length_m        = _b_nose_len
+            node.booster_aft_skirt_diameter_m = _b_skirt_dia
+            node.booster_aft_skirt_length_m   = _b_skirt_len
+            node.booster_nozzle_protrusion_m  = _b_noz_prot
 
         return node
 

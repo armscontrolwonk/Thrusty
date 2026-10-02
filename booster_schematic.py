@@ -55,6 +55,11 @@ NOSE             = "#d7dae0"
 LABEL, LABEL_MUT = "#333333", "#555555"
 
 
+from stage_outline import (outline as _stage_outline, profile as _outline_profile,
+                           strapon_piece as _strapon_piece,
+                           NOZZLE_NECK_FRACTION as _NECK)
+
+
 def stage_chain(p):
     """The stage list, bottom (stage 1) first, walking the .stage2 chain."""
     out, node = [], p
@@ -471,8 +476,38 @@ def draw_booster(ax, p, title=None):
                              "body_diameter_m": float(_eff_ro.diameter_m)}
         else:
             _body_patch(ax, x0, y, d, d_top, L, BODY, BODY_E)
+        # The stage's outline beyond a cylinder (stage_outline: the same
+        # numbers the spent-stage physics flies).  Drawn over the body.
+        _o = _stage_outline(s)
+        _extra = []
+        if _o.skirt_len > 0.0:
+            _rs = _o.skirt_d / 2.0
+            ax.add_patch(Polygon([(x0 - _rs, y), (x0 + _rs, y),
+                                  (x0 + R, y + _o.skirt_len),
+                                  (x0 - R, y + _o.skirt_len)], closed=True,
+                                 fc=BODY, ec=BODY_E, lw=1.2, zorder=2.2))
+            _extra.append(f"skirt ⌀{_o.skirt_d:g}×{_o.skirt_len:g} m")
+        elif (float(getattr(s, "aft_skirt_length_m", 0.0) or 0.0) > 0.0
+              or float(getattr(s, "aft_skirt_diameter_m", 0.0) or 0.0) > 0.0):
+            flags.append(f"S{i+1} aft skirt incomplete or not wider than "
+                         f"the body — not drawn or flown")
+        if _o.nozzle_len > 0.0:
+            _rn, _re = _NECK * _o.nozzle_d / 2.0, _o.nozzle_d / 2.0
+            ax.add_patch(Polygon([(x0 - _rn, y), (x0 + _rn, y),
+                                  (x0 + _re, y - _o.nozzle_len),
+                                  (x0 - _re, y - _o.nozzle_len)], closed=True,
+                                 fc=STRAP, ec=BODY_E, lw=1.1, zorder=4))
+            _extra.append(f"nozzle +{_o.nozzle_len:g} m")
+            if int(getattr(s, "n_nozzles", 1) or 1) > 1:
+                flags.append(f"S{i+1} nozzle cluster drawn and flown as one "
+                             f"nozzle of the total exit area")
+        elif float(getattr(s, "nozzle_protrusion_m", 0.0) or 0.0) > 0.0:
+            flags.append(f"S{i+1} nozzle protrusion set but no exit area — "
+                         f"not drawn or flown")
         _lbl = (f"S{i+1}: ⌀{d:g}→{d_top:g}×{L:g} m" if d_top != d
                 else f"S{i+1}: ⌀{d:g}×{L:g} m")
+        if _extra:
+            _lbl += "\n" + " · ".join(_extra)
         ax.text(x0 + R + 0.15, y + L / 2, _lbl,
                 va="center", ha="left", fontsize=8, color=LABEL)
         if getattr(s, "has_fins", False) and (getattr(s, "fin_span_m", 0.0) or 0) > 0:
@@ -639,25 +674,48 @@ def draw_booster(ax, p, title=None):
     if strap:
         s, yb, Lc = strap
         n = int(s.n_boosters)
-        bd = float(getattr(s, "booster_diam_m", 0.0) or 0.3)
-        bL = float(getattr(s, "booster_length_m", 0.0) or 0.0)
-        flag = ""
-        if bL <= 0:
-            bL = min(0.45 * Lc, 18 * bd)
-            flag = " (nom.)"
-            flags.append("strap-on (length unset — nominal)")
-        cR = float(s.diameter_m) / 2.0
-        R = bd / 2.0
-        for sgn in (+1, -1):
-            cx = sgn * (cR + R + 0.05)
-            ax.add_patch(Rectangle((cx - R, yb), bd, bL,
-                                   fc=STRAP, ec=BODY_E, lw=1.1, zorder=1))
-            _nose_patch(ax, cx, yb + bL, bd, 1.4 * bd, STRAP, BODY_E, "cone")
-        # label in the tall clear LEFT margin at the strap top, wrapped so it
-        # never runs over the core body (nor off the panel edge)
-        ax.text(-(cR + 2 * R + 0.35), yb + bL,
-                f"{n}× strap-on\n⌀{bd:g}×{bL:.1f} m{flag}",
-                va="center", ha="right", fontsize=7.5, color=LABEL_MUT)
+        # The strap-on is drawn from its ONE outline (stage_outline), the
+        # same the spent casing is flown with and ascent drag is built from.
+        # Nothing is invented: with no nose entered it is flat-fronted, as
+        # flown; with no length entered it is 2 x diameter, as flown.
+        piece = _strapon_piece(s)
+        if piece is not None:
+            _o = _stage_outline(piece)
+            bd, bL = _o.d, _o.L
+            flag = ""
+            if piece.length_unset:
+                flag = " (len. unset)"
+                flags.append("strap-on (length unset — 2 × diameter drawn "
+                             "and flown)")
+            if _o.nose_len <= 0.0:
+                flags.append("strap-on nose (shape and length unset — flat "
+                             "front drawn and flown; ascent drag from the "
+                             f"entered Cd {float(s.booster_cd):g})")
+            if (_o.nozzle_len <= 0.0 and float(getattr(
+                    s, "booster_nozzle_protrusion_m", 0.0) or 0.0) > 0.0):
+                flags.append("strap-on nozzle protrusion set but no exit "
+                             "area — not drawn or flown")
+            cR = float(s.diameter_m) / 2.0
+            R = bd / 2.0
+            prof = _outline_profile(piece)             # (x from front, r)
+            for sgn in (+1, -1):
+                cx = sgn * (cR + R + 0.05)
+                left = [(cx - r, yb + bL - x) for (x, r) in prof]
+                pts = left + [(2 * cx - xx, yy) for (xx, yy) in reversed(left)]
+                ax.add_patch(Polygon(pts, closed=True, fc=STRAP, ec=BODY_E,
+                                     lw=1.1, zorder=1))
+            _bits = [f"⌀{bd:g}×{bL:.1f} m{flag}"]
+            if _o.nose_len > 0.0:
+                _bits.append(f"{_o.nose_shape} nose {_o.nose_len:g} m")
+            if _o.skirt_len > 0.0:
+                _bits.append(f"skirt ⌀{_o.skirt_d:g}×{_o.skirt_len:g} m")
+            if _o.nozzle_len > 0.0:
+                _bits.append(f"nozzle +{_o.nozzle_len:g} m")
+            # label in the tall clear LEFT margin at the strap top, wrapped so
+            # it never runs over the core body (nor off the panel edge)
+            ax.text(-(cR + 2 * R + 0.35), yb + bL,
+                    f"{n}× strap-on\n" + "\n".join(_bits),
+                    va="center", ha="right", fontsize=7.5, color=LABEL_MUT)
 
     ax.set_aspect("equal")
     ax.relim(); ax.autoscale_view()

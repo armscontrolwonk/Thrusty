@@ -426,7 +426,8 @@ def test_a_marginal_finned_stage_reports_the_midpoint_with_its_half_width():
 # DMS-DR-2111, Fig. 2): overall 9.808; nose cone 1.059; body 0.800 dia;
 # skirt 0.524 long flaring to 1.082; nozzle 0.294 beyond it, exit 0.798.
 _M449 = dict(diameter_m=0.800, length_m=9.808 - 0.294,
-             forward_taper_length_m=1.059, aft_skirt_length_m=0.524,
+             own_nose_shape='cone', own_nose_length_m=1.059,
+             aft_skirt_length_m=0.524,
              aft_skirt_diameter_m=1.082, nozzle_protrusion_m=0.294,
              nozzle_exit_area_m2=math.pi * 0.798 ** 2 / 4.0)
 
@@ -447,7 +448,8 @@ def test_the_srb_models_side_on_area_is_centred_aft_of_mid_length():
 
 def test_each_outline_piece_moves_the_centroid_aft():
     base = ssa.planform_centroid_offset(_stage())[0]
-    taper = ssa.planform_centroid_offset(_stage(forward_taper_length_m=1.0))[0]
+    taper = ssa.planform_centroid_offset(
+        _stage(own_nose_shape='cone', own_nose_length_m=1.0))[0]
     skirt = ssa.planform_centroid_offset(
         _stage(aft_skirt_length_m=0.5, aft_skirt_diameter_m=1.4))[0]
     nozzle, L, area = ssa.planform_centroid_offset(
@@ -464,7 +466,7 @@ def test_each_outline_piece_moves_the_centroid_aft():
 def test_the_outline_moves_the_trim_away_from_end_on():
     plain = ssa.spent_stage_drag(_stage(), 1000.0, 'lower')
     shaped = ssa.spent_stage_drag(
-        _stage(forward_taper_length_m=1.0, aft_skirt_length_m=0.5,
+        _stage(own_nose_shape='cone', own_nose_length_m=1.0, aft_skirt_length_m=0.5,
                aft_skirt_diameter_m=1.4), 1000.0, 'lower')
     assert any('outline' in n for n in shaped['notes'])
     assert not any('outline' in n for n in plain['notes'])
@@ -475,7 +477,7 @@ def test_the_outline_moves_the_trim_away_from_end_on():
     # than this skirt adds.
     a_plain = ssa.planform_centroid_offset(_stage())[2]
     a_shaped = ssa.planform_centroid_offset(
-        _stage(forward_taper_length_m=1.0, aft_skirt_length_m=0.5,
+        _stage(own_nose_shape='cone', own_nose_length_m=1.0, aft_skirt_length_m=0.5,
                aft_skirt_diameter_m=1.4))[2]
     assert a_shaped < a_plain
     assert shaped['cda_random'](2.0) < plain['cda_random'](2.0)
@@ -484,7 +486,7 @@ def test_the_outline_moves_the_trim_away_from_end_on():
 def test_a_cg_at_the_area_centroid_leaves_no_trim():
     # Shift the centre of pressure as far aft as the CG: no preferred
     # attitude short of broadside (Bacchus et al.: CG at the centroid, 90 deg).
-    st = _stage(forward_taper_length_m=3.0, aft_skirt_length_m=1.0,
+    st = _stage(own_nose_shape='cone', own_nose_length_m=3.0, aft_skirt_length_m=1.0,
                 aft_skirt_diameter_m=2.0)
     off = ssa.planform_centroid_offset(st)[0]
     assert off > 0.10                                  # beyond the liquid CG, 0.60
@@ -506,11 +508,17 @@ def test_an_aft_skirt_adds_flare_drag_on_ascent_and_nothing_when_absent():
 
 def test_outline_fields_round_trip_through_the_booster_file():
     p = _shipped_stage1('Shahab-3')
-    p.forward_taper_length_m, p.aft_skirt_length_m = 1.1, 0.7
-    p.aft_skirt_diameter_m, p.nozzle_protrusion_m = 1.8, 0.4
+    p.aft_skirt_length_m, p.aft_skirt_diameter_m, p.nozzle_protrusion_m = 0.7, 1.8, 0.4
+    p.booster_nose_shape, p.booster_nose_length_m = 'tangent_ogive', 1.2
+    p.booster_aft_skirt_length_m, p.booster_aft_skirt_diameter_m = 0.3, 0.9
+    p.booster_nozzle_protrusion_m = 0.2
     q = bm.booster_from_dict(bm.booster_to_dict(p))
-    assert (q.forward_taper_length_m, q.aft_skirt_length_m,
-            q.aft_skirt_diameter_m, q.nozzle_protrusion_m) == (1.1, 0.7, 1.8, 0.4)
+    assert (q.aft_skirt_length_m, q.aft_skirt_diameter_m,
+            q.nozzle_protrusion_m) == (0.7, 1.8, 0.4)
+    assert (q.booster_nose_shape, q.booster_nose_length_m,
+            q.booster_aft_skirt_length_m, q.booster_aft_skirt_diameter_m,
+            q.booster_nozzle_protrusion_m) == ('tangent_ogive', 1.2, 0.3, 0.9, 0.2)
+    assert not hasattr(q, 'forward_taper_length_m')
 
 
 # ── benchmark: the Shuttle SRB (BENCHMARKING.md; Part IV §19h-i) ────────────
@@ -521,7 +529,8 @@ _FT, _LBM, _LBF, _PSF = 0.3048, 0.45359237, 4.4482216, 47.880259
 def _srb(outline):
     LT, d = 149.16 * _FT, 12.17 * _FT                 # Moore et al. 2012
     k = LT / 9.808                                    # model 449 proportions
-    geo = (dict(length_m=LT - 0.294 * k, forward_taper_length_m=1.059 * k,
+    geo = (dict(length_m=LT - 0.294 * k, own_nose_shape='cone',
+                own_nose_length_m=1.059 * k,
                 aft_skirt_length_m=0.524 * k, aft_skirt_diameter_m=d * 1.082 / 0.800,
                 nozzle_protrusion_m=0.294 * k,
                 nozzle_exit_area_m2=math.pi * (d * 0.798 / 0.800) ** 2 / 4.0)
@@ -559,3 +568,118 @@ def test_the_shuttle_srb_falls_between_the_trimmed_and_tumbling_ends():
 def ecef_alt_ft(pos):
     from coordinates import ecef_to_geodetic
     return ecef_to_geodetic(pos)[2] / _FT
+
+
+# ── one outline: drawn = flown (stage_outline) ──────────────────────────────
+
+import stage_outline as so
+
+
+def _strypi():
+    return _shipped_stage1('Strypi_VIII_R')          # carries strap-ons
+
+
+def test_a_stages_own_nose_is_not_its_vehicle_nose():
+    # A stage's nose_shape describes the front of the whole vehicle; a spent
+    # stage's front is flat.  Only a strap-on piece carries its own nose.
+    p = _shipped_stage1('Shahab-3')
+    p.nose_shape, p.nose_length_m = 'cone', 2.0
+    o = so.outline(p)
+    assert o.nose_len == 0.0 and o.nose_shape == ''
+    assert ssa.planform_centroid_offset(p)[0] == 0.0
+
+
+def test_a_strapon_with_nothing_entered_is_a_flat_fronted_cylinder():
+    p = _strypi()
+    piece = so.strapon_piece(p)
+    o = so.outline(piece)
+    assert piece.length_unset and o.L == pytest.approx(2.0 * o.d)   # as flown
+    assert o.nose_len == o.skirt_len == o.nozzle_len == 0.0
+    assert so.profile(piece) == [(0.0, 0.0), (0.0, o.d / 2), (o.L, o.d / 2), (o.L, 0.0)]
+    assert bm.strapon_cd(p, 2.0) == p.booster_cd                    # the number in the file
+    assert so.strapon_piece(_shipped_stage1('Shahab-3')) is None
+
+
+def test_a_strapon_nose_needs_both_shape_and_length_and_lies_inside_the_length():
+    p = _strypi()
+    p.booster_length_m = 3.0
+    p.booster_nose_shape = 'cone'                    # shape alone: no nose
+    assert so.outline(so.strapon_piece(p)).nose_len == 0.0
+    assert bm.strapon_cd(p, 2.0) == p.booster_cd
+    p.booster_nose_length_m = 0.6
+    o = so.outline(so.strapon_piece(p))
+    assert (o.nose_shape, o.nose_len, o.L, o.L_all) == ('cone', 0.6, 3.0, 3.0)
+    prof = so.profile(so.strapon_piece(p))
+    assert prof[0] == (0.0, 0.0) and prof[-1] == (3.0, 0.0)          # tip on the axis
+    assert max(x for x, _ in prof) == 3.0                            # nose inside length
+
+
+def test_with_a_nose_entered_ascent_drag_comes_from_it_not_from_the_cd_box():
+    p = _strypi()
+    p.booster_length_m, p.booster_nose_shape, p.booster_nose_length_m = 3.0, 'cone', 0.6
+    d = p.booster_diam_m
+    # Firing whenever this drag applies: base drag only outside the nozzle exit.
+    bar = max(0.0, 1.0 - p.booster_nozzle_area_m2 / (math.pi * d * d / 4.0)) \
+        if p.booster_nozzle_area_m2 > 0 else 1.0
+    for stored in (0.05, 0.20, 0.90):                # the Cd box no longer matters
+        p.booster_cd = stored
+        assert bm.strapon_cd(p, 2.0) == pytest.approx(
+            bm._cd_nose_shape('cone', 0.6 / d, 2.0, ld_body=3.0 / d,
+                              base_area_ratio=bar))
+    blunt = bm.strapon_cd(p, 2.0)
+    p.booster_nose_length_m = 1.2                    # a longer nose: less wave drag
+    assert bm.strapon_cd(p, 2.0) < blunt
+    p.booster_aft_skirt_diameter_m, p.booster_aft_skirt_length_m = 1.4 * d, 0.5 * d
+    with_skirt = bm.strapon_cd(p, 2.0)
+    p.booster_aft_skirt_diameter_m = 0.0
+    assert with_skirt > bm.strapon_cd(p, 2.0)        # the skirt adds flare drag
+
+
+def test_the_spent_casing_is_flown_with_the_strapons_outline():
+    p = _strypi()
+    p.booster_length_m, p.booster_nose_shape, p.booster_nose_length_m = 3.0, 'cone', 0.9
+    piece = so.strapon_piece(p)
+    off, L, area = ssa.planform_centroid_offset(piece)
+    d = p.booster_diam_m
+    assert L == 3.0 and area == pytest.approx(3.0 * d - 0.5 * 0.9 * d)
+    assert off > 0.0                                  # the nose moves the centroid aft
+    drag = ssa.spent_stage_drag(piece, p.booster_inert_kg, 'lower')
+    assert any('outline' in n for n in drag['notes'])
+
+
+def test_the_schematic_and_the_3d_export_draw_the_outline_that_is_flown():
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    import booster_schematic as bs
+    import blender_export as be
+    p = _strypi()
+    fig, ax = plt.subplots()
+    st = bs.draw_booster(ax, p)
+    plt.close(fig)
+    els = be.vehicle_elements(p)
+    flags3d = els['flags']
+    # Nothing entered: both views say the nose is unset and flat, as flown.
+    for flags in (st['flags'], flags3d):
+        assert any('strap-on nose' in f and 'unset' in f and 'flat' in f for f in flags)
+        assert any('strap-on' in f and 'length unset' in f for f in flags)
+    # A stage skirt with no diameter, a nozzle protrusion with no exit area:
+    # flagged in both, drawn and flown in neither.
+    p.aft_skirt_length_m = 0.5
+    p.nozzle_protrusion_m, p.nozzle_exit_area_m2 = 0.4, 0.0
+    fig, ax = plt.subplots()
+    st = bs.draw_booster(ax, p)
+    plt.close(fig)
+    els = be.vehicle_elements(p)
+    flags3d = els['flags']
+    for flags in (st['flags'], flags3d):
+        assert any('aft skirt' in f and 'not drawn or flown' in f for f in flags)
+        assert any('nozzle protrusion' in f and 'not drawn or flown' in f for f in flags)
+    assert so.outline(p).skirt_len == 0.0 and so.outline(p).nozzle_len == 0.0
+    # Entered properly, the strap-on's revolve profile IS the flown profile.
+    p.booster_length_m, p.booster_nose_shape, p.booster_nose_length_m = 3.0, 'cone', 0.9
+    els = be.vehicle_elements(p)
+    revolves = els['revolves']
+    strap = next(r for r in revolves if r[0].startswith('Strapon_'))
+    flown = so.profile(so.strapon_piece(p))
+    assert sorted(strap[1]) == sorted((r, 3.0 - x) for x, r in flown)

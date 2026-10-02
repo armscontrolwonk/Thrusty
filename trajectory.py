@@ -3762,17 +3762,12 @@ def integrate_trajectory(params: BoosterParams,
             and params.booster_inert_kg > 0):
         _t_bsep = booster_separation_time(params)
         if _t_bsep > 0 and _t_bsep <= t_arr[-1]:
-            _b_len = (params.booster_length_m
-                      if params.booster_length_m > 0
-                      else 2.0 * params.booster_diam_m)
             # Strap-on casings are solid motors; their empty CG comes from
-            # the nozzle share at the booster's thrust (spent_stage_aero).
-            from types import SimpleNamespace as _NS
-            _drag_b = spent_stage_drag(
-                _NS(diameter_m=params.booster_diam_m, length_m=_b_len,
-                    solid_motor=True, has_fins=False, has_grid_fins=False,
-                    thrust_N=params.booster_thrust_n, thrust_peak_N=0.0),
-                params.booster_inert_kg, 'lower')
+            # the nozzle share at the booster's thrust (spent_stage_aero),
+            # and their outline is the one the schematic draws.
+            from stage_outline import strapon_piece as _strapon_piece
+            _drag_b = spent_stage_drag(_strapon_piece(params),
+                                       params.booster_inert_kg, 'lower')
             _pos_b, _vel_b = _ecef_state_at(_t_bsep)
             _debris_b = _fly_band(_pos_b, _vel_b, params.booster_inert_kg,
                                   _drag_b,

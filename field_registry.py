@@ -126,7 +126,6 @@ BOOSTER_FIELD_OWNER = {
     'has_interstage':                  HARDWARE,
     'interstage_length_m':             HARDWARE,
     'interstage_mass_kg':              HARDWARE,
-    'forward_taper_length_m':          HARDWARE,
     'aft_skirt_length_m':              HARDWARE,
     'aft_skirt_diameter_m':            HARDWARE,
     'nozzle_protrusion_m':             HARDWARE,
@@ -168,6 +167,11 @@ BOOSTER_FIELD_OWNER = {
     'booster_diam_m':                  HARDWARE,
     'booster_length_m':                HARDWARE,
     'booster_cd':                      HARDWARE,
+    'booster_nose_shape':              HARDWARE,
+    'booster_nose_length_m':           HARDWARE,
+    'booster_aft_skirt_length_m':      HARDWARE,
+    'booster_aft_skirt_diameter_m':    HARDWARE,
+    'booster_nozzle_protrusion_m':     HARDWARE,
 }
 
 RO_FIELD_OWNER = {

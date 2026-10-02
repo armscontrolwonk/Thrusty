@@ -5306,17 +5306,28 @@ C_D·A(Mach) set by attitude, on the cross-section area πd²/4:
   (planform) area centred aft of mid-length, and the centre of pressure
   follows it (Jernell; the Shuttle SRB's is 0.03–0.06 L nearer the tail than
   the flat-ended cylinder's, with its area centred at about 53%: Johnson &
-  Braddock 1974, Bacchus et al. 1985). `planform_centroid_offset` builds the
-  outline from four hardware fields — `forward_taper_length_m` (the front
-  tapering to a point), `aft_skirt_length_m` and `aft_skirt_diameter_m` (a
-  skirt flaring over the last part of the length), `nozzle_protrusion_m` (a
-  nozzle beyond the base, widening from half its exit diameter to the exit
-  diameter) — and the cylinder's centre-of-pressure curve is moved aft by
+  Braddock 1974, Bacchus et al. 1985). The outline is described once, in
+  `stage_outline.py`, and read by the schematic, the 3-D export and the
+  physics alike (drawn ≡ flown). A stage has `aft_skirt_length_m` and
+  `aft_skirt_diameter_m` (a skirt flaring over the last part of the length)
+  and `nozzle_protrusion_m` (a nozzle beyond the base, widening from half
+  its exit diameter to the exit diameter); its front is flat. A strap-on
+  has the same plus its own nose, `booster_nose_shape` and
+  `booster_nose_length_m`, inside its length. `planform_centroid_offset`
+  integrates that profile and the cylinder's centre-of-pressure curve is moved aft by
   the centroid's offset from mid-length at every angle. The trim, the
   swing's moment and the fin check all use it, and the normal force is
   scaled by the outline's side-on area (L·d for a plain cylinder).
   All zero (every shipped file) is a plain cylinder and changes nothing. On
   ascent the aft skirt also adds flare wave drag (§6.7).
+- *Strap-on ascent drag.* With a nose entered (shape and length), a
+  strap-on's drag coefficient is built from its outline by the method used
+  for the core's front end — `_cd_nose_shape` (nose wave drag, body
+  friction, base drag over the annulus outside the nozzle exit) plus
+  `_flare_cd` for a skirt — and the stored `booster_cd` is ignored
+  (`strapon_cd`). With no nose entered the strap-on is drawn and flown
+  flat-fronted and its ascent drag is `booster_cd`, the number in the
+  file; the schematic and the 3-D export flag it.
 
 How a piece is flown: one still climbing at separation is flown end over
 end to apogee. It leaves front-first, which is statically unstable (the CP

@@ -72,6 +72,15 @@ stay at the main flight's values.
    broadside (Tartabini & Starr 2011); Purinton et al. 2011 say the Ares I
    booster trims "near broadside" and give no values. The document to find
    is the Shuttle SRB reentry database (`MISSING_DOCS.md` item 1).
+5a. **One outline, drawn and flown** (Part IV §19i–j, 2026-10-02):
+   `stage_outline.py` describes a stage's skirt and nozzle and a strap-on's
+   nose, skirt and nozzle once; the schematic, the 3-D export, the
+   spent-stage model and strap-on ascent drag all read it. The user's rule:
+   the schematic AND the 3-D export are the only ways to audit the input,
+   so they must always match what is flown and show what is not entered.
+   Open: whether an interstage leaves separately from its stage.
+   The SRB benchmark (BENCHMARKING.md) is a test; the outline closes a
+   third of its gap, the rest needs the SRB tables digitised.
 6. **Documents to track down** are listed in `MISSING_DOCS.md`, with a
    Received table. PDF pages can be rendered without poppler by a small
    Swift/PDFKit program (see Working notes).
