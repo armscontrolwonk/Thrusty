@@ -468,3 +468,46 @@ If the point is an observation (a recovery position, or the centre of a
 smaller hazard area), this is the first spent-stage impact Thrusty has
 been fitted to, and it constrains the first stage's flight to a few
 kilometres.
+
+## 15. "Too much oomph"? The centre assumption and the energy (2026-10-02)
+
+The first-stage point of §14 is the user's estimate of the centre of box
+C, on the assumption that the planners aim the nominal impact at the
+middle of the box ("possibly a wrong assumption"). By area the box's
+centre is 115 km from the pad; the user's point is 19 km beyond it, at
+134 km. Box E's centre is 2,114 km out, box G's 3,975 km.
+
+The user also asked whether needing −9° on the second stage means the
+booster has too much energy. Plans that put the first stage at 134 km and
+the second at the centre of box E, for less energy in either stage:
+
+| Stage 1 vacuum peak (equivalent Isp) | Stage 2 Isp | Stage 1 angle | Stage 2 angle | Apogee | Burnout speed |
+|---|---|---|---|---|---|
+| 302.9 kN (280 s), candidate | 280 s | 26.4° | −12.0° | 150 km | 5.18 km/s |
+| 290 kN (268 s) | 280 s | 33.4° | −15.0° | 172 km | 4.97 |
+| 280 kN (259 s) | 280 s | cannot reach 134 km by 38° | | | |
+| 302.9 kN (280 s) | 270 s | 26.4° | −9.7° | 159 km | 5.06 |
+| 302.9 kN (280 s) | 260 s | 26.4° | −7.0° | 170 km | 4.93 |
+
+- **Less thrust in the first stage makes it worse.** A weaker first stage
+  has to be lofted more steeply to throw its casing 134 km, and the second
+  stage then has to pitch down further. Below about 285 kN the casing
+  cannot reach 134 km at all. If the nominal impact is near the middle of
+  box C, that is evidence for the first stage's thrust, not against it.
+- **Less energy in the second stage is what eases the pitch-down.** Its
+  280 s has no stated basis, and its thrust and burn time are not measured
+  ("at least 46 s" seen, 63 s stored). At 260 s the angle is −7°.
+- **The pitch-down also follows from the centre assumption itself.**
+  Aiming the second stage anywhere inside box E instead of at its middle
+  allows −8° to −9° with the candidate as it is (§14: −9° lands it at
+  2,316 km, 80 km inside the far edge).
+- A second-stage angle a few degrees below level is not strange for this
+  kind of flight: the user's own fits used −2° and −5°.
+
+The glider in all these runs flies the damped (phugoid) glide law of the
+shipped C-HGB reentry plan: damping 0.7, the drag-polar model, lift-to-drag
+2.0, one skip, terminal dive on; it does not affect where the stages fall.
+
+The candidate plan stays at 26.5°, −9°, azimuth 102.5° (first stage on the
+user's point, second stage and fairing inside box E, apogee 171 km) until
+the centre assumption and the second stage's numbers are settled.
