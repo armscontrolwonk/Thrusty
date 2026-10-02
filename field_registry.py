@@ -234,6 +234,7 @@ RO_FIELD_OWNER = {
     'body_tps_thickness_m':            HARDWARE,
     'structure_material':              HARDWARE,
     'structure_limit_K':               HARDWARE,
+    'interior_limit_C':                HARDWARE,
     'nose_tps_custom':                 HARDWARE,
     'body_tps_custom':                 HARDWARE,
     # The places on the airframe where heating is judged, as a list of

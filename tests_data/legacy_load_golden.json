@@ -57,7 +57,8 @@
         "wing_root_chord_m": 0.0,
         "wing_span_exposed_m": 0.0,
         "wing_sweep_deg": 0.0,
-        "wing_thickness_m": 0.0
+        "wing_thickness_m": 0.0,
+        "interior_limit_C": 80.0
       },
       "aerospike_LD": 0.0,
       "aerospike_dD": 0.0,
@@ -193,7 +194,8 @@
         "wing_root_chord_m": 0.0,
         "wing_span_exposed_m": 0.0,
         "wing_sweep_deg": 0.0,
-        "wing_thickness_m": 0.0
+        "wing_thickness_m": 0.0,
+        "interior_limit_C": 80.0
       },
       "shroud_diameter_m": 0.0,
       "shroud_jettison_alt_km": 80.0,
@@ -272,7 +274,8 @@
         "wing_root_chord_m": 0.0,
         "wing_span_exposed_m": 0.0,
         "wing_sweep_deg": 0.0,
-        "wing_thickness_m": 0.0
+        "wing_thickness_m": 0.0,
+        "interior_limit_C": 80.0
       },
       "aerospike_LD": 0.0,
       "aerospike_dD": 0.0,
@@ -408,7 +411,8 @@
         "wing_root_chord_m": 0.0,
         "wing_span_exposed_m": 0.0,
         "wing_sweep_deg": 0.0,
-        "wing_thickness_m": 0.0
+        "wing_thickness_m": 0.0,
+        "interior_limit_C": 80.0
       },
       "shroud_diameter_m": 0.0,
       "shroud_jettison_alt_km": 80.0,
@@ -3462,7 +3466,8 @@
         "wing_root_chord_m": 0.0,
         "wing_span_exposed_m": 0.0,
         "wing_sweep_deg": 0.0,
-        "wing_thickness_m": 0.0
+        "wing_thickness_m": 0.0,
+        "interior_limit_C": 80.0
       },
       "aerospike_LD": 0.0,
       "aerospike_dD": 0.0,
@@ -3598,7 +3603,8 @@
         "wing_root_chord_m": 0.0,
         "wing_span_exposed_m": 0.0,
         "wing_sweep_deg": 0.0,
-        "wing_thickness_m": 0.0
+        "wing_thickness_m": 0.0,
+        "interior_limit_C": 80.0
       },
       "shroud_diameter_m": 0.0,
       "shroud_jettison_alt_km": 80.0,
@@ -3677,7 +3683,8 @@
         "wing_root_chord_m": 0.0,
         "wing_span_exposed_m": 0.0,
         "wing_sweep_deg": 0.0,
-        "wing_thickness_m": 0.0
+        "wing_thickness_m": 0.0,
+        "interior_limit_C": 80.0
       },
       "aerospike_LD": 0.0,
       "aerospike_dD": 0.0,
@@ -3813,7 +3820,8 @@
         "wing_root_chord_m": 0.0,
         "wing_span_exposed_m": 0.0,
         "wing_sweep_deg": 0.0,
-        "wing_thickness_m": 0.0
+        "wing_thickness_m": 0.0,
+        "interior_limit_C": 80.0
       },
       "shroud_diameter_m": 0.0,
       "shroud_jettison_alt_km": 80.0,
@@ -4892,7 +4900,8 @@
       "wing_root_chord_m": 0.0,
       "wing_span_exposed_m": 0.0,
       "wing_sweep_deg": 0.0,
-      "wing_thickness_m": 0.0
+      "wing_thickness_m": 0.0,
+      "interior_limit_C": 80.0
     },
     "body_form_unknown": {
       "beta_kg_m2": 8000.0,
@@ -4950,7 +4959,8 @@
       "wing_root_chord_m": 0.0,
       "wing_span_exposed_m": 0.0,
       "wing_sweep_deg": 0.0,
-      "wing_thickness_m": 0.0
+      "wing_thickness_m": 0.0,
+      "interior_limit_C": 80.0
     },
     "cap_explicit_false": {
       "beta_kg_m2": 8000.0,
@@ -5008,7 +5018,8 @@
       "wing_root_chord_m": 0.0,
       "wing_span_exposed_m": 0.0,
       "wing_sweep_deg": 0.0,
-      "wing_thickness_m": 0.0
+      "wing_thickness_m": 0.0,
+      "interior_limit_C": 80.0
     },
     "cap_from_enabled": {
       "beta_kg_m2": 8000.0,
@@ -5066,7 +5077,8 @@
       "wing_root_chord_m": 0.0,
       "wing_span_exposed_m": 0.0,
       "wing_sweep_deg": 0.0,
-      "wing_thickness_m": 0.0
+      "wing_thickness_m": 0.0,
+      "interior_limit_C": 80.0
     },
     "cap_from_ld": {
       "beta_kg_m2": 8000.0,
@@ -5124,7 +5136,8 @@
       "wing_root_chord_m": 0.0,
       "wing_span_exposed_m": 0.0,
       "wing_sweep_deg": 0.0,
-      "wing_thickness_m": 0.0
+      "wing_thickness_m": 0.0,
+      "interior_limit_C": 80.0
     },
     "cap_from_wing": {
       "beta_kg_m2": 8000.0,
@@ -5182,7 +5195,8 @@
       "wing_root_chord_m": 0.0,
       "wing_span_exposed_m": 0.0,
       "wing_sweep_deg": 0.0,
-      "wing_thickness_m": 0.0
+      "wing_thickness_m": 0.0,
+      "interior_limit_C": 80.0
     },
     "cap_none": {
       "beta_kg_m2": 8000.0,
@@ -5240,7 +5254,8 @@
       "wing_root_chord_m": 0.0,
       "wing_span_exposed_m": 0.0,
       "wing_sweep_deg": 0.0,
-      "wing_thickness_m": 0.0
+      "wing_thickness_m": 0.0,
+      "interior_limit_C": 80.0
     },
     "carries_plan_keys": {
       "beta_kg_m2": 8000.0,
@@ -5304,7 +5319,8 @@
       "wing_root_chord_m": 0.0,
       "wing_span_exposed_m": 0.0,
       "wing_sweep_deg": 0.0,
-      "wing_thickness_m": 0.0
+      "wing_thickness_m": 0.0,
+      "interior_limit_C": 80.0
     },
     "file:AHW.ro.json": {
       "beta_kg_m2": 9000.0,
@@ -5372,7 +5388,8 @@
       "wing_root_chord_m": 0.0,
       "wing_span_exposed_m": 0.0,
       "wing_sweep_deg": 0.0,
-      "wing_thickness_m": 0.0
+      "wing_thickness_m": 0.0,
+      "interior_limit_C": 80.0
     },
     "file:Al_Hussein_warhead.ro.json": {
       "beta_kg_m2": 0.0,
@@ -5440,7 +5457,8 @@
       "wing_root_chord_m": 0.0,
       "wing_span_exposed_m": 0.0,
       "wing_sweep_deg": 0.0,
-      "wing_thickness_m": 0.0
+      "wing_thickness_m": 0.0,
+      "interior_limit_C": 80.0
     },
     "file:C-HGB.ro.json": {
       "beta_kg_m2": 15000.0,
@@ -5508,7 +5526,8 @@
       "wing_root_chord_m": 0.0,
       "wing_span_exposed_m": 0.0,
       "wing_sweep_deg": 0.0,
-      "wing_thickness_m": 0.0
+      "wing_thickness_m": 0.0,
+      "interior_limit_C": 80.0
     },
     "file:Generic-Maneuvering-Body.ro.json": {
       "name": "Generic maneuvering body",
@@ -5576,7 +5595,8 @@
         }
       ],
       "source": "GENERIC FIXTURE - not a specific vehicle.  Represents the quasi-ballistic maneuvering-body class: a non-separating unitary airframe flying a depressed trajectory (~50 km apogee, ~450-690 km range) that pulls up aerodynamically in the terminal phase at roughly Mach 6-7.  The numbers are open-source order-of-magnitude estimates for that class, not a fit to any published vehicle, and there is no measured aero or thermal data behind them.  Use it to exercise the non-separating glide path, not to characterise a real system.",
-      "notes": "Reentry mode: this object was characterised flying damped_glide, which is now its shipped default reentry plan. The glide law is a reentry-plan choice (still switchable on the sidebar strip), not object hardware."
+      "notes": "Reentry mode: this object was characterised flying damped_glide, which is now its shipped default reentry plan. The glide law is a reentry-plan choice (still switchable on the sidebar strip), not object hardware.",
+      "interior_limit_C": 80.0
     },
     "file:Generic-RV.ro.json": {
       "beta_kg_m2": 10000.0,
@@ -5644,7 +5664,8 @@
       "wing_root_chord_m": 0.0,
       "wing_span_exposed_m": 0.0,
       "wing_sweep_deg": 0.0,
-      "wing_thickness_m": 0.0
+      "wing_thickness_m": 0.0,
+      "interior_limit_C": 80.0
     },
     "file:Generic_Body_Missile_warhead.ro.json": {
       "name": "Generic body missile warhead",
@@ -5712,7 +5733,8 @@
         }
       ],
       "source": "",
-      "notes": "[2026-09-30] Removed the stored copies of the last stage's mass, diameter and length (988 kg, 1.1 m, 9.18 m), which the run ignored; 0 = from booster."
+      "notes": "[2026-09-30] Removed the stored copies of the last stage's mass, diameter and length (988 kg, 1.1 m, 9.18 m), which the run ignored; 0 = from booster.",
+      "interior_limit_C": 80.0
     },
     "file:HTV-2.ro.json": {
       "beta_kg_m2": 26000.0,
@@ -5780,7 +5802,8 @@
       "wing_root_chord_m": 0.0,
       "wing_span_exposed_m": 0.0,
       "wing_sweep_deg": 0.0,
-      "wing_thickness_m": 0.0
+      "wing_thickness_m": 0.0,
+      "interior_limit_C": 80.0
     },
     "file:Mk21.ro.json": {
       "beta_kg_m2": 75000.0,
@@ -5848,7 +5871,8 @@
       "wing_root_chord_m": 0.0,
       "wing_span_exposed_m": 0.0,
       "wing_sweep_deg": 0.0,
-      "wing_thickness_m": 0.0
+      "wing_thickness_m": 0.0,
+      "interior_limit_C": 80.0
     },
     "file:No-dong_warhead.ro.json": {
       "beta_kg_m2": 3653.7,
@@ -5916,7 +5940,8 @@
       "wing_root_chord_m": 0.0,
       "wing_span_exposed_m": 0.0,
       "wing_sweep_deg": 0.0,
-      "wing_thickness_m": 0.0
+      "wing_thickness_m": 0.0,
+      "interior_limit_C": 80.0
     },
     "file:SWERVE.ro.json": {
       "name": "SWERVE",
@@ -5984,7 +6009,8 @@
         }
       ],
       "source": "Sandia Winged Energetic Re-entry Vehicle (SWERVE). Three flights 1979-1985 from the Kauai Test Facility on STRYPI boosters; flight 3 reentered near Johnston Island (~1,180 km). Spherically blunted 5.25-deg half-angle cone with small wings/elevons for lift and control, Mach 2-14 maneuvering; nose-tip and heat shield ablative.\n\nTHIS OBJECT IS SWERVE III. AvWeek (6 Aug 1990) records that the three flights used TWO DIFFERENT-SIZED vehicles; Iliff & Shafer's dimensions are explicitly 'the third vehicle'. SWERVE I/II were a smaller airframe of undocumented dimensions and are NOT represented here. The object is still named 'SWERVE' because two shipped flight plans, the reentry plan and any user-saved plan bind to that name.\n\nPRIMARY SOURCE: Iliff, K. W. & Shafer, M. F., 'A Comparison of Hypersonic Flight and Prediction Results', AIAA 93-0311, 31st Aerospace Sciences Meeting, Reno, 11-14 Jan 1993. Flight-3 maneuver (their Fig. 20): ~-10 deg AoA pull-out at t=20 s / Mach 12, return to 0 deg AoA by t=60 s at ~Mach 8, requiring trim deflections of ~4 deg. PNS tables 1-2 give delta_TRIM = 4.11 deg (M=12, turbulent, T_w 4000 R) and 3.1 deg (M=8, laminar, T_w 2000 R).\n\nCITATION CORRECTION (2026-09-08): this file previously credited the flight-3 maneuver and Fig. 20 to Williamson, AIAA 92-3989. That is WRONG. Williamson's paper never names SWERVE; it is a generic hypersonic-flight-testing overview whose Fig. 20 is 'Typical Accelerometer Flight Data and Model', and its only SWERVE content is unattributed (Fig. 1 wind-tunnel envelope, Figs. 26-27 photodiode/thermocouple data on 'a maneuvering vehicle'). All SWERVE specifics are Iliff & Shafer's. Schneider (JSR 36(1), 1999, p. 11) records that Iliff and Williamson both confirmed by private communication in Sept 1996 that these two papers contain ALL open-literature information on the SWERVE results -- so Aviation Week (11 Oct 2018) is NOT independent corroboration: its 'just over 100 in.' and 'nosetip-to-base radius ratio around 0.07' are recycled from Iliff verbatim.\n\nBOOSTER: STRYPI VIII-R, a TWO-STAGE configuration (Sandia LAB NEWS, 23 Jan 1981, names it twice for the SWERVE II test). Do NOT use Wente's AIAA 1982 Strypi VII R numbers for this vehicle -- VII R is a different, three-stage system that carried RCTV, MTV-II and NRV, not SWERVE.\n\nFLIGHT HISTORY: 1979 (I), 29 Sep 1980 (II), 1985 (III). Sandia states SWERVE II was SUCCESSFUL -- LAB NEWS 23 Jan 1981 ('successfully flight tested', 'All systems performed successfully') and Rigali in LAB NEWS 31 Oct 1980 ('a complete success'). This contradicts the widely repeated claim that the first two flights had anomalies, and agrees with AvWeek 1990, which reports only flight 1 degraded by a shroud deployment problem.\n\n(The AHW conical glide body is described as 'SWERVE with improved TPS'. AHW differs in TPS, glide L/D and booster (STARS), not in basic airframe class.)",
-      "notes": "== SOURCED (document and page) ==\nCone half-angle 5.25 deg -- Iliff & Shafer, AIAA 93-0311: 'The cone half-angle in all cases was 5.25 deg.' Independently corroborated by Griswold/Stein/Redding, SAE 820850, Fig. 2 (10.5 deg INCLUDED cone angle) and Murbach, AIAA 93-0313 ('a sharp 10.5 degree cone'). Gulan 2024 Tbl 2's 5 deg traces solely to Murbach/Keese/Farmer 1997, where the same author who wrote 10.5 deg in 1993 rounded; 5.25 deg governs.\nNose-tip/base radius ratio ~0.07 -- Iliff & Shafer, same passage. Note their word is 'about': a rounded descriptive figure, not a specification.\nLength 2.743 m (108 in) -- Murbach, AIAA 93-0313, p.1: 'flown three times in the 2.75 m long version', repeated in Murbach/Keese/Farmer, SSC97-V-2, p.6 ('The 2.75m baseline design'). Consistent with Iliff's 'a little over 100-in. long' for the third vehicle. The previous 2.6 m matched NO source and sat between two real numbers; it has been dropped.\nFour wings, cruciform -- Murbach 1993 ('short wings arranged in a cruciform'); Murbach/Keese/Farmer 1997, p.6 ('four wings arranged in a cruciform'); Gulan Tbl 2 (4 fins).\nSmall wings and elevons -- Iliff & Shafer: 'Small wings and elevons were used to increase lift and provide control.' Basis for glider_control_surfaces = 'small'.\nTPS materials -- Murbach 1993 p.3: nose tip / leading edges bare carbon-carbon, body silica phenolic. CAVEAT, per BENCHMARKING.md: that passage describes Murbach's MARS BASELINE vehicle (a SWERVE-derived design), and Iliff says only 'The heat shield and nose tip were ablative materials'. The honest status is 'an ablative, probably a phenolic, specific resin/reinforcement unconfirmed'.\n\n== DERIVED (arithmetic, formula shown) ==\nBase radius and nose radius, BLUNTED-CONE construction (corrected 2026-09-08). The vehicle is spherically blunted ('All vehicles flown were spherically blunted conical vehicles' -- Iliff), and at FIXED OVERALL LENGTH blunting makes the base LARGER than the sharp-cone value, not smaller. With R_n = 0.07*R_b:\n    R_b = R_n*cos(th) + (L - R_n*(1 - sin(th)))*tan(th)\n        = L * tan(th) / (1 - 0.07*cos(th) + 0.07*(1 - sin(th))*tan(th))\n        = L * 0.098156                      (th = 5.25 deg)\nAt L = 2.743 m:  R_base = 0.26923 m -> diameter 0.5385 m; S_ref = 0.2277 m^2; R_n = 0.01885 m; fineness 5.09; wetted area ~2.48 m^2.\nThe previous file used the SHARP-cone base R = L*tan(5.25) = 0.2389 m (S_ref 0.1793 m^2) and then applied a ratio defined on the blunted body, so both the reference area and the nose radius were low. This was a bug, not a modelling choice.\nbeta = 24,733 kg/m^2 HELD AT ITS PRE-REVISION VALUE -- see the open question below. On the CORRECTED reference area this implies C_D = m/(beta*S_ref) = 300/(24733*0.2277) = 0.0533, which is a better-founded number than the 0.068 it replaces: the previous 'Cd ~ 0.068, a realistic sharp-5.25-deg-cone value' was computed against the WRONG (sharp-cone) area and is withdrawn.\n    OPEN QUESTION -- WHICH MACH DOES beta REFERENCE?  The repo's own cone drag model (booster_models.cd_cone_hypersonic, theta 5.25 deg, eps 0.07) does not return a single C_D: base drag makes it strongly Mach-dependent -- 0.193 at M3, 0.092 at M5, 0.057 at M8, 0.049 at M10, 0.0445 at M12, 0.042 at M14. The implied 0.0533 above sits between the M8 and M12 values, i.e. a representative down-leg Mach of ~9-10, which is a defensible choice for a single-beta object flown from M12 to impact.\n    Pinning beta to the M12 pull-out condition instead would give C_D = 0.04453 and beta = 29,579, and that value BREAKS the shipped pull-up validation case (test_pullup.py): the vehicle becomes slippery enough through the down-leg that the commanded-pull run impacts while the no-pull run still troughs at 19.5 km. Recorded rather than adopted.\n    NOTE THE DIRECTION for whoever revisits this: correcting the area alone LOWERS beta, but the repo's C_D at high Mach is well below the 0.068 previously assumed, and that dominates -- so an M12-referenced beta RISES. It falls below the current value only if the mass falls: ~20,500 at 208 kg, ~17,600 at 178 kg (at the M12 C_D).\nExposed wing span ~0.166 m per panel = (0.87 - 0.5385)/2, from Gulan's over-wing span against the corrected base diameter. Recorded here only; NOT entered as geometry (see ASSUMED).\n\n== ASSUMED (fits, defaults, directions -- each with what it rests on) ==\nmass_kg = 300 is a TRAJECTORY FIT, not a sourced value, and it is the TOP OF A 150-300 kg BAND. No primary-source SWERVE mass exists. It is retained as the modelling point value so existing results stay reproducible, but every sourced analogue for this airframe falls BELOW it: 208.35 kg (Murbach, AIAA 93-0313, Table 1 -- entry system mass, 2.75 m SWERVE-derived Mars vehicle, original-type TPS, of which TPS alone is 93 kg at 2.5 cm) and 178 kg (Murbach/Keese/Farmer, SSC97-V-2 p.6 -- same baseline with SIRCA substituted). The circularity is worse than it looks: the fit is pinned against the one edge of the plausible range that MAXIMISES range. Wente's AIAA 1982 Strypi VII R payload rating of 50-300 lbm (23-136 kg) would be a hard upper bound if it transferred, but SWERVE flew VIII-R, for which no payload rating exists in any source; treat it as a caution, not a bound.\nglider_LD = 1.8 is UNCITED ON THIS AIRFRAME and is retained pending better evidence, NOT because it is sourced. The provenance review of 2026-09-08 established that neither candidate is sourced: 1.8 comes from a generic biconic-aeroshell range (Rigali, 1.2-1.8 -- for a shape SWERVE is not) and a third-party PRC estimate of AHW's maximum (1.4-2.1); the ONLY airframe-specific sourced statement is 'L/D>1' (Murbach, AIAA 93-0313 p.1; Murbach/Keese/Farmer, SSC97-V-2 p.6) -- a lower bound, not a value.\n    WHAT THE 0.6 ACTUALLY IS (clarified 2026-09-08): it is the ADDED LIFT FROM THE WINGS -- the wings' contribution, NOT a total lift-to-drag ratio. This file's notes previously described it as 'the maneuvering flight-3 record ... shows a lower ~0.6', attributed to 'Williamson Fig. 20' (a citation that does not exist as described -- see the source field). Entering 0.6 in glider_LD would therefore have put an INCREMENT into a TOTAL field: the same class of error as entering the ~4 deg delta_TRIM as usable flap travel. It also means 0.6 never contradicted Murbach's 'L/D>1'; the two measure different things and were never comparable.\n    STILL UNPINNED: whether 0.6 is a delta(L/D) or a lift fraction, and where it comes from. It needs a citation like everything else here.\n    DO NOT use glider_ld.whole_booster_LD to scale this. Run on the corrected geometry it returns a body-alone L/D_max near 2.8-3.0 at M5-M12, and that is TOO HIGH for this shape class, on three grounds:\n      (i)  It is outside its validated envelope on both axes. The build-up is DATCOM-validated for a FINLESS SLENDER body of fineness 13.4 at M2/3/5 (test_ld_calibration.py). SWERVE III's fineness is 5.09 and the glide runs to M12.\n      (ii) It contradicts the source it would be supporting. Murbach presents 'L/D>1' as a notable feature of the vehicle WITH its cruciform wings; a build-up that hands the WINGLESS body ~3 makes both the wings and that sentence pointless.\n      (iii) It beats HTV-2. Tracy & Wright (S&GS 28(3), 2020) put HTV-2-class glide at L/D ~ 2.6 for a purpose-built lifting body. A blunted 5.25 deg cone exceeding that is not credible.\n    In any case L/D_max is the aerodynamic ceiling at best-glide alpha, not a trimmed value, and for this vehicle class the trimmed figure is the one that flies -- see the trim-gate discussion in METHODS 8.10. Getting a defensible ceiling for a low-fineness cone needs the finned/deflected DATCOM deck that TRIM_GATE_APPROACH.md 7 lists as the highest-value missing evidence.\n    WHY 1.8 AND NOT 0.6: shipping 0.6 makes this object stop gliding altogether. On its own Strypi VIII-R flight plan neither the commanded-pull nor the baseline run produces a phugoid trough -- both impact -- so the vehicle ceases to demonstrate the behaviour it exists to model, and test_pullup's mechanism case dies with it. That is too large a behavioural change to make on a number that is itself unverified.\n    TREAT 1.8 AS A CEILING UNDER REVIEW, not a measurement. The honest band is 0.6-1.8 with a sourced floor of 1.0. If this object is used to test a glide-range claim, run the band rather than the point value -- range is roughly linear in L/D, so the ambiguity IS the answer. commanded_LD in the reentry plan is held equal to this value.\nglider_control_surfaces = 'small' rests on the qualitative description only. NOTHING in the open literature sizes the elevons -- checked against Williamson 1992, Murbach 1993 and 1997, Iliff & Shafer 1993, Griswold 1982, AvWeek 1990 and 2018, and the Sandia LAB NEWS issues. AvWeek 1990 records that the vehicle's 'actual shape and performance are still classified' as of publication, so the absence is structural, not a gap in the search.\nglider_flap_deflection_deg is deliberately left at 0 (estimator uses its 12 deg default). The sourced ~4 deg is delta_TRIM at ONE condition -- the deflection needed to hold -10 deg AoA at Mach 12 -- not maximum control travel, on a vehicle whose envelope runs to Mach 14. Entering it would attach a correct citation to the wrong variable and would UNDERSTATE control authority. The trim values are recorded in the source field instead.\nWing planform left entirely unset (area, chord, sweep, aspect ratio, spans all 0). Nothing in any source gives a planform, and deriving one from a single span number would be invention with a citation attached. The Gulan thesis was checked directly (2026-09-08): its Table 2 carries only length / half-cone angle / span / fin count, and its Figure 24 is an illustration citing a NextBigFuture web article, not a dimensioned drawing -- Gulan needed a fin area too and built it from a parametric CAD model rather than a citation. The absence is therefore structural across Iliff & Shafer, Murbach and Gulan alike. Two span figures exist and CONFLICT: 0.87 m (Gulan Tbl 2, second-hand, ultimate source not established) and ~0.61 m (factsheet, described as including the wings). The corrected base diameter of 0.5385 m settles which is implausible -- a 0.61 m over-wing width leaves 3.6 cm of exposed wing per side, a strake that cannot produce L/D>1, whereas 0.87 m gives 0.166 m per side. 0.61 m is close to AvWeek 1990's 'about 2 ft. in diameter', which is a BODY measurement, so it is probably a body diameter misdescribed. Note also that body_span_m is NOT the field for this: it is documented as wedge-only ('a body of revolution has none'), and this object is axisymmetric.\nbody_tps_thickness_m = 0.025 and structure_material = 'aluminum' are SOURCED BY ANALOGY, not for the flown vehicle. Murbach/Keese/Farmer, SSC97-V-2, Table 1 ('Preliminary Heating Results'), footnoted 'Original vehicle TPS used for preliminary analysis', carries a 'Max Aluminum Temp 483 K (870 R)' row for the cone sidewall -- establishing an aluminium substructure under the silica-phenolic body TPS. Thickness 2.5 cm is Murbach AIAA 93-0313 p.3 (TPS mass 93 kg at 2.5 cm), corroborated by SSC97-V-2 Table 1's char depth 2.64 cm / pyrolysis 0.30 cm / recession 0.00 cm. CAVEAT: 2.5 cm is the MARS-mission sizing for a CO2 entry at 7 km/s -- right order, right materials, not established as the flown SWERVE thickness.\nstructure_limit_K left at 0.0 so the repo's aluminium default governs (heating.py: continuous 450 K, peak/melt 775 K). The 483 K figure above is an ANALYSED backface temperature for a Mars entry, not a certified material limit, and is recorded rather than entered. Other SSC97-V-2 Table 1 values worth having: nose carbon-carbon max surface 3055 K with 3.43 cm recession; wing LE silica phenolic 2200 K with 1.0 cm recession; cone sidewall 1411 K.\nglider_beta_entry_kg_m2 = 7.0 is Acton's HTV-2 fit (Table 3, p. 206), replacing an unexplained 20.0 whose origin nothing in the SWERVE source set produces. It is a BORROWED screening value: HTV-2 is a wedge-shaped lifting body, not a blunted cone with cruciform wings. Read only by the 'equilibrium_glide_acton' guidance mode and ignored under this object's shipped plan; a cited 7 makes that mode switch safe by default, which zeroing the field would not.\nemissivity = 0.85 is a screening default applied to BOTH the carbon-carbon nose/leading edges and the silica-phenolic body; no measured emissivity for either SWERVE surface appears in the open literature. Radiative equilibrium wall temperature scales as eps^-0.25, so the TPS tier verdict is weakly sensitive -- moving to 0.80 or 0.90 shifts T_wall by under 2 percent.\nMurbach (AIAA 93-0313 p.2) ASSUMES R_n = 0.025 m for heating on the 2.75 m vehicle. Against the corrected base radius that is a ratio of 0.093, not 0.07 -- 33 percent higher. Iliff's 0.07 governs because Murbach says 'assumed', but the discrepancy matters: q scales as R_n^-0.5, so 33 percent in R_n is ~15 percent in stagnation heating.\n\n== TRAJECTORY CAUTION ==\nRigali's widely quoted 'leveled off at 25,000 feet' (LAB NEWS, 31 Oct 1980) cannot be reconciled with the digitised SWERVE III trajectory, which shows cruise at 84,000-87,000 ft between Mach 5 and 12. Treat 25,000 ft as attributed-but-doubtful -- probably a terminal segment or a simplification for a general readership. Do NOT fit a reconstruction to it.\n\n== REENTRY MODE ==\nThis object was characterised flying damped_glide; the shipped plan default is dynamic_equilibrium_glide. Select the intended reentry mode in the Reentry-mode dropdown -- the glide law is a flight-plan choice, not object hardware."
+      "notes": "== SOURCED (document and page) ==\nCone half-angle 5.25 deg -- Iliff & Shafer, AIAA 93-0311: 'The cone half-angle in all cases was 5.25 deg.' Independently corroborated by Griswold/Stein/Redding, SAE 820850, Fig. 2 (10.5 deg INCLUDED cone angle) and Murbach, AIAA 93-0313 ('a sharp 10.5 degree cone'). Gulan 2024 Tbl 2's 5 deg traces solely to Murbach/Keese/Farmer 1997, where the same author who wrote 10.5 deg in 1993 rounded; 5.25 deg governs.\nNose-tip/base radius ratio ~0.07 -- Iliff & Shafer, same passage. Note their word is 'about': a rounded descriptive figure, not a specification.\nLength 2.743 m (108 in) -- Murbach, AIAA 93-0313, p.1: 'flown three times in the 2.75 m long version', repeated in Murbach/Keese/Farmer, SSC97-V-2, p.6 ('The 2.75m baseline design'). Consistent with Iliff's 'a little over 100-in. long' for the third vehicle. The previous 2.6 m matched NO source and sat between two real numbers; it has been dropped.\nFour wings, cruciform -- Murbach 1993 ('short wings arranged in a cruciform'); Murbach/Keese/Farmer 1997, p.6 ('four wings arranged in a cruciform'); Gulan Tbl 2 (4 fins).\nSmall wings and elevons -- Iliff & Shafer: 'Small wings and elevons were used to increase lift and provide control.' Basis for glider_control_surfaces = 'small'.\nTPS materials -- Murbach 1993 p.3: nose tip / leading edges bare carbon-carbon, body silica phenolic. CAVEAT, per BENCHMARKING.md: that passage describes Murbach's MARS BASELINE vehicle (a SWERVE-derived design), and Iliff says only 'The heat shield and nose tip were ablative materials'. The honest status is 'an ablative, probably a phenolic, specific resin/reinforcement unconfirmed'.\n\n== DERIVED (arithmetic, formula shown) ==\nBase radius and nose radius, BLUNTED-CONE construction (corrected 2026-09-08). The vehicle is spherically blunted ('All vehicles flown were spherically blunted conical vehicles' -- Iliff), and at FIXED OVERALL LENGTH blunting makes the base LARGER than the sharp-cone value, not smaller. With R_n = 0.07*R_b:\n    R_b = R_n*cos(th) + (L - R_n*(1 - sin(th)))*tan(th)\n        = L * tan(th) / (1 - 0.07*cos(th) + 0.07*(1 - sin(th))*tan(th))\n        = L * 0.098156                      (th = 5.25 deg)\nAt L = 2.743 m:  R_base = 0.26923 m -> diameter 0.5385 m; S_ref = 0.2277 m^2; R_n = 0.01885 m; fineness 5.09; wetted area ~2.48 m^2.\nThe previous file used the SHARP-cone base R = L*tan(5.25) = 0.2389 m (S_ref 0.1793 m^2) and then applied a ratio defined on the blunted body, so both the reference area and the nose radius were low. This was a bug, not a modelling choice.\nbeta = 24,733 kg/m^2 HELD AT ITS PRE-REVISION VALUE -- see the open question below. On the CORRECTED reference area this implies C_D = m/(beta*S_ref) = 300/(24733*0.2277) = 0.0533, which is a better-founded number than the 0.068 it replaces: the previous 'Cd ~ 0.068, a realistic sharp-5.25-deg-cone value' was computed against the WRONG (sharp-cone) area and is withdrawn.\n    OPEN QUESTION -- WHICH MACH DOES beta REFERENCE?  The repo's own cone drag model (booster_models.cd_cone_hypersonic, theta 5.25 deg, eps 0.07) does not return a single C_D: base drag makes it strongly Mach-dependent -- 0.193 at M3, 0.092 at M5, 0.057 at M8, 0.049 at M10, 0.0445 at M12, 0.042 at M14. The implied 0.0533 above sits between the M8 and M12 values, i.e. a representative down-leg Mach of ~9-10, which is a defensible choice for a single-beta object flown from M12 to impact.\n    Pinning beta to the M12 pull-out condition instead would give C_D = 0.04453 and beta = 29,579, and that value BREAKS the shipped pull-up validation case (test_pullup.py): the vehicle becomes slippery enough through the down-leg that the commanded-pull run impacts while the no-pull run still troughs at 19.5 km. Recorded rather than adopted.\n    NOTE THE DIRECTION for whoever revisits this: correcting the area alone LOWERS beta, but the repo's C_D at high Mach is well below the 0.068 previously assumed, and that dominates -- so an M12-referenced beta RISES. It falls below the current value only if the mass falls: ~20,500 at 208 kg, ~17,600 at 178 kg (at the M12 C_D).\nExposed wing span ~0.166 m per panel = (0.87 - 0.5385)/2, from Gulan's over-wing span against the corrected base diameter. Recorded here only; NOT entered as geometry (see ASSUMED).\n\n== ASSUMED (fits, defaults, directions -- each with what it rests on) ==\nmass_kg = 300 is a TRAJECTORY FIT, not a sourced value, and it is the TOP OF A 150-300 kg BAND. No primary-source SWERVE mass exists. It is retained as the modelling point value so existing results stay reproducible, but every sourced analogue for this airframe falls BELOW it: 208.35 kg (Murbach, AIAA 93-0313, Table 1 -- entry system mass, 2.75 m SWERVE-derived Mars vehicle, original-type TPS, of which TPS alone is 93 kg at 2.5 cm) and 178 kg (Murbach/Keese/Farmer, SSC97-V-2 p.6 -- same baseline with SIRCA substituted). The circularity is worse than it looks: the fit is pinned against the one edge of the plausible range that MAXIMISES range. Wente's AIAA 1982 Strypi VII R payload rating of 50-300 lbm (23-136 kg) would be a hard upper bound if it transferred, but SWERVE flew VIII-R, for which no payload rating exists in any source; treat it as a caution, not a bound.\nglider_LD = 1.8 is UNCITED ON THIS AIRFRAME and is retained pending better evidence, NOT because it is sourced. The provenance review of 2026-09-08 established that neither candidate is sourced: 1.8 comes from a generic biconic-aeroshell range (Rigali, 1.2-1.8 -- for a shape SWERVE is not) and a third-party PRC estimate of AHW's maximum (1.4-2.1); the ONLY airframe-specific sourced statement is 'L/D>1' (Murbach, AIAA 93-0313 p.1; Murbach/Keese/Farmer, SSC97-V-2 p.6) -- a lower bound, not a value.\n    WHAT THE 0.6 ACTUALLY IS (clarified 2026-09-08): it is the ADDED LIFT FROM THE WINGS -- the wings' contribution, NOT a total lift-to-drag ratio. This file's notes previously described it as 'the maneuvering flight-3 record ... shows a lower ~0.6', attributed to 'Williamson Fig. 20' (a citation that does not exist as described -- see the source field). Entering 0.6 in glider_LD would therefore have put an INCREMENT into a TOTAL field: the same class of error as entering the ~4 deg delta_TRIM as usable flap travel. It also means 0.6 never contradicted Murbach's 'L/D>1'; the two measure different things and were never comparable.\n    STILL UNPINNED: whether 0.6 is a delta(L/D) or a lift fraction, and where it comes from. It needs a citation like everything else here.\n    DO NOT use glider_ld.whole_booster_LD to scale this. Run on the corrected geometry it returns a body-alone L/D_max near 2.8-3.0 at M5-M12, and that is TOO HIGH for this shape class, on three grounds:\n      (i)  It is outside its validated envelope on both axes. The build-up is DATCOM-validated for a FINLESS SLENDER body of fineness 13.4 at M2/3/5 (test_ld_calibration.py). SWERVE III's fineness is 5.09 and the glide runs to M12.\n      (ii) It contradicts the source it would be supporting. Murbach presents 'L/D>1' as a notable feature of the vehicle WITH its cruciform wings; a build-up that hands the WINGLESS body ~3 makes both the wings and that sentence pointless.\n      (iii) It beats HTV-2. Tracy & Wright (S&GS 28(3), 2020) put HTV-2-class glide at L/D ~ 2.6 for a purpose-built lifting body. A blunted 5.25 deg cone exceeding that is not credible.\n    In any case L/D_max is the aerodynamic ceiling at best-glide alpha, not a trimmed value, and for this vehicle class the trimmed figure is the one that flies -- see the trim-gate discussion in METHODS 8.10. Getting a defensible ceiling for a low-fineness cone needs the finned/deflected DATCOM deck that TRIM_GATE_APPROACH.md 7 lists as the highest-value missing evidence.\n    WHY 1.8 AND NOT 0.6: shipping 0.6 makes this object stop gliding altogether. On its own Strypi VIII-R flight plan neither the commanded-pull nor the baseline run produces a phugoid trough -- both impact -- so the vehicle ceases to demonstrate the behaviour it exists to model, and test_pullup's mechanism case dies with it. That is too large a behavioural change to make on a number that is itself unverified.\n    TREAT 1.8 AS A CEILING UNDER REVIEW, not a measurement. The honest band is 0.6-1.8 with a sourced floor of 1.0. If this object is used to test a glide-range claim, run the band rather than the point value -- range is roughly linear in L/D, so the ambiguity IS the answer. commanded_LD in the reentry plan is held equal to this value.\nglider_control_surfaces = 'small' rests on the qualitative description only. NOTHING in the open literature sizes the elevons -- checked against Williamson 1992, Murbach 1993 and 1997, Iliff & Shafer 1993, Griswold 1982, AvWeek 1990 and 2018, and the Sandia LAB NEWS issues. AvWeek 1990 records that the vehicle's 'actual shape and performance are still classified' as of publication, so the absence is structural, not a gap in the search.\nglider_flap_deflection_deg is deliberately left at 0 (estimator uses its 12 deg default). The sourced ~4 deg is delta_TRIM at ONE condition -- the deflection needed to hold -10 deg AoA at Mach 12 -- not maximum control travel, on a vehicle whose envelope runs to Mach 14. Entering it would attach a correct citation to the wrong variable and would UNDERSTATE control authority. The trim values are recorded in the source field instead.\nWing planform left entirely unset (area, chord, sweep, aspect ratio, spans all 0). Nothing in any source gives a planform, and deriving one from a single span number would be invention with a citation attached. The Gulan thesis was checked directly (2026-09-08): its Table 2 carries only length / half-cone angle / span / fin count, and its Figure 24 is an illustration citing a NextBigFuture web article, not a dimensioned drawing -- Gulan needed a fin area too and built it from a parametric CAD model rather than a citation. The absence is therefore structural across Iliff & Shafer, Murbach and Gulan alike. Two span figures exist and CONFLICT: 0.87 m (Gulan Tbl 2, second-hand, ultimate source not established) and ~0.61 m (factsheet, described as including the wings). The corrected base diameter of 0.5385 m settles which is implausible -- a 0.61 m over-wing width leaves 3.6 cm of exposed wing per side, a strake that cannot produce L/D>1, whereas 0.87 m gives 0.166 m per side. 0.61 m is close to AvWeek 1990's 'about 2 ft. in diameter', which is a BODY measurement, so it is probably a body diameter misdescribed. Note also that body_span_m is NOT the field for this: it is documented as wedge-only ('a body of revolution has none'), and this object is axisymmetric.\nbody_tps_thickness_m = 0.025 and structure_material = 'aluminum' are SOURCED BY ANALOGY, not for the flown vehicle. Murbach/Keese/Farmer, SSC97-V-2, Table 1 ('Preliminary Heating Results'), footnoted 'Original vehicle TPS used for preliminary analysis', carries a 'Max Aluminum Temp 483 K (870 R)' row for the cone sidewall -- establishing an aluminium substructure under the silica-phenolic body TPS. Thickness 2.5 cm is Murbach AIAA 93-0313 p.3 (TPS mass 93 kg at 2.5 cm), corroborated by SSC97-V-2 Table 1's char depth 2.64 cm / pyrolysis 0.30 cm / recession 0.00 cm. CAVEAT: 2.5 cm is the MARS-mission sizing for a CO2 entry at 7 km/s -- right order, right materials, not established as the flown SWERVE thickness.\nstructure_limit_K left at 0.0 so the repo's aluminium default governs (heating.py: continuous 450 K, peak/melt 775 K). The 483 K figure above is an ANALYSED backface temperature for a Mars entry, not a certified material limit, and is recorded rather than entered. Other SSC97-V-2 Table 1 values worth having: nose carbon-carbon max surface 3055 K with 3.43 cm recession; wing LE silica phenolic 2200 K with 1.0 cm recession; cone sidewall 1411 K.\nglider_beta_entry_kg_m2 = 7.0 is Acton's HTV-2 fit (Table 3, p. 206), replacing an unexplained 20.0 whose origin nothing in the SWERVE source set produces. It is a BORROWED screening value: HTV-2 is a wedge-shaped lifting body, not a blunted cone with cruciform wings. Read only by the 'equilibrium_glide_acton' guidance mode and ignored under this object's shipped plan; a cited 7 makes that mode switch safe by default, which zeroing the field would not.\nemissivity = 0.85 is a screening default applied to BOTH the carbon-carbon nose/leading edges and the silica-phenolic body; no measured emissivity for either SWERVE surface appears in the open literature. Radiative equilibrium wall temperature scales as eps^-0.25, so the TPS tier verdict is weakly sensitive -- moving to 0.80 or 0.90 shifts T_wall by under 2 percent.\nMurbach (AIAA 93-0313 p.2) ASSUMES R_n = 0.025 m for heating on the 2.75 m vehicle. Against the corrected base radius that is a ratio of 0.093, not 0.07 -- 33 percent higher. Iliff's 0.07 governs because Murbach says 'assumed', but the discrepancy matters: q scales as R_n^-0.5, so 33 percent in R_n is ~15 percent in stagnation heating.\n\n== TRAJECTORY CAUTION ==\nRigali's widely quoted 'leveled off at 25,000 feet' (LAB NEWS, 31 Oct 1980) cannot be reconciled with the digitised SWERVE III trajectory, which shows cruise at 84,000-87,000 ft between Mach 5 and 12. Treat 25,000 ft as attributed-but-doubtful -- probably a terminal segment or a simplification for a general readership. Do NOT fit a reconstruction to it.\n\n== REENTRY MODE ==\nThis object was characterised flying damped_glide; the shipped plan default is dynamic_equilibrium_glide. Select the intended reentry mode in the Reentry-mode dropdown -- the glide law is a flight-plan choice, not object hardware.",
+      "interior_limit_C": 80.0
     },
     "file:Scud-B_warhead.ro.json": {
       "beta_kg_m2": 0.0,
@@ -6052,7 +6078,8 @@
       "wing_root_chord_m": 0.0,
       "wing_span_exposed_m": 0.0,
       "wing_sweep_deg": 0.0,
-      "wing_thickness_m": 0.0
+      "wing_thickness_m": 0.0,
+      "interior_limit_C": 80.0
     },
     "file:Strypi_VII_R_payload.ro.json": {
       "beta_kg_m2": 2651.7,
@@ -6120,7 +6147,8 @@
       "wing_root_chord_m": 0.0,
       "wing_span_exposed_m": 0.0,
       "wing_sweep_deg": 0.0,
-      "wing_thickness_m": 0.0
+      "wing_thickness_m": 0.0,
+      "interior_limit_C": 80.0
     },
     "file:Taepodong-I_payload.ro.json": {
       "beta_kg_m2": 4096.2,
@@ -6188,7 +6216,8 @@
       "wing_root_chord_m": 0.0,
       "wing_span_exposed_m": 0.0,
       "wing_sweep_deg": 0.0,
-      "wing_thickness_m": 0.0
+      "wing_thickness_m": 0.0,
+      "interior_limit_C": 80.0
     },
     "glide_absent": {
       "beta_kg_m2": 8000.0,
@@ -6246,7 +6275,8 @@
       "wing_root_chord_m": 0.0,
       "wing_span_exposed_m": 0.0,
       "wing_sweep_deg": 0.0,
-      "wing_thickness_m": 0.0
+      "wing_thickness_m": 0.0,
+      "interior_limit_C": 80.0
     },
     "glide_azimuth_command": {
       "beta_kg_m2": 8000.0,
@@ -6304,7 +6334,8 @@
       "wing_root_chord_m": 0.0,
       "wing_span_exposed_m": 0.0,
       "wing_sweep_deg": 0.0,
-      "wing_thickness_m": 0.0
+      "wing_thickness_m": 0.0,
+      "interior_limit_C": 80.0
     },
     "glide_constant_bank": {
       "beta_kg_m2": 8000.0,
@@ -6362,7 +6393,8 @@
       "wing_root_chord_m": 0.0,
       "wing_span_exposed_m": 0.0,
       "wing_sweep_deg": 0.0,
-      "wing_thickness_m": 0.0
+      "wing_thickness_m": 0.0,
+      "interior_limit_C": 80.0
     },
     "glide_skip_to_equilibrium": {
       "beta_kg_m2": 8000.0,
@@ -6420,7 +6452,8 @@
       "wing_root_chord_m": 0.0,
       "wing_span_exposed_m": 0.0,
       "wing_sweep_deg": 0.0,
-      "wing_thickness_m": 0.0
+      "wing_thickness_m": 0.0,
+      "interior_limit_C": 80.0
     },
     "modern_control": {
       "beta_kg_m2": 8000.0,
@@ -6478,7 +6511,8 @@
       "wing_root_chord_m": 0.0,
       "wing_span_exposed_m": 0.0,
       "wing_sweep_deg": 0.0,
-      "wing_thickness_m": 0.0
+      "wing_thickness_m": 0.0,
+      "interior_limit_C": 80.0
     },
     "sep_non_separating": {
       "beta_kg_m2": 8000.0,
@@ -6536,7 +6570,8 @@
       "wing_root_chord_m": 0.0,
       "wing_span_exposed_m": 0.0,
       "wing_sweep_deg": 0.0,
-      "wing_thickness_m": 0.0
+      "wing_thickness_m": 0.0,
+      "interior_limit_C": 80.0
     },
     "sep_separating_rv": {
       "beta_kg_m2": 8000.0,
@@ -6594,7 +6629,8 @@
       "wing_root_chord_m": 0.0,
       "wing_span_exposed_m": 0.0,
       "wing_sweep_deg": 0.0,
-      "wing_thickness_m": 0.0
+      "wing_thickness_m": 0.0,
+      "interior_limit_C": 80.0
     }
   }
 }

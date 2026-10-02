@@ -616,6 +616,268 @@ def _map_skin_cells(L, coverage=None):
     return (surf, dur, None)
 
 
+# ── The four answers (TODO item 11; user, 2026-10-02) ──────────────────────
+# What a reader wants from this tab: is a surface compromised (the nose, a
+# wing or leading edge, the windward surface), and is the inside cooked by
+# a long, hot soak.  One row each; the headline is the worst row.
+_TIER_RANK = {'experience': 0, 'design': 1, 'beyond': 2, 'fail': 3}
+_VERDICT_TEXT = {'experience': "holds", 'design': "past tested dwell",
+                 'beyond': "beyond its limit", 'fail': "fails"}
+ANSWER_COLS = ("Verdict", "Value", "Limit")
+
+
+def _worst(cells):
+    """(text, tier) of the worst cell among (text, tier) pairs or None."""
+    cells = [c for c in cells if c]
+    return max(cells, key=lambda c: _TIER_RANK.get(c[1], 0)) if cells else None
+
+
+def _row(place, tier=None, value="", limit="", basis="", reason="",
+         verdict=None):
+    """One answer.  tier None = not computed (reason says why) or, with
+    verdict given, a neutral statement such as 'none on this object'."""
+    return dict(place=place, tier=tier,
+                verdict=(verdict or (_VERDICT_TEXT[tier] if tier
+                                     else "not computed")),
+                value=value, limit=limit, basis=basis, reason=reason)
+
+
+def _label(key):
+    m = heating.TPS_MATERIALS.get(str(key or ""))
+    return re.sub(r'\s*\(.*\)$', '', (m or {}).get('label') or str(key or ""))
+
+
+def _ablator_row(place, L, worst, mat):
+    """An ablative location: its flown heat load against the material's
+    flight record (the burn-through bound overrides)."""
+    rc = (L.get('criteria') or {}).get('recession') or {}
+    if rc.get('burnthrough_bound'):
+        return _row(place, 'fail', "burn-through", f"the layer's capacity ({mat})",
+                    basis="the burn-through bound at the most optimistic "
+                          "cited heat of ablation")
+    rec = rc.get('demonstrated_load_MJ_m2')
+    Q = float(rc.get('load_MJ_m2', 0.0) or 0.0)
+    if not rec:
+        return _row(place, reason=f"no flown heat-load record for {mat}")
+    return _row(place, 'beyond' if Q > rec else 'experience',
+                f"{Q:,.0f} MJ/m² heat load ({Q / rec:.0%} of the record)",
+                f"{rec:,.0f} MJ/m² flown, "
+                f"{_record_anchor(rc.get('demonstrated_load_source'))} ({mat})",
+                basis="ablative: judged on flown heat load against the "
+                      "material's flight record")
+
+
+def _nose_answer(nose, coverage, prof):
+    if not (nose or {}).get('material') and not prof.get('nose_material'):
+        return _row("Nose", reason="no nose material entered")
+    mat = _label(prof.get('nose_material') or nose.get('material'))
+    surf, dur, rec = _map_skin_cells(nose, coverage)
+    worst = _worst([surf, dur, rec])
+    if worst is None:
+        return _row("Nose", reason=f"no limit on file for {mat}")
+    if coverage is not None:
+        return _row("Nose", worst[1], surf[0].split(" of ")[0],
+                    f"{coverage['pa_K']:,.0f} K, the edge of passive oxidation; "
+                    f"tested to {coverage['floor_s']:.0f} s ({mat})",
+                    basis="the UHTC envelope coverage")
+    if nose.get('is_ablator'):
+        return _ablator_row("Nose", nose, worst, mat)
+    ps = (nose.get('criteria') or {}).get('peak_surface')
+    if surf and ps:
+        return _row("Nose", worst[1], surf[0].split(" of ")[0],
+                    f"{ps['limit_K']:,.0f} K peak ({mat})",
+                    basis="radiative-equilibrium wall temperature")
+    return _row("Nose", worst[1], worst[0], mat)
+
+
+def _windward_answer(fom, body_loc, prof):
+    w = (fom or {}).get('windward')
+    wc = ((w or {}).get('criteria') or {}).get('windward_surface')
+    if w and wc and w.get('T_eq_windward_K'):
+        Tw = w['T_eq_windward_K']
+        over = (Tw['lo'] > wc['limit_continuous_K']
+                or Tw['hi'] > wc['limit_peak_K'])
+        ab = w.get('alpha_band_deg') or (5, 20)
+        return _row("Windward surface", 'beyond' if over else 'experience',
+                    f"{Tw['lo']:,.0f}–{Tw['hi']:,.0f} K at α {ab[0]:.0f}–{ab[1]:.0f}°",
+                    f"{wc['limit_continuous_K']:,.0f} K continuous, "
+                    f"{wc['limit_peak_K']:,.0f} K peak "
+                    f"({_label(w.get('body_material'))})",
+                    basis=w.get('thompson_band', '') or
+                    "windward flank, modified-Newtonian amplification")
+    if body_loc is None or not body_loc.get('material'):
+        if not prof.get('body_material'):
+            return _row("Windward surface", reason="no body material entered")
+        return _row("Windward surface",
+                    reason="no windward heating computed for this flight")
+    mat = _label(body_loc.get('material'))
+    surf, dur, rec = _map_skin_cells(body_loc)
+    worst = _worst([surf, dur, rec])
+    if worst is None:
+        return _row("Windward surface", reason=f"no limit on file for {mat}")
+    if body_loc.get('is_ablator'):
+        r = _ablator_row("Windward surface", body_loc, worst, mat)
+        if r['tier']:
+            r['basis'] = "body acreage at zero angle of attack; " + r['basis']
+        return r
+    ps = (body_loc.get('criteria') or {}).get('peak_surface')
+    return _row("Windward surface", worst[1],
+                surf[0].split(" of ")[0] if surf else worst[0],
+                (f"{ps['limit_K']:,.0f} K ({mat})" if ps else mat),
+                basis="body acreage at zero angle of attack")
+
+
+def _edge_answer(fom, prof):
+    les = (fom or {}).get('leading_edges') or []
+    if not les:
+        if prof.get('wing'):
+            return _row("Wing / leading edge",
+                        reason="the object has a wing, but no leading-edge "
+                               "entry (edge radius and material) in its "
+                               "heating locations")
+        if prof.get('body_form') in ('wedge', 'half_cone'):
+            return _row("Wing / leading edge",
+                        reason=f"a {prof['body_form'].replace('_', ' ')} has "
+                               f"edges, but none is entered in the object's "
+                               f"heating locations")
+        return _row("Wing / leading edge", verdict="none on this object",
+                    reason="no wing, fin or leading edge entered")
+    worst = None
+    for le in les:
+        name = le.get('name') or 'leading edge'
+        if le.get('status') != 'evaluated':
+            r = _row("Wing / leading edge",
+                     reason=f"{name}: " + "; ".join(le.get('missing') or
+                                                    [le.get('status', '')]))
+        else:
+            res = (le.get('results') or {}).get('laminar') or {}
+            mat = heating.TPS_MATERIALS.get(str(le.get('material') or ''))
+            T = res.get('T_wall_peak_K')
+            if mat is None:
+                r = _row("Wing / leading edge",
+                         reason=f"{name}: material not in the catalog")
+            elif mat.get('is_ablator'):
+                rec = mat.get('demonstrated_load_MJ_m2')
+                Q = res['heat_load_J_m2']
+                Q = (max(Q) if isinstance(Q, tuple) else Q) / 1e6
+                if not rec:
+                    r = _row("Wing / leading edge",
+                             reason=f"{name}: no flown heat-load record for "
+                                    f"{_label(le['material'])}")
+                else:
+                    r = _row("Wing / leading edge",
+                             'beyond' if Q > rec else 'experience',
+                             f"{Q:,.0f} MJ/m² heat load",
+                             f"{rec:,.0f} MJ/m² flown ({_label(le['material'])})",
+                             basis=le.get('accuracy', ''))
+            elif T is not None:
+                lo, hi = T if isinstance(T, tuple) else (T, T)
+                cont, peak = float(mat['continuous_K']), float(mat['peak_K'])
+                tier = ('beyond' if (lo > cont or hi > peak) else 'experience')
+                r = _row("Wing / leading edge", tier,
+                         (f"{lo:,.0f}–{hi:,.0f} K" if hi > lo else f"{hi:,.0f} K")
+                         + f" ({name})",
+                         f"{cont:,.0f} K continuous, {peak:,.0f} K peak "
+                         f"({_label(le['material'])})",
+                         basis=le.get('accuracy', ''))
+            else:
+                r = _row("Wing / leading edge",
+                         reason=f"{name}: no wall temperature computed")
+        if worst is None or _TIER_RANK.get(r['tier'], -1) > _TIER_RANK.get(worst['tier'], -1):
+            worst = r
+    return worst
+
+
+def _interior_answer(arc, prof):
+    limit = float(prof.get('interior_limit_C', 80.0) or 80.0)
+    lim_src = ("Hayabusa sample container, Yada et al. 2014"
+               if abs(limit - 80.0) < 1e-9 else "entered for this object")
+    lim_txt = f"{limit:,.0f} °C ({lim_src})"
+    mat = prof.get('body_material')
+    if not mat:
+        return _row("Interior after the soak", limit=lim_txt,
+                    reason="no body heat-shield material entered")
+    thick = float(prof.get('body_thickness_m', 0.0) or 0.0)
+    if thick <= 0.0:
+        return _row("Interior after the soak", limit=lim_txt,
+                    reason="no body heat-shield thickness entered")
+    t = np.asarray(arc.get('t', []), float)
+    if t.size < 2:
+        return _row("Interior after the soak", limit=lim_txt,
+                    reason="no reentry arc to evaluate over")
+    q, _, _ = heating.acreage_flux(
+        t, arc['rho'], arc['V'], arc['alt'],
+        nose_radius_m=float(prof.get('nose_radius_m', 0.0) or 0.0),
+        body_radius_m=float(prof.get('diameter_m', 0.0) or 0.0) / 2.0)
+    bl = heating.bondline_screen(t, q, material=str(mat), thickness_m=thick,
+                                 emissivity=prof.get('emissivity', 0.85),
+                                 limit_C=limit)
+    if not bl.get('evaluated'):
+        why = bl.get('reason', '')
+        if 'conductivity' in why:
+            why = f"no cited conductivity for {_label(mat)} in the catalog"
+        return _row("Interior after the soak", limit=lim_txt, reason=why)
+    return _row("Interior after the soak",
+                'beyond' if bl['crossed'] else 'experience',
+                f"{bl['T_bond_peak_C']:,.0f} °C behind "
+                f"{thick * 100:.1f} cm of {_label(mat)}",
+                lim_txt,
+                basis="one-dimensional conduction through the body layer "
+                      "with an insulated inner face (Dec & Braun), to "
+                      "impact: an upper bound for the inside")
+
+
+def answers(result) -> list:
+    """The four answers: nose, wing or leading edge, windward surface,
+    interior after the soak.  Each row is a dict with place, tier (None =
+    not computed or not applicable), verdict, value, limit, basis and
+    reason.  Presentation over numbers already computed, except the
+    interior row, which runs the existing one-dimensional conduction screen
+    against the object's own interior limit."""
+    fom = result.get('heating_fom') or {}
+    arc = result.get('heating_arc') or {}
+    prof = arc.get('profile') or {}
+    locs = fom.get('locations') or {'nose': fom}
+    nose = locs.get('nose') or fom
+    body_loc = locs.get('body')
+    t = np.asarray(arc.get('t', []), float)
+    q = np.asarray(arc.get('q_dot', []), float)
+    _nm = heating.TPS_MATERIALS.get(str(prof.get('nose_material') or ""))
+    coverage = None
+    if (classify(result) == 'glide' and _nm and not _nm.get('is_ablator')
+            and _nm.get('oxidation_dwell_s') and t.size > 1):
+        coverage = _uhtc_coverage(t, q, prof.get('emissivity', 0.85),
+                                  prof.get('nose_radius_m', 0.0), _nm)
+    return [_nose_answer(nose, coverage, prof),
+            _edge_answer(fom, prof),
+            _windward_answer(fom, body_loc, prof),
+            _interior_answer(arc, prof)]
+
+
+def answers_block(rows):
+    """(lines, spans) for the GUI: the header line, the column titles, one
+    tab-separated line per answer, then the reasons and bases.  Spans are
+    (line index in the block, start, end, tier) on each verdict cell."""
+    lines = ["─── Survival map ───────────────────────────────────────────",
+             "\t" + "\t".join(ANSWER_COLS)]
+    spans = []
+    for r in rows:
+        line = "  " + r['place'] + "\t"
+        if r['tier']:
+            spans.append((len(lines), len(line), len(line) + len(r['verdict']),
+                          r['tier']))
+        line += r['verdict'] + "\t" + (r['value'] or "—") + "\t" \
+            + (r['limit'] or "—")
+        lines.append(line)
+    notes = [f"  {r['place']}: {r['reason']}." for r in rows if r['reason']]
+    notes += [f"  {r['place']}: {r['basis']}." for r in rows
+              if r['basis'] and r['tier']]
+    if notes:
+        lines.append("")
+        lines += notes
+    return lines, spans
+
+
 def _survival_map(nose, body_loc, coverage, windward, bondline, warnings):
     """Assemble the matrix.  Returns (lines, spans); spans are
     (line_idx_within_block, char_start, char_end, tier_key) for the GUI to
@@ -773,6 +1035,7 @@ def build_report(result) -> dict:
     # ---- judgement (mode-keyed) ---------------------------------------------
     j = ["─── Judgement ──────────────────────────────────────────────"]
     status = 'survive'
+    _not_thermal = []
 
     # Ablator load-vs-record regime (nose) — shared by the lead and judgement.
     rc = (nose.get('criteria') or {}).get('recession')
@@ -785,8 +1048,9 @@ def build_report(result) -> dict:
     if form == 'ballistic':
         if regime is not None:
             status = regime['status']
-            j.append("  " + regime['load_sentence'])
-            if regime['accuracy_sentence']:
+            # The load sentence (and, when it leads, the accuracy sentence)
+            # is in the lead above; the judgement does not repeat it.
+            if regime['accuracy_sentence'] and not regime['lead_accuracy']:
                 j.append("  " + regime['accuracy_sentence'])
             for c in regime['context']:
                 if c:
@@ -836,8 +1100,7 @@ def build_report(result) -> dict:
         elif regime is not None:
             # Ablative-nosed glider: same load-vs-record regime as a ballistic RV.
             status = regime['status']
-            j.append("  " + regime['load_sentence'])
-            if regime['accuracy_sentence']:
+            if regime['accuracy_sentence'] and not regime['lead_accuracy']:
                 j.append("  " + regime['accuracy_sentence'])
             for c in regime['context']:
                 if c:
@@ -943,7 +1206,7 @@ def build_report(result) -> dict:
         # demonstrated-envelope context whether or not it dives at the end —
         # the case the old Form C trigger got backwards (SWERVE pulled -10°
         # AoA at 10 g and never saw this block).
-        j += _maneuver_context(prof.get('pullup_g_max', 0.0))
+        _not_thermal = _maneuver_context(prof.get('pullup_g_max', 0.0))
 
     # ---- Interior (bondline) screen — all forms -----------------------------
     # The "does the inside survive" axis: 1-D conduction through the body TPS
@@ -951,13 +1214,15 @@ def build_report(result) -> dict:
     # limit is BEYOND DESIGN ENVELOPE (yellow) — a sizing criterion, not a
     # demonstrated-death bound — so it escalates survive→beyond, never to fail.
     _bl = (fom or {}).get('bondline')
+    # Shown in the detail only when the user entered the layer's thickness;
+    # the interior answer (answers()) is what the headline and lead use.
+    if not float(prof.get('body_thickness_m', 0.0) or 0.0) > 0.0:
+        _bl = None
     if _bl and _bl.get('evaluated'):
-        j.append("─── Interior (bondline) screen ─────────────────────────────")
+        j.append("─── Bondline (structure behind the layer) ──────────────────")
         _bmat = heating.TPS_MATERIALS.get(str(prof.get('body_material') or ""))
         _blabel = (_bmat.get('label') if _bmat else None) or prof.get('body_material') or "body TPS"
         if _bl['crossed']:
-            if status in ('survive', 'degraded'):
-                status = 'beyond'
             j.append(f"  Bondline reaches {_bl['T_bond_peak_C']:,.0f} °C behind "
                      f"the {_blabel} layer ({_bl['thickness_m']*100:.1f} cm) — "
                      f"past the {_bl['limit_C']:.0f} °C structure limit at "
@@ -975,6 +1240,10 @@ def build_report(result) -> dict:
 
     # ---- NRC ladder (gliders) + method line ---------------------------------
     tail = []
+    # Not about temperature: the maneuver-load context, kept at the end.
+    if _not_thermal:
+        tail += ["", "─── Not thermal ────────────────────────────────────────────"]
+        tail += _not_thermal
     if form == 'glide' and dur > 60.0:
         tail += ["", tps_ladder.format_ladder(dur)]
     tail += [
@@ -1003,6 +1272,11 @@ def build_report(result) -> dict:
 
     # ── Unified 4-tier verdict (the headline every material now shares) ──────
     tier = survival_tier(status, coverage)
+    # The headline is the worst answer, never better (user, 2026-10-02).
+    _answers = answers(result)
+    for _a in _answers:
+        if _a['tier'] and _TIER_RANK[_a['tier']] > _TIER_RANK[tier]:
+            tier = _a['tier']
     tier_label, tier_color = SURVIVAL_TIERS[tier]
     if coverage is not None and coverage.get('exits') and tier in ('design', 'beyond'):
         tier_label += "  (" + " + ".join(sorted(coverage['exits'])) + ")"
@@ -1013,6 +1287,14 @@ def build_report(result) -> dict:
     # by its own trigger (descriptors()), never a Form letter standing in for
     # behaviour the plan may not carry.
     headline = f"{tier_label}   —   {' · '.join(descriptors(result))}"
+    _bad = [a['place'].split(' ')[0].lower() for a in _answers
+            if a['tier'] in ('beyond', 'fail')]
+    _unk = [a['place'].split(' ')[0].lower() for a in _answers
+            if a['tier'] is None and a['verdict'] == 'not computed']
+    if _bad:
+        headline += "   ·   " + " and ".join(_bad) + " past limit"
+    if _unk:
+        headline += "   ·   not computed: " + ", ".join(_unk)
     if _mods:
         headline += "  *"
 
@@ -1114,12 +1396,13 @@ def build_report(result) -> dict:
     # Interior-survivability sentence in the LEAD when the bondline is the (or
     # a) reason for a 'beyond' verdict — the skin can survive while the
     # structure behind it cooks, which a nose/skin verdict alone would miss.
-    if _bl and _bl.get('evaluated') and _bl.get('crossed'):
+    _int = next((a for a in answers(result)
+                 if a['place'].startswith('Interior')), None)
+    if _int and _int['tier'] in ('beyond', 'fail'):
         because.append(
-            f"The heat also reaches the structure: the bondline behind the "
-            f"body TPS hits {_bl['T_bond_peak_C']:,.0f} °C, past the "
-            f"{_bl['limit_C']:.0f} °C limit — the skin may hold, but the "
-            f"interior does not.")
+            f"The heat also reaches the inside: {_int['value']}, past the "
+            f"{_int['limit']} limit — the skin may hold, but the interior "
+            f"does not.")
         if not fix:
             fix = "thicker body TPS, a lower-load trajectory, or an insulating sub-layer"
     lead += ["", " ".join(because)]
@@ -1149,13 +1432,13 @@ def build_report(result) -> dict:
 
     # ── Survival map: the hinge between the lead and the full analysis — a
     # one-glance station × question matrix; each cell elaborated below it.
-    _map_lines, _map_spans = _survival_map(
-        nose, body_loc, coverage, (fom or {}).get('windward'), _bl,
-        fom.get('warnings'))
-    _map_block = ("\n".join(_map_lines) + "\n\n") if _map_lines else ""
+    _map_lines, _map_spans = answers_block(_answers)
+    _map_block = "\n".join(_map_lines) + "\n\n"
 
+    # The four answers first; the plain-language lead and everything else
+    # below them, the engineering detail behind the divider.
     _divider = "═══ Full analysis " + "═" * 42
-    body = "\n".join(lead) + "\n\n" + _map_block + _divider + "\n\n" \
+    body = _map_block + "\n".join(lead) + "\n\n" + _divider + "\n\n" \
            + "\n".join(hdr) + "\n\n" + "\n".join(budget) + "\n" \
            + "\n".join(j) + "\n" + "\n".join(tail) + "\n"
 

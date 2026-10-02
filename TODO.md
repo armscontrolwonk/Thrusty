@@ -7,7 +7,7 @@ invent.
 
 ## New — not yet planned
 
-### 11. Review the temperature screens — OPEN (user, 2026-10-02)
+### 11. Review the temperature screens — FIRST PASS BUILT (2026-10-02)
 
 The user: "the way in which all the temperature data is presented is a
 mess. Users really just want to know if the reentry object will be
@@ -101,6 +101,42 @@ attached to the sample container indicated that the container was never
 heated over 65°C" (JAXA ASRG, Guidebook for proposers, 4th Announcement of
 Opportunity for Hayabusa2 samples, July 2023, updated October 2023, p. 3).
 The default is the user's choice.
+
+The user then supplied the source: Yada et al., "Hayabusa-returned sample
+curation in the Planetary Material Sample Curation Facility of JAXA",
+Meteoritics & Planetary Science 49(2), 135–153 (2014), doi
+10.1111/maps.12027, p. 136: "During atmospheric entry, the sample container
+was designed to be preserved under 80 °C within the reentry capsule".
+80 °C is the default.
+
+**Built, 2026-10-02.**
+- `ROParams.interior_limit_C` (hardware, default 80 °C with that citation),
+  in the object editor; the editor no longer drops `structure_material`,
+  `structure_limit_K` or `tps_material` on save.
+- `survivability_report.answers(result)`: the four rows (nose; wing or
+  leading edge; windward surface; interior after the soak), each with a
+  verdict, the one number, its limit and where the limit comes from, and a
+  basis line; "not computed" with its reason where an input is missing.
+  They head the tab, above the plain-language paragraph.
+- The headline is the worst row and names the rows past their limit and the
+  rows not computed.
+- The interior row runs the existing one-dimensional conduction screen
+  (insulated inner face, an upper bound) on the user's body material and
+  thickness against the object's interior limit. No default thickness: the
+  old screen ran on 2 cm when none was entered, against a 250 °C structure
+  limit, and drove the headline; it now appears only in the detail, and
+  only when a thickness is entered.
+- The leading-edge row uses `heating_by_location` for any leading edge the
+  object lists (the first verdict wired to the per-location modules); with
+  a wing and no entry it says so.
+- The nose paragraph is no longer repeated; the g-load anchors move to a
+  "Not thermal" section at the end.
+
+**Still open:** the nose and windward rows still come from the screening
+correlations (Sutton-Graves and the windward amplification), not the
+per-location Tauber relations; the per-material accuracy statement is a
+basis line, not a number against a test case for every row; the plot shows
+the nose only; the rest of the detail below the divider is unchanged.
 
 ### 10. Models to validate with our own data — OPEN LIST (2026-10-01)
 

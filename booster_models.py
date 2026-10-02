@@ -690,6 +690,13 @@ class ROParams:
     body_tps_thickness_m:   float = 0.0
     structure_material:     str   = ""
     structure_limit_K:      float = 0.0
+    # The hottest the inside may get (deg C): what "cooked internally" is
+    # judged against (survivability_report.answers).  Entered by the user per
+    # object; the default is the Hayabusa capsule's: "the sample container
+    # was designed to be preserved under 80 °C within the reentry capsule"
+    # (Yada et al., Meteoritics & Planetary Science 49(2), 135-153, 2014,
+    # p. 136).
+    interior_limit_C:       float = 80.0
     # Bespoke (user-defined) material properties, keyed by location.  When a
     # location's material is the sentinel 'custom_nose' / 'custom_body', the
     # matching dict here holds a catalog-shaped entry (label, group, is_ablator,
@@ -922,6 +929,7 @@ def ro_to_dict(ro: ROParams, include_reentry_plan: bool = True) -> dict:
         'body_tps_thickness_m':  ro.body_tps_thickness_m,
         'structure_material':    ro.structure_material,
         'structure_limit_K':     ro.structure_limit_K,
+        'interior_limit_C':      ro.interior_limit_C,
         'nose_tps_custom':       ro.nose_tps_custom,
         'body_tps_custom':       ro.body_tps_custom,
         'source':                ro.source,
@@ -1040,6 +1048,7 @@ def ro_from_dict(d: dict) -> ROParams:
         body_tps_thickness_m=float(d.get('body_tps_thickness_m', 0.0)),
         structure_material=str(d.get('structure_material', '')),
         structure_limit_K=float(d.get('structure_limit_K', 0.0)),
+        interior_limit_C=float(d.get('interior_limit_C', 80.0) or 80.0),
         nose_tps_custom=(d.get('nose_tps_custom') or None),
         body_tps_custom=(d.get('body_tps_custom') or None),
         heating_locations=clean_heating_locations(

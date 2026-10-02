@@ -4404,7 +4404,7 @@ class ROEditorDialog(tk.Toplevel):
         self._body_thick_var = tk.StringVar(value=_bt)
         _bt_in = ttk.Frame(tps_frm); _bt_in.grid(row=4, column=1, sticky=tk.W, pady=2)
         ttk.Entry(_bt_in, textvariable=self._body_thick_var, width=10).pack(side=tk.LEFT)
-        ttk.Label(_bt_in, text=" m  (0 = auto)").pack(side=tk.LEFT)
+        ttk.Label(_bt_in, text=" m  (0 = not entered: the interior is not computed)").pack(side=tk.LEFT)
 
         ttk.Label(tps_frm, text="Emissivity:").grid(
             row=5, column=0, sticky=tk.W, padx=(0, 8), pady=2)
@@ -4412,6 +4412,15 @@ class ROEditorDialog(tk.Toplevel):
         _em_in = ttk.Frame(tps_frm); _em_in.grid(row=5, column=1, sticky=tk.W, pady=2)
         ttk.Entry(_em_in, textvariable=self._emiss_var, width=10).pack(side=tk.LEFT)
         ttk.Label(_em_in, text="  (0.85 typical; range 0.75–0.90)").pack(side=tk.LEFT)
+
+        ttk.Label(tps_frm, text="Interior limit:").grid(
+            row=6, column=0, sticky=tk.W, padx=(0, 8), pady=2)
+        self._int_lim_var = tk.StringVar(
+            value=f"{ro.interior_limit_C:g}" if ro else "80")
+        _il_in = ttk.Frame(tps_frm); _il_in.grid(row=6, column=1, sticky=tk.W, pady=2)
+        ttk.Entry(_il_in, textvariable=self._int_lim_var, width=10).pack(side=tk.LEFT)
+        ttk.Label(_il_in, text=" °C  the hottest the inside may get "
+                               "(80 = Hayabusa sample container)").pack(side=tk.LEFT)
 
         self._nose_mat_cb.bind("<<ComboboxSelected>>",
                                lambda _e: self._update_custom_state("nose"))
@@ -5287,10 +5296,12 @@ class ROEditorDialog(tk.Toplevel):
         try:
             emiss = float(self._emiss_var.get())
             body_thick = float(self._body_thick_var.get())
+            int_lim = float(self._int_lim_var.get())
         except ValueError:
             messagebox.showerror(
                 "Invalid input",
-                "Emissivity and body layer thickness must be numbers.",
+                "Emissivity, body layer thickness and interior limit must be "
+                "numbers.",
                 parent=self)
             return None
 
@@ -5331,6 +5342,7 @@ class ROEditorDialog(tk.Toplevel):
             nose_tps_material=nose_key,
             body_tps_material=body_key,
             body_tps_thickness_m=body_thick,
+            interior_limit_C=int_lim,
             nose_tps_custom=nose_custom,
             body_tps_custom=body_custom,
             source=self._source_var.get().strip(),
@@ -5353,6 +5365,9 @@ class ROEditorDialog(tk.Toplevel):
             # unchanged, or a save would erase it from the file.
             _carry['heating_locations'] = [
                 dict(e) for e in self._orig_ro.heating_locations]
+            for _k in ('structure_material', 'structure_limit_K',
+                       'tps_material'):
+                _carry[_k] = getattr(self._orig_ro, _k)
             ro_new = _dc.replace(ro_new, **_carry)
         return ro_new
 

@@ -923,6 +923,25 @@ def _severity(res):
     return worst
 
 
+def acreage_flux(t, rho, V, alt, *, nose_radius_m, body_radius_m,
+                 body_flux_fraction=None):
+    """Heat flux on the body acreage over an arc, the one heating_fom_per_
+    location uses for the body and the interior: a screening fraction of the
+    BODY-scale stagnation flux, turbulent-augmented at low altitude by the
+    transition gate (§13.11).
+
+    Returns (q_W_m2 array, transition_state, peak transition factor)."""
+    if body_flux_fraction is None:
+        body_flux_fraction = BODY_FLUX_FRACTION
+    f = min(max(float(body_flux_fraction), 1e-3), 1.0)
+    r_ref = body_radius_m if body_radius_m and body_radius_m > 0.0 \
+        else nose_radius_m
+    r_t = nose_radius_m if nose_radius_m and nose_radius_m > 0.0 else r_ref
+    rho = np.asarray(rho, float); V = np.asarray(V, float)
+    tf, _, state = transition_factor(rho, V, alt, r_t)
+    return f * _stag_flux(rho, V, r_ref) * tf, state, float(np.max(tf))
+
+
 def heating_fom_per_location(t, rho, V, alt, rng, *, nose_radius_m=0.05,
                              body_radius_m=0.0, emissivity=0.85,
                              nose_material="", body_material="",
@@ -1002,10 +1021,9 @@ def heating_fom_per_location(t, rho, V, alt, rng, *, nose_radius_m=0.05,
     if _body_mat and _body_mat.get("is_ablator") and _body_mat.get("k_W_mK"):
         # Acreage flux, turbulent-augmented at low altitude (transition gate,
         # §13.11) — a turbulent acreage cooks the interior faster.
-        _Rt = nose_radius_m if nose_radius_m and nose_radius_m > 0 else _R_ref
-        _tf_b, _, _ts_b = transition_factor(np.asarray(rho, float),
-                                            np.asarray(V, float), alt, _Rt)
-        _q_body = f * _stag_flux(np.asarray(rho, float), np.asarray(V, float), _R_ref) * _tf_b
+        _q_body, _ts_b, _tfpk_b = acreage_flux(
+            t, rho, V, alt, nose_radius_m=nose_radius_m,
+            body_radius_m=body_radius_m, body_flux_fraction=f)
         _bl = bondline_screen(np.asarray(t, float), _q_body,
                               material=str(body_material), thickness_m=_body_depth,
                               emissivity=emissivity)
@@ -1013,7 +1031,7 @@ def heating_fom_per_location(t, rho, V, alt, rng, *, nose_radius_m=0.05,
             # Carry the gate's state on the result so the report's survival-map
             # regime line can name it on every form (not just Form C).
             _bl["transition_state"] = _ts_b
-            _bl["transition_factor_peak"] = float(np.max(_tf_b))
+            _bl["transition_factor_peak"] = _tfpk_b
             if _ts_b != "laminar":
                 _bl.setdefault("warnings", []).append(
                     f"Acreage boundary layer {_ts_b} at low altitude — flux "

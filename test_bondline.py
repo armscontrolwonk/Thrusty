@@ -106,23 +106,35 @@ def _green_ballistic():
     return integrate_trajectory(p, 0.0, 0.0, 90.0, max_time_s=6000.0, dt_output=2.0)
 
 
-def test_report_bondline_escalates_a_green_case_to_beyond():
-    # Take a genuinely WITHIN-EXPERIENCE result and inject a crossed bondline
-    # (a thin body under a long soak) — the report must escalate green→yellow
-    # on the interior axis alone, and say the skin holds but the inside cooks.
+def test_report_interior_escalates_a_green_case_to_beyond():
+    # Take a genuinely WITHIN-EXPERIENCE result and give its body a thin
+    # layer with an entered thickness and a low interior limit: the report
+    # must escalate green -> yellow on the interior answer alone and say the
+    # skin holds but the inside cooks (TODO item 11: the headline is the
+    # worst answer).
     import thresholds
     thresholds.reset(); thresholds.apply()
     r = _green_ballistic()
     assert sr.build_report(r)["tier"] == "experience"       # clean baseline
 
+    r["heating_arc"]["profile"].update(body_material="carbon_phenolic",
+                                       body_thickness_m=0.003,
+                                       interior_limit_C=20.0)
+    rep = sr.build_report(r)
+    assert rep["tier"] == "beyond"
+    assert "BEYOND DESIGN ENVELOPE" in rep["headline"]
+    assert "interior past limit" in rep["headline"]
+    assert "interior does not" in rep["body"]
+    thresholds.reset(); thresholds.apply()
+
+
+def test_a_crossed_bondline_alone_no_longer_drives_the_headline():
+    # The old screen ran on a default 2 cm layer when none was entered and
+    # judged it against a 250 deg C structure limit; the interior answer now
+    # owns the verdict, from the user's own thickness and limit.
+    r = _green_ballistic()
     t, q = _flat(1.0, 800.0)
     r["heating_fom"]["bondline"] = heating.bondline_screen(
         t, q, material="carbon_phenolic", thickness_m=0.003)
     assert r["heating_fom"]["bondline"]["crossed"]
-    rep = sr.build_report(r)
-    assert rep["tier"] == "beyond"
-    assert "BEYOND DESIGN ENVELOPE" in rep["headline"]
-    assert "bondline" in rep["body"].lower()
-    assert ("interior does not" in rep["body"]
-            or "structure behind it cooks" in rep["body"])
-    thresholds.reset(); thresholds.apply()
+    assert sr.build_report(r)["tier"] == "experience"

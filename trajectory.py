@@ -4023,6 +4023,9 @@ def integrate_trajectory(params: BoosterParams,
                     'body_material':   (_ero_ms.body_material()
                                         if hasattr(_ero_ms, 'body_material') else ''),
                     'body_thickness_m': float(getattr(_ero_ms, 'body_tps_thickness_m', 0.0) or 0.0),
+                    'interior_limit_C': float(getattr(_ero_ms, 'interior_limit_C', 80.0) or 80.0),
+                    'body_form': str(getattr(_ero_ms, 'body_form', '') or 'axisymmetric'),
+                    'wing': float(getattr(_ero_ms, 'wing_span_exposed_m', 0.0) or 0.0) > 0.0,
                     'pullup_g_max':    float(getattr(_ero_ms, 'glider_pullup_g_max', 0.0) or 0.0),
                     'terminal_alt_km': (float(getattr(_ero_ms, 'glider_terminal_alt_km', 0.0) or 0.0)
                                         if getattr(_ero_ms, 'glider_terminal_dive', False) else 0.0),
@@ -4132,6 +4135,26 @@ def integrate_trajectory(params: BoosterParams,
                                           or 'axisymmetric'))
                     except Exception:
                         pass   # windward is an overlay; never break the FOM
+
+                # Leading edges the object lists (heating_by_location): the
+                # wing / leading-edge answer of the survivability report.
+                # Only places of that kind are evaluated here; the nose and
+                # windward answers keep their screening sources.
+                if isinstance(_heating_fom, dict) and any(
+                        isinstance(_e, dict) and _e.get('kind') == 'leading_edge'
+                        for _e in (getattr(_ero_ms, 'heating_locations', None) or [])):
+                    try:
+                        import heating_by_location as _hbl
+                        _heating_fom['leading_edges'] = [
+                            _l for _l in _hbl.evaluate_locations(
+                                _ero_ms, t_arr[_re_idx:], _rho_g, _glide_v,
+                                _glide_a)
+                            if _l['kind'] == 'leading_edge']
+                    except Exception as _exc:
+                        _heating_fom['leading_edges'] = [dict(
+                            kind='leading_edge', name='', status='cannot be evaluated',
+                            missing=[f"evaluation failed: {_exc}"], results={},
+                            material='', notes=[], accuracy='')]
 
                 _cmp = _heating_fom.get('compromise')
                 if _cmp is not None:
