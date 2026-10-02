@@ -345,3 +345,33 @@ Without the banks the glider flies 300 km further in each case.
   the peak, to make the glider land in G would be fitting a hardware number
   to a trajectory. That is allowed only if the value is recorded as
   *modelled: fitted to the warning*, and it is the user's decision.
+
+## 11. When the fairing leaves (2026-10-02)
+
+The plan's `shroud_jettison_alt_km` is 0, which means Thrusty's heating
+rule: release when free-molecular heating falls below 1,135 W/m², a
+launch-vehicle convention, not something sourced for this system. On this
+low, fast trajectory the rule is not met until 176 s, after second-stage
+burnout, so the fairing is carried through the whole boost and released
+with the glider at 117 s (87 km up, 5.26 km/s, 217 km downrange). It then
+lands at 2,182 km, in box E beside the second stage. The user's run of
+28 Sep released it at 168 s, at 124 km.
+
+Releasing it at a set altitude instead:
+
+| Released at | Time | Fairing lands | Second stage | Burnout speed |
+|---|---|---|---|---|
+| heating rule | 117 s | 2,182 km, box E | 2,312 km, box E | 5.26 km/s |
+| 30 km | 55 s | 40 km, box A | 2,383 km, outside | 5.32 |
+| 40 km | 66 s | 87 km, box C | 2,384 km, outside | 5.32 |
+| 50 km | 77 s | 223 km, box B | 2,393 km, outside | 5.33 |
+| 60 km | 87 s | 557 km, no box | 2,382 km, outside | 5.32 |
+| 80 km | 109 s | 1,533 km, no box | 2,346 km, box E | 5.29 |
+
+Nothing else lands in box B (173–315 km). A fairing released at about
+50 km, some 23 s into the second-stage burn, does. The user's draft paper
+says the warnings mark drop zones "for the first stage, shroud and second
+stage", which is three zones: C, B and E on this reading. It is an
+inference from the boxes, not a sourced jettison time. Dropping the
+fairing early adds about 0.06 km/s at burnout, so the pitch plan would need
+re-fitting and the glider's overshoot of box G grows.
