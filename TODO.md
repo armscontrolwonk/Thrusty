@@ -7,6 +7,39 @@ invent.
 
 ## New — not yet planned
 
+### 11. Review the temperature screens — OPEN (user, 2026-10-02)
+
+The user: "the way in which all the temperature data is presented is a
+mess. Users really just want to know if the reentry object will be
+compromised (wing, nose, or windward surface) or cooked internally from a
+long, hot soak."
+
+So the review starts from two questions a reader asks, not from the list of
+quantities the code can produce:
+
+1. **Is a surface compromised?** One line each for the nose, the wing or
+   leading edge, and the windward surface: holds, marginal, or beyond what
+   has flown, with the one number behind it.
+2. **Is the inside cooked?** The long, hot soak: does the heat get through
+   to the structure or the contents over the length of the flight.
+
+Everything else (flux histories, per-material ladders, anchors, the
+derivation) belongs behind those two answers, reachable but not in the way.
+
+Where the material is now: the "Reentry Survivability" tab in `thrusty.py`,
+fed by `survivability_report.build_report`; `heating.py`, `tps_ladder.py`;
+and the per-location modules (`heating_locations.py`, `heating_solid.py`,
+`heating_by_location.py`), which are built and tested but not yet wired
+into any verdict (HANDOFF_PHASE3.md, tracked items). The review should
+decide what the two answers are computed from before rearranging the
+screen, and it must keep to CLAUDE.md: the GUI computes nothing; verdicts
+stay consequence bands anchored to flight experience; every heating output
+states its accuracy.
+
+First step: an inventory of what the tab shows today, line by line, marked
+as "answers question 1", "answers question 2", or "supporting detail".
+No code yet.
+
 ### 10. Models to validate with our own data — OPEN LIST (2026-10-01)
 
 Each of these is a published relation, or an inference from one, that
