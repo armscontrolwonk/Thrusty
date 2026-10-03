@@ -4432,6 +4432,34 @@ class ROEditorDialog(tk.Toplevel):
         ttk.Label(_sl_in, text=" °C  behind the heat shield (0 = not entered: "
                                "the 250 °C bondline design limit)").pack(side=tk.LEFT)
 
+        # The nose piece: how far a nose of its own material reaches, so the
+        # wall can be split at the joint (ro_section.nose_piece).  Stored in
+        # the object's nose_cap entry (heating_locations); nothing else here.
+        ttk.Label(tps_frm, text="Nose piece:").grid(
+            row=8, column=0, sticky=tk.W, padx=(0, 8), pady=2)
+        _ne = next((e for e in (ro.heating_locations if ro else [])
+                    if e.get('kind') == 'nose_cap'), {})
+        _con = _ne.get('construction', '')
+        _kind = ("solid tip" if _con == 'solid' and _ne.get('solid_length_m')
+                 else "shell" if _con == 'skin' and _ne.get('length_m')
+                 else "not entered")
+        self._nose_kind_var = tk.StringVar(value=_kind)
+        _ext0 = float(_ne.get('solid_length_m') or _ne.get('length_m') or 0)
+        self._nose_ext_var = tk.StringVar(value=f"{_ext0:g}")
+        self._nose_th_var = tk.StringVar(
+            value=f"{float(_ne.get('thickness_m') or 0):g}")
+        _np = ttk.Frame(tps_frm); _np.grid(row=8, column=1, sticky=tk.W, pady=2)
+        ttk.Combobox(_np, textvariable=self._nose_kind_var, state="readonly",
+                     values=("not entered", "solid tip", "shell"),
+                     width=11).pack(side=tk.LEFT)
+        ttk.Label(_np, text="  back from the tip").pack(side=tk.LEFT)
+        ttk.Entry(_np, textvariable=self._nose_ext_var, width=7).pack(
+            side=tk.LEFT, padx=2)
+        ttk.Label(_np, text="m   shell").pack(side=tk.LEFT)
+        ttk.Entry(_np, textvariable=self._nose_th_var, width=7).pack(
+            side=tk.LEFT, padx=2)
+        ttk.Label(_np, text="m thick").pack(side=tk.LEFT)
+
         self._nose_mat_cb.bind("<<ComboboxSelected>>",
                                lambda _e: self._update_custom_state("nose"))
         self._body_mat_cb.bind("<<ComboboxSelected>>",
@@ -4478,7 +4506,8 @@ class ROEditorDialog(tk.Toplevel):
                    command=self._redraw_section).pack(anchor=tk.E)
         for _v in (self._dia_var, self._len_var, self._nose_var,
                    self._body_thick_var, self._body_mat_var,
-                   self._shape_var):
+                   self._shape_var, self._nose_mat_var, self._nose_kind_var,
+                   self._nose_ext_var, self._nose_th_var):
             _v.trace_add("write", lambda *_a: self._schedule_section())
         self.after_idle(self._redraw_section)
 
@@ -5363,6 +5392,12 @@ class ROEditorDialog(tk.Toplevel):
         except ValueError as exc:
             messagebox.showerror("Invalid layer", str(exc), parent=self)
             return None
+        try:
+            heating_locs = self._nose_locations(
+                getattr(self._orig_ro, 'heating_locations', None))
+        except ValueError as exc:
+            messagebox.showerror("Invalid nose piece", str(exc), parent=self)
+            return None
 
         # A body's mass, diameter and length are the booster's: the fields
         # show them, and the file stores 0 = "from booster", so nothing about
@@ -5404,6 +5439,7 @@ class ROEditorDialog(tk.Toplevel):
             interior_limit_C=int_lim,
             structure_limit_K=(struct_lim_C + 273.15 if struct_lim_C > 0 else 0.0),
             interior_layers=interior_layers,
+            heating_locations=heating_locs,
             nose_tps_custom=nose_custom,
             body_tps_custom=body_custom,
             source=self._source_var.get().strip(),
@@ -5422,10 +5458,11 @@ class ROEditorDialog(tk.Toplevel):
             _carry = {k: (list(_v) if isinstance(_v := getattr(self._orig_ro, k),
                                                  list) else _v)
                       for k in mm._REENTRY_PLAN_KEYS}
+            # heating_locations: the nose cap's extent is edited in the Nose
+            # piece row; every other entry and key is carried through.
+            _carry['heating_locations'] = heating_locs
             # Hardware this dialog has no widgets for yet: carried through
             # unchanged, or a save would erase it from the file.
-            _carry['heating_locations'] = [
-                dict(e) for e in self._orig_ro.heating_locations]
             for _k in ('structure_material', 'tps_material'):
                 _carry[_k] = getattr(self._orig_ro, _k)
             ro_new = _dc.replace(ro_new, **_carry)
@@ -5767,6 +5804,41 @@ class ROEditorDialog(tk.Toplevel):
                 out.append(e)
         return mm.clean_interior_layers(out) if strict else out
 
+    def _nose_locations(self, base, strict=True):
+        """heating_locations with the nose cap entry set from the Nose piece
+        row; other entries, and the nose cap's other keys, kept.  strict:
+        checked by clean_heating_locations (raises ValueError)."""
+        locs = [dict(e) for e in (base or [])]
+        kind = self._nose_kind_var.get()
+        try:
+            ext = float(self._nose_ext_var.get() or 0)
+            th = float(self._nose_th_var.get() or 0)
+        except ValueError:
+            if strict:
+                raise ValueError("The nose piece's length and thickness must "
+                                 "be numbers.")
+            ext = th = 0.0
+        e = next((x for x in locs if x.get('kind') == 'nose_cap'), None)
+        if kind != "not entered" and e is None:
+            e = {'kind': 'nose_cap'}
+            locs.append(e)
+        if e is not None:
+            for k in ('solid_length_m', 'thickness_m', 'length_m'):
+                e.pop(k, None)
+            if kind == "solid tip":
+                e['construction'] = 'solid'
+                e['solid_length_m'] = ext
+            elif kind == "shell":
+                e['construction'] = 'skin'
+                e['length_m'] = ext
+                e['thickness_m'] = th
+        if not strict:
+            try:
+                return mm.clean_heating_locations(locs)
+            except ValueError:
+                return [x for x in locs if x.get('kind') != 'nose_cap']
+        return mm.clean_heating_locations(locs)
+
     def _schedule_section(self):
         if getattr(self, '_sec_pending', None):
             self.after_cancel(self._sec_pending)
@@ -5789,6 +5861,11 @@ class ROEditorDialog(tk.Toplevel):
             except ValueError:
                 pr.body_tps_thickness_m = 0.0
             pr.interior_layers = self._layers_from_rows(strict=False)
+            pr.nose_tps_material = self._mat_map.get(
+                self._nose_mat_var.get(), "")
+            pr.heating_locations = self._nose_locations(
+                getattr(self._orig_ro, 'heating_locations', None),
+                strict=False)
             name = self._name_var.get() if hasattr(self, '_name_var') else ""
             bsch.draw_ro_section(self._sec_ax, pr, title=name or None)
         except Exception as exc:                      # never break the dialog

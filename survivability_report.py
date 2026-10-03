@@ -816,6 +816,53 @@ def _stack(arc, prof):
     return cache[key]
 
 
+def _nose_stack(arc, prof):
+    """The conduction screen through the nose piece (ro_section.nose_piece)
+    and the layers behind it, on the stagnation-point flux the nose row
+    uses.  A shell is its thickness; a solid tip is a slab of its length.
+    Cached like _stack.  None when no nose piece is entered."""
+    nz = prof.get('nose_piece')
+    t = np.asarray(arc.get('t', []), float)
+    if not nz or t.size < 2 or 'q_dot' not in arc:
+        return None
+    layers = [(str(nz['material']), float(nz['thickness_m']))] + [
+        (str(e['material']), float(e['thickness_m']))
+        for e in (prof.get('interior_layers') or [])]
+    key = ('nose', tuple(layers),
+           float(prof.get('emissivity', 0.85) or 0.85))
+    cache = arc.setdefault('_stack_cache', {})
+    if key not in cache:
+        cache[key] = heating.layered_conduction(
+            t, np.asarray(arc['q_dot'], float), layers, emissivity=key[2])
+    return cache[key]
+
+
+def _nose_phrase(nz):
+    return (f"{nz['thickness_m'] * 100:.1f} cm of {_label(nz['material'])}"
+            + (" (solid tip, as a slab)" if nz['kind'] == 'solid' else ""))
+
+
+_NOSE_BASIS = ("; the nose: the same through the nose piece and the layers "
+               "behind it under the stagnation-point heating, which "
+               "overstates it away from the tip")
+
+
+def _face_limit(mat, prof):
+    """(limit °C, text) for the face behind an outer piece of `mat`: its
+    own continuous limit for a hot structure or metal, else the structure
+    limit entered for the object, else the bondline design limit."""
+    m = heating.TPS_MATERIALS.get(str(mat or ""))
+    if heating.is_hot_structure(mat):
+        lim = float((m or {}).get('continuous_K') or 0.0) - 273.15
+        return lim, f"{lim:,.0f} °C ({_label(mat)} continuous limit)"
+    if float(prof.get('structure_limit_K', 0.0) or 0.0) > 0.0:
+        lim = float(prof['structure_limit_K']) - 273.15
+        return lim, f"{lim:,.0f} °C (structure limit entered for this object)"
+    lim = float(heating.BONDLINE_LIMIT_C)
+    return lim, (f"{lim:,.0f} °C (bondline design limit, Dec & Braun, "
+                 f"NTRS 20060004824)")
+
+
 def _crossing(t, T_K, limit_C):
     over = np.nonzero(np.asarray(T_K) >= limit_C + 273.15)[0]
     return float(np.asarray(t)[over[0]]) if over.size else None
@@ -828,10 +875,11 @@ def _back_face_answer(arc, prof):
     for the object, else the bondline design limit.  A hot structure or a
     metal skin IS the structure, so its back face is judged against the
     material's own continuous limit.  With layers entered behind it, the
-    face is the joint with the first of them.  Neither is the payload: see
+    face is the joint with the first of them.  A nose piece of its own
+    (ro_section.nose_piece) is a second column, judged the same way by its
+    own material; the row takes the worse.  Neither is the payload: see
     _interior_answer."""
     mat = prof.get('body_material')
-    m = heating.TPS_MATERIALS.get(str(mat or ""))
     hot = heating.is_hot_structure(mat)
     place = ("Back of the hot structure" if hot
              else "Bondline (heat shield to structure)")
@@ -843,16 +891,7 @@ def _back_face_answer(arc, prof):
     if thick <= 0.0:
         return _row(place, reason="no body heat-shield thickness entered",
                     short=short)
-    if hot:
-        limit = float((m or {}).get('continuous_K') or 0.0) - 273.15
-        lim_txt = f"{limit:,.0f} °C ({_label(mat)} continuous limit)"
-    elif float(prof.get('structure_limit_K', 0.0) or 0.0) > 0.0:
-        limit = float(prof['structure_limit_K']) - 273.15
-        lim_txt = f"{limit:,.0f} °C (structure limit entered for this object)"
-    else:
-        limit = float(heating.BONDLINE_LIMIT_C)
-        lim_txt = (f"{limit:,.0f} °C (bondline design limit, Dec & Braun, "
-                   f"NTRS 20060004824)")
+    limit, lim_txt = _face_limit(mat, prof)
     res = _stack(arc, prof)
     if res is None:
         return _row(place, limit=lim_txt,
@@ -865,19 +904,30 @@ def _back_face_answer(arc, prof):
         return _row(place, limit=lim_txt, reason=why, short=short)
     face = res['T_faces'][1]
     crossed = _crossing(arc['t'], face, limit) is not None
+    value = (f"{float(face.max()) - 273.15:,.0f} °C behind "
+             f"{thick * 100:.1f} cm of {_label(mat)}")
     inner = len(prof.get('interior_layers') or []) > 0
-    return _row(place,
-                'beyond' if crossed else 'experience',
-                f"{float(face.max()) - 273.15:,.0f} °C behind "
-                f"{thick * 100:.1f} cm of {_label(mat)}",
-                lim_txt,
-                basis=("one-dimensional conduction through the body layer "
-                       + ("and the layers entered behind it, in perfect "
-                          "contact, with an insulated innermost face"
-                          if inner else "with an insulated inner face")
-                       + " (Dec & Braun), to impact: an upper bound for "
-                         "that face"),
-                short=short)
+    basis = ("one-dimensional conduction through the body layer "
+             + ("and the layers entered behind it, in perfect contact, with "
+                "an insulated innermost face" if inner
+                else "with an insulated inner face")
+             + " (Dec & Braun), to impact: an upper bound for that face")
+    nz = prof.get('nose_piece')
+    nres = _nose_stack(arc, prof)
+    reason = ""
+    if nz and nres is not None and nres.get('evaluated'):
+        n_lim, n_txt = _face_limit(nz['material'], prof)
+        nface = nres['T_faces'][1]
+        crossed = crossed or (_crossing(arc['t'], nface, n_lim) is not None)
+        value += (f"; nose: {float(nface.max()) - 273.15:,.0f} °C behind "
+                  f"{_nose_phrase(nz)}")
+        if n_txt != lim_txt:
+            lim_txt = f"body {lim_txt}; nose {n_txt}"
+        basis += _NOSE_BASIS
+    elif nz and nres is not None:
+        reason = f"the nose path is not computed: {nres.get('reason', '')}"
+    return _row(place, 'beyond' if crossed else 'experience', value,
+                lim_txt, basis=basis, reason=reason, short=short)
 
 
 def _interior_answer(arc, prof):
@@ -907,19 +957,31 @@ def _interior_answer(arc, prof):
     face = res['T_faces'][-1]
     crossed = _crossing(arc['t'], face, limit) is not None
     last = layers[-1]
+    value = (f"{float(face.max()) - 273.15:,.0f} °C at the inner face of "
+             f"{float(last['thickness_m']) * 100:.1f} cm of "
+             f"{_label(last['material'])}")
+    nz = prof.get('nose_piece')
+    nres = _nose_stack(arc, prof)
+    nose_basis, reason = "", ""
+    if nz and nres is not None and nres.get('evaluated'):
+        nface = nres['T_faces'][-1]
+        crossed = crossed or (_crossing(arc['t'], nface, limit) is not None)
+        value += (f"; under the nose ({_nose_phrase(nz)}): "
+                  f"{float(nface.max()) - 273.15:,.0f} °C")
+        nose_basis = _NOSE_BASIS
+    elif nz and nres is not None:
+        reason = f"the nose path is not computed: {nres.get('reason', '')}"
     return _row("Interior (payload)",
                 'beyond' if crossed else 'experience',
-                f"{float(face.max()) - 273.15:,.0f} °C at the inner face of "
-                f"{float(last['thickness_m']) * 100:.1f} cm of "
-                f"{_label(last['material'])}",
-                lim_txt,
+                value,
+                lim_txt, reason=reason,
                 basis=(f"one-dimensional conduction through the body layer "
                        f"and {len(layers)} layer"
                        f"{'s' if len(layers) > 1 else ''} behind it, in "
                        f"perfect contact, the innermost face insulated and "
                        f"no payload mass, to impact: an upper bound. "
                        f"Accuracy not yet established; the Hayabusa2 flight "
-                       f"record is the test case being set up"),
+                       f"record is the test case being set up" + nose_basis),
                 short="interior")
 
 

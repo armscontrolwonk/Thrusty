@@ -838,7 +838,8 @@ def clean_heating_locations(entries) -> list:
         for k in allowed[1:]:
             if k not in e or e[k] is None or e[k] == '':
                 continue
-            if k in ('radius_m', 'sweep_deg', 'solid_length_m'):
+            if k in ('radius_m', 'sweep_deg', 'solid_length_m',
+                     'thickness_m', 'length_m'):
                 try:
                     if isinstance(e[k], bool):
                         raise ValueError
@@ -863,6 +864,18 @@ def clean_heating_locations(entries) -> list:
             raise ValueError(
                 f"{where}: construction {c['construction']!r} is not one of "
                 f"{', '.join(_fr.RO_LOCATION_CONSTRUCTIONS)}")
+        if kind == 'nose_cap':
+            con = c.get('construction', '')
+            shell = [k for k in ('thickness_m', 'length_m') if k in c]
+            plug = [k for k in ('solid_length_m',) if k in c]
+            wrong = (shell if con == 'solid' else plug if con == 'skin'
+                     else (shell + plug if shell and plug else []))
+            if wrong:
+                raise ValueError(
+                    f"{where}: a {con or 'nose cap with no construction'} "
+                    f"cannot carry {', '.join(wrong)} here; a solid tip "
+                    f"gives solid_length_m, a skin gives thickness_m and "
+                    f"length_m")
         if kind == 'leading_edge':
             if c.get('of', '') not in ('', 'wing'):
                 raise ValueError(f"{where}: of {c['of']!r} is not 'wing'")

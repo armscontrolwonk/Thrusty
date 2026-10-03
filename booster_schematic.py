@@ -184,11 +184,30 @@ def _lifting_body_shape(ax, x0, y0, depth, length, color, edge):
     ax.add_patch(Polygon(pts, closed=True, fc=color, ec=edge, lw=1.3, zorder=3))
 
 
-# Wall layers in a cross-section, by the catalog's material group.
-LAYER_FILL = {"ablative": "#8b5a2b", "insulative": "#efe2a8",
-              "metal": "#a7adb4", "hot_structure": "#4b4f57"}
-LAYER_FILL_OTHER = "#c9b8d9"
+# Wall layers in a cross-section, by the catalog's material group; a second
+# or third material of the same group takes the next shade, so a carbon tip
+# on a carbon-phenolic body still reads as two materials.
+LAYER_FILL = {"ablative": ("#8b5a2b", "#c4823f", "#5e3a17"),
+              "insulative": ("#efe2a8", "#d9c66b", "#f7f0d2"),
+              "metal": ("#a7adb4", "#6f7780", "#cfd3d8"),
+              "hot_structure": ("#4b4f57", "#7b6f9a", "#2a2d33")}
+LAYER_FILL_OTHER = ("#c9b8d9", "#9fc5b8", "#e0b7b7")
 INTERIOR_FILL = "white"
+
+
+def material_colours(sec):
+    """{material key: fill} for every piece of a section, in order of
+    appearance, one shade per distinct material within its group."""
+    out, used = {}, {}
+    for pc in sec.get("pieces", []):
+        m = pc["material"]
+        if pc["kind"] == "interior" or m in out:
+            continue
+        shades = LAYER_FILL.get(pc["group"], LAYER_FILL_OTHER)
+        k = used.get(pc["group"], 0)
+        out[m] = shades[k % len(shades)]
+        used[pc["group"]] = k + 1
+    return out
 
 
 def _closed(profile, x0, y0, sgn=+1):
@@ -199,11 +218,12 @@ def _closed(profile, x0, y0, sgn=+1):
 
 def _ro_sectioned(ax, sec, x0, y0, color, edge):
     """The object from ro_section: the left half its outside, the right half
-    cut open to show each wall layer, outside in, and the space inside.
-    With no layers entered, both halves are the outside."""
+    cut open to show each piece of the wall (the layers, the nose tip ahead
+    of its joint) and the space inside.  With nothing entered, both halves
+    are the outside."""
     prof = sec["outline"]
     left = _closed(prof, x0, y0, -1)
-    if not sec["layers"]:
+    if not sec["pieces"]:
         right = _closed(prof, x0, y0, +1)
         pts = left + list(reversed(right))
         ax.add_patch(Polygon(pts, closed=True, fc=color, ec=edge, lw=1.3,
@@ -211,21 +231,29 @@ def _ro_sectioned(ax, sec, x0, y0, color, edge):
         return
     ax.add_patch(Polygon(left, closed=True, fc=color, ec=edge, lw=1.3,
                          zorder=3))
-    for lay in sec["layers"]:
-        ax.add_patch(Polygon(_closed(lay["outer"], x0, y0), closed=True,
-                             fc=LAYER_FILL.get(lay["group"], LAYER_FILL_OTHER),
-                             ec=edge, lw=0.6, zorder=3))
-    if sec["interior"] is not None:
-        ax.add_patch(Polygon(_closed(sec["interior"], x0, y0), closed=True,
-                             fc=INTERIOR_FILL, ec=edge, lw=0.6, zorder=3))
+    colours = material_colours(sec)
+    for pc in sec["pieces"]:
+        fc = (INTERIOR_FILL if pc["kind"] == "interior"
+              else colours.get(pc["material"], LAYER_FILL_OTHER[0]))
+        ax.add_patch(Polygon(_closed(pc["loop"], x0, y0), closed=True,
+                             fc=fc, ec=edge, lw=0.6, zorder=3))
     ax.plot([x0, x0], [y0, y0 + sec["L"]], color=edge, lw=0.6, ls="-.",
             zorder=4)
 
 
 def section_caption(sec):
-    """One line per wall layer, outside in, for a caption or legend."""
-    return [f"{lay['thickness_m'] * 100:.1f} cm {lay['label']}"
-            for lay in sec["layers"]]
+    """One line per wall layer, outside in, then the nose tip, for a
+    caption or legend."""
+    out = [f"{lay['thickness_m'] * 100:.1f} cm {lay['label']}"
+           for lay in sec["layers"]]
+    nz = sec.get("nose")
+    if nz:
+        lab = next(pc["label"] for pc in sec["pieces"] if pc["kind"] == "nose")
+        out.append(f"nose: {lab}, " + (
+            f"solid {nz['extent_m'] * 100:.1f} cm" if nz["kind"] == "solid"
+            else f"{nz['thickness_m'] * 100:.1f} cm shell back "
+                 f"{nz['extent_m'] * 100:.1f} cm"))
+    return out
 
 
 def draw_ro_section(ax, ro, title=None):
@@ -256,14 +284,15 @@ def draw_ro_section(ax, ro, title=None):
     if total > 0:
         # The wall, magnified: every layer to scale against the others, the
         # outer face at the top, with the magnification stated.
-        H = 0.75 * L
+        H = (0.62 if sec.get("nose") else 0.75) * L
         mag = H / total
         y = 0.9 * L
+        colours = material_colours(sec)
         for lay in sec["layers"]:
             h = lay["thickness_m"] * mag
             ax.add_patch(Rectangle((x_bar, y - h), w_bar, h,
-                                   fc=LAYER_FILL.get(lay["group"],
-                                                     LAYER_FILL_OTHER),
+                                   fc=colours.get(lay["material"],
+                                                  LAYER_FILL_OTHER[0]),
                                    ec=BODY_E, lw=0.6, zorder=3))
             ax.text(x_bar + w_bar * 1.15, y - h / 2.0,
                     f"{lay['thickness_m'] * 100:.1f} cm {lay['label']}",
@@ -273,12 +302,28 @@ def draw_ro_section(ax, ro, title=None):
                 fontsize=7.5, color=LABEL_MUT, va="bottom")
         ax.text(x_bar + w_bar * 1.15, y - 0.04 * L, "inside", fontsize=8,
                 color=LABEL_MUT, va="top")
+    if sec.get("nose"):
+        # the nose tip's swatch, under the wall bar
+        npc = next(pc for pc in sec["pieces"] if pc["kind"] == "nose")
+        ys = 0.08 * L
+        ax.add_patch(Rectangle((x_bar, ys), w_bar, 0.06 * L,
+                               fc=material_colours(sec).get(
+                                   npc["material"], LAYER_FILL_OTHER[0]),
+                               ec=BODY_E, lw=0.6, zorder=3))
+        ax.text(x_bar + w_bar * 1.15, ys + 0.03 * L, section_caption(sec)[-1],
+                fontsize=8, color=LABEL_MUT, va="center")
     notes = []
     if not sec["layers"] and sec["form"] == "axisymmetric":
         notes.append("no wall layers entered (body layer thickness 0)")
+    if sec.get("nose"):
+        notes.append(section_caption(sec)[-1]
+                     + f" (joint {sec['nose']['z_joint_m']:.3g} m up)")
     notes += sec["flags"]
+    import textwrap
     lines = [title or (getattr(ro, "name", "") or "reentry object"),
-             f"⌀{D:g} × {L:g} m"] + notes
+             f"⌀{D:g} × {L:g} m"]
+    for nt in notes:
+        lines += textwrap.wrap(nt, 64)
     ax.text(-R, -0.08 * L, "\n".join(lines), fontsize=8, color=LABEL_MUT,
             va="top", ha="left")
     ax.set_xlim(-R * 1.1, x_bar + w_bar + 0.75 * max(D, L))
@@ -442,7 +487,7 @@ def _draw_reentry_object(ax, ro, view_right, yl, veh_right=0.0):
         th1 = math.degrees(math.atan2(Dbrk / 2.0, Lf))
         th2 = math.degrees(math.atan2((D - Dbrk) / 2.0, L - Lf))
         lines.append(f"biconic {th1:.1f}°/{th2:.1f}°")
-    if sec["layers"]:
+    if sec["pieces"]:
         lines.append("wall: " + " · ".join(section_caption(sec)))
     elif ro_section.LIFTING_NOT_SECTIONED in sec["flags"]:
         lines.append(ro_section.LIFTING_NOT_SECTIONED)

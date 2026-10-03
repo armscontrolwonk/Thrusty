@@ -5228,6 +5228,22 @@ export (one closed shell per layer, `RO_Body` outermost, then
 `RO_Layer_k_<material>`, then `RO_Interior`) all read it.  The lifting forms
 are not sectioned, and both the drawing and the export say so.
 
+*A nose of its own.*  When the nose material differs from the body's, the
+object's nose-cap entry says how far it reaches back from the actual tip
+(below `length_m` on a blunted cone): a solid tip by `solid_length_m`, a
+shell by `length_m` and `thickness_m`.  The wall is split at that joint
+plane.  A shell is followed by the same layers behind it, each measured in
+from the outer surface, so a layer steps at the joint where the shell and
+the body layer differ in thickness.  Under a solid tip the layers behind it
+run flat across the joint, the first as its bulkhead (an assumption, said
+on the drawing).  The nose is a second conduction column under the
+stagnation-point flux (the nose row's), through the shell, or a slab the
+tip's length, and then the layers behind it; the bondline and interior rows
+report both columns and take the worse.  Stagnation heating over the whole
+nose piece overstates it away from the tip.  With a different nose
+material and no extent entered, the wall is drawn as the body's to the tip
+and the drawing and the export say so.
+
 *Not modelled (next step).*  The payload's own heat capacity and the routes
 from the wall to it: radiation across a gap, conduction through the gas in
 the gap, and conduction through mounts; and the soak after landing until

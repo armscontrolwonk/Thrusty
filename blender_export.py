@@ -664,23 +664,41 @@ def _ro_elements(ro, x_off, revolves, plates, flags):
         Dbrk = _f(getattr(ro, "break_diameter_m", 0.0))
         if 0 < Lf < L and 0 < Dbrk < D:
             bic = (Lf, Dbrk)
-    if not sec["layers"]:
+    if not sec["pieces"]:
         revolves.append(("RO_Body", profile, pos, "full"))
     else:
-        # One closed shell per layer, outside in; RO_Body is the outer
-        # layer, so its outer surface is the object's.  RO_Interior is the
-        # space left inside, a separate solid so it can be shown or hidden.
-        for k, lay in enumerate(sec["layers"]):
-            name = ("RO_Body" if k == 0 else
-                    f"RO_Layer_{k + 1}_{lay['material']}")
-            revolves.append((name, ro_section.band(lay["outer"],
-                                                   lay["inner"]),
-                             pos, "full"))
-        flags.append("RO wall: " + " · ".join(
-            f"{lay['thickness_m'] * 100:.1f} cm {lay['label']}"
-            for lay in sec["layers"]))
-        if sec["interior"] is not None:
-            revolves.append(("RO_Interior", sec["interior"], pos, "full"))
+        # One closed piece per region, outside in; RO_Body is the body's
+        # outer layer, RO_Nose_<material> the nose tip (shell or plug) ahead
+        # of the joint, RO_Interior the space left inside — each separate,
+        # so it can be shown or hidden.
+        k = 1
+        for pc in sec["pieces"]:
+            if pc["kind"] == "nose":
+                name = f"RO_Nose_{pc['material']}"
+            elif pc["kind"] == "interior":
+                name = "RO_Interior"
+            elif k == 1:
+                name = "RO_Body"
+            else:
+                name = f"RO_Layer_{k}_{pc['material']}"
+            if pc["kind"] == "layer":
+                k += 1
+            revolves.append((name, pc["profile"], pos, "full"))
+        wall = [f"{lay['thickness_m'] * 100:.1f} cm {lay['label']}"
+                for lay in sec["layers"]]
+        if wall:
+            flags.append("RO wall: " + " · ".join(wall))
+        if sec["nose"]:
+            nz = sec["nose"]
+            nlab = next(pc["label"] for pc in sec["pieces"]
+                        if pc["kind"] == "nose")
+            flags.append(
+                f"RO nose: {nlab}, "
+                + (f"solid {nz['extent_m'] * 100:.1f} cm"
+                   if nz["kind"] == "solid" else
+                   f"{nz['thickness_m'] * 100:.1f} cm shell back "
+                   f"{nz['extent_m'] * 100:.1f} cm")
+                + " from the tip")
 
     # faithful wing panels only from a stored planform (same rule as 2-D)
     w_rc = _f(getattr(ro, "wing_root_chord_m", 0.0))

@@ -266,6 +266,11 @@ RO_LAYER_KEYS = ('material', 'thickness_m', 'source')
 #                  from there and may not restate it.  Any other edge (a
 #                  chine, a strake, a fin) carries its own sweep.
 #
+# A nose cap of a different material from the body also says how far it
+# reaches, so the wall can be split at the joint (ro_section.py): a solid tip
+# by `solid_length_m` (the plug, measured back from the tip along the axis),
+# a skin by `length_m` (the same distance) and `thickness_m` (the shell).
+#
 # All of it is hardware.  `construction` says how the part sheds heat: 'skin'
 # (a thin shell that radiates it away) or 'solid' (a solid piece that conducts
 # it inward).  An ablator is recognised from its material, not declared.
@@ -273,7 +278,7 @@ RO_LOCATION_KINDS = ('nose_cap', 'leading_edge', 'windward_face')
 RO_LOCATION_CONSTRUCTIONS = ('skin', 'solid')
 RO_LOCATION_KEYS = {
     'nose_cap':      ('kind', 'name', 'construction', 'solid_length_m',
-                      'source'),
+                      'thickness_m', 'length_m', 'source'),
     'leading_edge':  ('kind', 'name', 'of', 'radius_m', 'sweep_deg',
                       'material', 'construction', 'source'),
     'windward_face': ('kind', 'name', 'construction', 'source'),

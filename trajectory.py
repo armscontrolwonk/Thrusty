@@ -83,6 +83,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from gravity import gravity_ecef, GM, RE
 from atmosphere import atmosphere, speed_of_sound
 import heating
+import ro_section
 from coordinates import (
     geodetic_to_ecef, ecef_to_geodetic,
     coriolis_acceleration, centrifugal_acceleration,
@@ -4026,6 +4027,7 @@ def integrate_trajectory(params: BoosterParams,
                     'interior_limit_C': float(getattr(_ero_ms, 'interior_limit_C', 80.0) or 80.0),
                     'structure_limit_K': float(getattr(_ero_ms, 'structure_limit_K', 0.0) or 0.0),
                     'interior_layers': [dict(e) for e in (getattr(_ero_ms, 'interior_layers', None) or [])],
+                    'nose_piece': ro_section.nose_piece(_ero_ms)[0],
                     'body_form': str(getattr(_ero_ms, 'body_form', '') or 'axisymmetric'),
                     'wing': float(getattr(_ero_ms, 'wing_span_exposed_m', 0.0) or 0.0) > 0.0,
                     'pullup_g_max':    float(getattr(_ero_ms, 'glider_pullup_g_max', 0.0) or 0.0),

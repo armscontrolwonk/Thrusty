@@ -193,6 +193,21 @@ against the payload limit. Now:
   has one shell per layer and `RO_Interior`.  Lifting bodies are not
   sectioned, said in both.
 
+**Nose tip built, 2026-10-02** (user: "do the nose tip first"; METHODS
+§13.18).  The nose cap entry carries the piece's extent (solid
+`solid_length_m`; skin `length_m` and `thickness_m`), edited in the object
+editor's Nose piece row; `ro_section` splits the wall at the joint (measured
+from the actual tip: building it found the joint had been placed from
+`length_m`, which on a blunted cone lies above the tip); the schematic,
+cross-section and export show the nose as its own piece; the report adds a
+nose column under the stagnation-point flux.  Open for the user:
+- a solid tip's bulkhead is taken as the first layer behind the body
+  layer, drawn running flat under the plug (said on the drawing);
+- under a shell, each layer is measured in from the outer surface, so the
+  structure steps at the joint when the shell and the body layer differ in
+  thickness.  The alternative is a continuous structure with the shell
+  filling to it (then only the length would be entered, not a thickness).
+
 **Step 3, next (user, 2026-10-02: "payload mass next").** A lumped payload
 behind the innermost face: its mass and material, and the routes to it from
 the wall: radiation across the gap (emissivities), conduction through the
