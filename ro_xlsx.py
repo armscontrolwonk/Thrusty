@@ -24,6 +24,9 @@ Sheet layout
   Sheet 4 "Interior layers" — the object's interior_layers list, outside in,
                         one row per layer.  Absent in older workbooks, which
                         import with none.
+  Sheet 5 "Payload"   — the object's payload_thermal entry: one row per
+                        value, then its mounts, one row each.  Absent in
+                        older workbooks, which import with none.
 
 Public API
 ----------
@@ -471,6 +474,75 @@ def _read_layers_sheet(wb) -> list:
     return clean_interior_layers(out)
 
 
+_PAY_SHEET = 'Payload'
+_PAY_VAL_ROW = 3                 # the payload's values start here (key, value)
+_PAY_MOUNT_HEAD = 13             # the mounts' column headers
+_PAY_MOUNT_ROWS = 6
+
+
+def _build_payload_sheet(ws, ro) -> None:
+    """The payload_thermal entry: key and value per row, then the mounts."""
+    import field_registry as fr
+    import heating
+    from booster_xlsx import _col_headers
+    p = getattr(ro, 'payload_thermal', None) or {}
+    ws.cell(row=1, column=1, value='Payload — the part judged against the '
+            'interior limit, as one mass behind the innermost layer.  Leave '
+            'mass blank for none.  An emissivity left blank is taken as 1.')
+    keys = [k for k in fr.RO_PAYLOAD_KEYS if k != 'mounts']
+    for i, k in enumerate(keys):
+        ws.cell(row=_PAY_VAL_ROW + i, column=1, value=k)
+        v = p.get(k)
+        _inputs(ws, _PAY_VAL_ROW + i, [2],
+                [(_ZWSP + v if isinstance(v, str) and v.startswith('=')
+                  else v)])
+        if k == 'material':
+            _dropdown(ws, _PAY_VAL_ROW + i, 2, list(heating.TPS_MATERIALS))
+    cols = list(fr.RO_MOUNT_KEYS)
+    _col_headers(ws, _PAY_MOUNT_HEAD,
+                 [(j, k) for j, k in enumerate(cols, start=1)])
+    mounts = list(p.get('mounts') or [])
+    for i in range(len(mounts) + _PAY_MOUNT_ROWS):
+        row = _PAY_MOUNT_HEAD + 1 + i
+        m = mounts[i] if i < len(mounts) else {}
+        _inputs(ws, row, list(range(1, len(cols) + 1)),
+                [m.get(k) for k in cols])
+        _dropdown(ws, row, 1, list(heating.TPS_MATERIALS))
+    ws.column_dimensions['A'].width = 18
+    ws.column_dimensions['B'].width = 30
+
+
+def _read_payload_sheet(wb):
+    """payload_thermal from its sheet; None when there is none."""
+    import field_registry as fr
+    from booster_models import clean_payload_thermal
+    if _PAY_SHEET not in wb.sheetnames:
+        return None
+    ws = wb[_PAY_SHEET]
+    p = {}
+    for row in range(_PAY_VAL_ROW, _PAY_MOUNT_HEAD):
+        k = str(ws.cell(row=row, column=1).value or '').strip()
+        v = ws.cell(row=row, column=2).value
+        if isinstance(v, str):
+            v = v.lstrip(_ZWSP).strip()
+        if k and v not in (None, ''):
+            p[k] = v
+    heads = [str(ws.cell(row=_PAY_MOUNT_HEAD, column=j).value or '').strip()
+             for j in range(1, len(fr.RO_MOUNT_KEYS) + 1)]
+    mounts = []
+    for row in range(_PAY_MOUNT_HEAD + 1, ws.max_row + 1):
+        m = {k: ws.cell(row=row, column=j).value
+             for j, k in enumerate(heads, start=1)
+             if k and ws.cell(row=row, column=j).value not in (None, '')}
+        if m:
+            mounts.append(m)
+    if mounts:
+        p['mounts'] = mounts
+    if not p.get('mass_kg'):
+        return None
+    return clean_payload_thermal(p)
+
+
 # ---------------------------------------------------------------------------
 # Reader
 # ---------------------------------------------------------------------------
@@ -566,6 +638,7 @@ def import_ro_xlsx(path: str):
         body_tps_custom=body_cust,
         heating_locations=_read_locations_sheet(wb),
         interior_layers=_read_layers_sheet(wb),
+        payload_thermal=_read_payload_sheet(wb),
         source=_rstr(ws, _R['source'], _VAL_COL),
         notes=_rstr(ws, _R['notes'], _VAL_COL),
     )
@@ -584,6 +657,7 @@ def export_ro_xlsx(path: str, ro) -> None:
     _build_ro_reference_sheet(wb.create_sheet('Reference'))
     _build_locations_sheet(wb.create_sheet(_LOC_SHEET), ro)
     _build_layers_sheet(wb.create_sheet(_LAYER_SHEET), ro)
+    _build_payload_sheet(wb.create_sheet(_PAY_SHEET), ro)
     wb.save(path)
 
 

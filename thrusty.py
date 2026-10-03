@@ -4492,6 +4492,61 @@ class ROEditorDialog(tk.Toplevel):
                        "layer and the inside.  The innermost face is judged "
                        "against the interior limit.").pack(anchor=tk.W)
 
+        # ── The payload: the mass judged against the interior limit ────────
+        _pay_box = ttk.LabelFrame(
+            right, text="Payload (the part judged against the interior limit)",
+            padding=(8, 2, 8, 6))
+        _pay_box.pack(fill=tk.X, pady=(8, 0))
+        _pt = (getattr(ro, 'payload_thermal', None) or {}) if ro else {}
+        _pf = ttk.Frame(_pay_box); _pf.pack(fill=tk.X)
+
+        def _pvar(key, fmt="{:g}"):
+            v = _pt.get(key)
+            return tk.StringVar(value=fmt.format(v) if v not in (None, "")
+                                else "")
+        self._pay_vars = {k: _pvar(k) for k in
+                          ('mass_kg', 'area_m2', 'emissivity',
+                           'wall_emissivity', 'gap_m')}
+        self._pay_mat_var = tk.StringVar(
+            value=self._display_for_key(_pt.get('material', ''))
+            if _pt.get('material') else "")
+        self._pay_src_var = tk.StringVar(value=str(_pt.get('source', '') or ''))
+        _rows = (("Mass (kg)", 'mass_kg', "0 or blank = not entered"),
+                 ("Surface area (m²)", 'area_m2', "facing the wall"),
+                 ("Emissivity", 'emissivity', "blank = 1, the most heat"),
+                 ("Wall's inner emissivity", 'wall_emissivity',
+                  "blank = 1, the most heat"),
+                 ("Gap to the wall (m)", 'gap_m',
+                  "blank = gas route left out"))
+        for _r, (_lab, _k, _hint) in enumerate(_rows):
+            ttk.Label(_pf, text=_lab + ":").grid(row=_r, column=0,
+                                                 sticky=tk.W, padx=(0, 8))
+            _ff = ttk.Frame(_pf); _ff.grid(row=_r, column=1, sticky=tk.W)
+            ttk.Entry(_ff, textvariable=self._pay_vars[_k], width=10).pack(
+                side=tk.LEFT)
+            ttk.Label(_ff, text="  " + _hint, foreground="gray40").pack(
+                side=tk.LEFT)
+        ttk.Label(_pf, text="Material:").grid(row=5, column=0, sticky=tk.W,
+                                              padx=(0, 8))
+        _pchoices = [d for d in self._mat_choices
+                     if d not in (self._MAT_NONE_LABEL, self._MAT_CUSTOM_LABEL)]
+        ttk.Combobox(_pf, textvariable=self._pay_mat_var, values=_pchoices,
+                     state="readonly", width=32).grid(row=5, column=1,
+                                                      sticky=tk.W)
+        ttk.Label(_pf, text="Source:").grid(row=6, column=0, sticky=tk.W,
+                                            padx=(0, 8))
+        ttk.Entry(_pf, textvariable=self._pay_src_var, width=34).grid(
+            row=6, column=1, sticky=tk.W)
+        ttk.Label(_pay_box, text="Mounts (material, area m², length m, "
+                                 "count):", foreground="gray40").pack(
+            anchor=tk.W, pady=(4, 0))
+        self._mount_frm = ttk.Frame(_pay_box); self._mount_frm.pack(fill=tk.X)
+        self._mount_rows = []
+        for _m in _pt.get('mounts') or []:
+            self._add_mount_row(_m)
+        ttk.Button(_pay_box, text="Add mount",
+                   command=lambda: self._add_mount_row({})).pack(anchor=tk.W)
+
         # ── Cross-section: drawn from the same outline the 3-D export uses ──
         _sec_box = ttk.LabelFrame(cols, text="Cross-section",
                                   padding=(6, 4, 6, 6))
@@ -5393,6 +5448,11 @@ class ROEditorDialog(tk.Toplevel):
             messagebox.showerror("Invalid layer", str(exc), parent=self)
             return None
         try:
+            payload_thermal = self._payload_from_fields()
+        except ValueError as exc:
+            messagebox.showerror("Invalid payload", str(exc), parent=self)
+            return None
+        try:
             heating_locs = self._nose_locations(
                 getattr(self._orig_ro, 'heating_locations', None))
         except ValueError as exc:
@@ -5440,6 +5500,7 @@ class ROEditorDialog(tk.Toplevel):
             structure_limit_K=(struct_lim_C + 273.15 if struct_lim_C > 0 else 0.0),
             interior_layers=interior_layers,
             heating_locations=heating_locs,
+            payload_thermal=payload_thermal,
             nose_tps_custom=nose_custom,
             body_tps_custom=body_custom,
             source=self._source_var.get().strip(),
@@ -5584,7 +5645,8 @@ class ROEditorDialog(tk.Toplevel):
     _MAT_NONE_LABEL   = "(none — numbers only)"
     _MAT_CUSTOM_LABEL = "Custom…"
     _GROUP_TITLES = {"metal": "Metal / heat-sink", "hot_structure": "Hot structure",
-                     "insulative": "Insulative tile", "ablative": "Ablator"}
+                     "insulative": "Insulative tile", "ablative": "Ablator",
+                     "bond": "Bond / adhesive"}
 
     def _material_choices(self):
         """Return (display_list, {display: material_key}) for the grouped catalog,
@@ -5783,6 +5845,55 @@ class ROEditorDialog(tk.Toplevel):
         self._layer_rows.append(entry)
         if hasattr(self, '_sec_ax'):
             self._schedule_section()
+
+    def _add_mount_row(self, m):
+        """One mount: material, cross-section area, length, count, remove."""
+        row = ttk.Frame(self._mount_frm)
+        row.pack(fill=tk.X, pady=1)
+        choices = [d for d in self._mat_choices
+                   if d not in (self._MAT_NONE_LABEL, self._MAT_CUSTOM_LABEL)]
+        vs = (tk.StringVar(value=self._display_for_key(m.get('material', ''))
+                           if m.get('material') else ""),
+              tk.StringVar(value=f"{m['area_m2']:g}" if m.get('area_m2')
+                           else ""),
+              tk.StringVar(value=f"{m['length_m']:g}" if m.get('length_m')
+                           else ""),
+              tk.StringVar(value=f"{m.get('count', 1)}"))
+        ttk.Combobox(row, textvariable=vs[0], values=choices, state="readonly",
+                     width=26).pack(side=tk.LEFT)
+        for v, w in zip(vs[1:], (9, 7, 4)):
+            ttk.Entry(row, textvariable=v, width=w).pack(side=tk.LEFT, padx=2)
+        entry = (row,) + vs
+
+        def _remove():
+            row.destroy()
+            self._mount_rows.remove(entry)
+        ttk.Button(row, text="✕", width=2, command=_remove).pack(side=tk.LEFT)
+        self._mount_rows.append(entry)
+
+    def _payload_from_fields(self):
+        """payload_thermal from the Payload box, checked by
+        clean_payload_thermal (raises ValueError); None when no mass is
+        entered."""
+        mass = self._pay_vars['mass_kg'].get().strip()
+        if not mass or mass in ("0", "0.0"):
+            return None
+        p = {k: v.get().strip() for k, v in self._pay_vars.items()
+             if v.get().strip()}
+        p['material'] = self._mat_map.get(self._pay_mat_var.get(), "")
+        mounts = []
+        for _row, mat, area, length, count in self._mount_rows:
+            if not (mat.get() or area.get() or length.get()):
+                continue
+            mounts.append({'material': self._mat_map.get(mat.get(), ""),
+                           'area_m2': area.get().strip(),
+                           'length_m': length.get().strip(),
+                           'count': count.get().strip() or 1})
+        if mounts:
+            p['mounts'] = mounts
+        if self._pay_src_var.get().strip():
+            p['source'] = self._pay_src_var.get().strip()
+        return mm.clean_payload_thermal(p)
 
     def _layers_from_rows(self, strict=True):
         """interior_layers from the table.  strict: checked by

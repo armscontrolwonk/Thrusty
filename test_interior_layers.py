@@ -233,3 +233,118 @@ def test_the_editor_keeps_the_layers(root):
         thrusty.messagebox.showerror = orig
     assert shown and "positive" in shown[0][1]
     dlg.destroy()
+
+
+# ── the payload ──────────────────────────────────────────────────────────────
+PAYLOAD = dict(mass_kg=10.0, material='aluminum', area_m2=0.3, emissivity=0.1,
+               wall_emissivity=0.9, gap_m=0.01,
+               mounts=[dict(material='titanium', area_m2=1e-4, length_m=0.03,
+                            count=6)])
+STACK = [('carbon_phenolic', 0.02), ('rtv560', 0.00025), ('aluminum', 0.003)]
+
+
+def test_air_conductivity_is_ussa_1976_eq_53():
+    # the worked value at sea-level temperature, 2.5326e-2 W/(m K)
+    assert heating.air_conductivity(288.15) == pytest.approx(2.5326e-2,
+                                                             rel=1e-4)
+
+
+def test_enclosed_radiation_is_siegel_howell_3_14():
+    # a black body in a black enclosure: A sigma (T1^4 - T2^4)
+    q = heating.enclosed_radiation_W(1.0, 1.0, 400.0, 2.0, 1.0, 300.0)
+    assert q == pytest.approx(heating.SIGMA * (400.0 ** 4 - 300.0 ** 4))
+    # a small body in a large enclosure sees only its own emissivity
+    q = heating.enclosed_radiation_W(1e-3, 0.5, 400.0, 1e3, 0.1, 300.0)
+    assert q == pytest.approx(0.5e-3 * heating.SIGMA * (400.0 ** 4 - 300.0 ** 4),
+                              rel=1e-3)
+
+
+def test_the_routes_are_what_was_entered():
+    c = heating.payload_coupling(PAYLOAD, 0.5, 400.0, 300.0)
+    k_ti = heating.material_curve('titanium', 'k')
+    assert c['mounts'] == pytest.approx(
+        6 * np.interp(350.0, k_ti[0], k_ti[1]) * 1e-4 / 0.03)
+    assert c['gas'] == pytest.approx(
+        float(heating.air_conductivity(350.0)) * 0.3 / 0.01)
+    rad_secant = c['radiation'] * (400.0 - 300.0)
+    assert rad_secant == pytest.approx(heating.enclosed_radiation_W(
+        0.3, 0.1, 400.0, 0.5, 0.9, 300.0))
+    assert heating.payload_coupling({'area_m2': 0.3}, 0.5, 400, 300)[
+        'gas'] is None
+
+
+def test_a_payload_stays_below_the_insulated_face_and_energy_balances():
+    t = np.linspace(0, 600, 601)
+    q = np.where(t < 100, 5e5, 0.0)
+    bare = heating.layered_conduction(t, q, STACK)
+    res = heating.layered_conduction(t, q, STACK, payload=PAYLOAD,
+                                     A_wall_m2=0.5)
+    Tp = res['T_payload_K']
+    assert Tp.max() < res['T_faces'][-1].max() < bare['T_faces'][-1].max()
+    assert Tp[-1] > Tp[0] + 10.0           # it does warm
+    # heat absorbed at the surface (net of radiation) equals what the wall
+    # and the payload stored, per square metre of wall
+    eps = 0.85
+    Ts = res['T_faces'][0]
+    net = np.trapezoid(eps * q - eps * heating.SIGMA * Ts ** 4, t)
+    stored = 0.0
+    n = res['x_m'].size // len(STACK)
+    for li, (mat, th) in enumerate(STACK):
+        pr, _ = heating._layer_props(mat)
+        T0, T1 = res['T_cells'][0, li * n:(li + 1) * n], \
+            res['T_cells'][-1, li * n:(li + 1) * n]
+        Tg = np.linspace(T0, T1, 50)
+        stored += np.sum(pr['rho'] * (th / n)
+                         * np.trapezoid(pr['c'](Tg.ravel()).reshape(Tg.shape),
+                                        Tg, axis=0))
+    pp, _ = heating._layer_props('aluminum')
+    Tg = np.linspace(Tp[0], Tp[-1], 200)
+    stored += PAYLOAD['mass_kg'] / 0.5 * np.trapezoid(pp['c'](Tg), Tg)
+    assert stored == pytest.approx(net, rel=0.03)
+
+
+def test_payload_entry_is_checked():
+    assert bm.clean_payload_thermal(None) is None
+    with pytest.raises(ValueError, match="catalog"):
+        bm.clean_payload_thermal({'mass_kg': 1, 'material': 'lead'})
+    with pytest.raises(ValueError, match="out of range"):
+        bm.clean_payload_thermal({'mass_kg': 1, 'material': 'aluminum',
+                                  'emissivity': 1.5})
+    with pytest.raises(ValueError, match="may carry only"):
+        bm.clean_payload_thermal({'mass_kg': 1, 'material': 'aluminum',
+                                  'mounts': [{'material': 'titanium',
+                                              'area_m2': 1e-4, 'length_m': 1,
+                                              'bolt': 'M6'}]})
+
+
+def test_the_report_reads_the_payload_and_the_wall_readings():
+    r = _glider()
+    p = r['heating_arc']['profile']
+    p.update(body_material='carbon_phenolic', body_thickness_m=0.02,
+             interior_layers=[{'material': 'rtv560', 'thickness_m': 0.00025},
+                              {'material': 'aluminum', 'thickness_m': 0.003}],
+             payload_thermal=PAYLOAD, interior_wall_area_m2=1.5)
+    inside = _row(sr.answers(r), "Interior")
+    assert "°C in the payload (10 kg of Aluminum)" in inside['value']
+    assert "gas in the gap" in inside['basis'] and "W/K" in inside['basis']
+    body = sr.build_report(r)['body'].split("═══ Full analysis")[0]
+    wall = body[body.index("─── Wall temperatures"):]
+    for want in ("Carbon phenolic, 50 mils (1.27 mm) from its back face",
+                 "joint: Carbon phenolic | RTV-560 bond",
+                 "RTV-560 bond (0.25 mm), its hottest point",
+                 "Aluminum (3 mm), its hottest point", "\n  payload\t"):
+        assert want in wall
+
+
+def test_the_payload_round_trips_and_is_edited(root):
+    import thrusty
+    ro = _capsule()
+    ro.payload_thermal = bm.clean_payload_thermal(PAYLOAD)
+    assert bm.ro_from_dict(bm.ro_to_dict(ro)).payload_thermal == \
+        ro.payload_thermal
+    dlg = thrusty.ROEditorDialog(root, ro=ro)
+    dlg.withdraw()
+    assert dlg._build_ro().payload_thermal == ro.payload_thermal
+    dlg._pay_vars['mass_kg'].set("")
+    assert dlg._build_ro().payload_thermal is None
+    dlg.destroy()

@@ -243,6 +243,9 @@ RO_FIELD_OWNER = {
     # What sits behind the body's outer layer, outside in, as a list of
     # entries; their keys are RO_LAYER_KEYS below.
     'interior_layers':                 HARDWARE,
+    # The part judged against interior_limit_C, as one lumped mass behind the
+    # innermost layer, and the routes heat takes to it; keys RO_PAYLOAD_KEYS.
+    'payload_thermal':                 HARDWARE,
 }
 
 # ── the entries of an object's `interior_layers` list ───────────────────────
@@ -250,6 +253,17 @@ RO_FIELD_OWNER = {
 # bespoke material), a thickness, and where the number came from.  The outer
 # layer is not listed here: it is body_tps_material at body_tps_thickness_m.
 RO_LAYER_KEYS = ('material', 'thickness_m', 'source')
+
+# ── the object's `payload_thermal` entry ────────────────────────────────────
+# The mass that must stay below the interior limit (a sample container, the
+# instruments), not the payload_kg mass bookkeeping: on Hayabusa2 the sample
+# container is a small part of what the capsule carries.  Its material gives
+# its specific heat.  The routes from the wall: radiation (its area and
+# emissivity, and the wall's inner emissivity), gas in the gap (the gap's
+# width; its area is the payload's), and mounts (a list, keys RO_MOUNT_KEYS).
+RO_PAYLOAD_KEYS = ('mass_kg', 'material', 'area_m2', 'emissivity',
+                   'wall_emissivity', 'gap_m', 'mounts', 'source')
+RO_MOUNT_KEYS = ('material', 'area_m2', 'length_m', 'count')
 
 # ── the entries of an object's `heating_locations` list ─────────────────────
 # Each entry names ONE place on the airframe.  Nothing is stored twice, so an

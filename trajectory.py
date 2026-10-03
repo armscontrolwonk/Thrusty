@@ -4028,6 +4028,10 @@ def integrate_trajectory(params: BoosterParams,
                     'structure_limit_K': float(getattr(_ero_ms, 'structure_limit_K', 0.0) or 0.0),
                     'interior_layers': [dict(e) for e in (getattr(_ero_ms, 'interior_layers', None) or [])],
                     'nose_piece': ro_section.nose_piece(_ero_ms)[0],
+                    'payload_thermal': (dict(_ero_ms.payload_thermal)
+                                        if getattr(_ero_ms, 'payload_thermal', None) else None),
+                    'interior_wall_area_m2': ro_section.interior_wall_area(
+                        ro_section.section(_ero_ms)),
                     'body_form': str(getattr(_ero_ms, 'body_form', '') or 'axisymmetric'),
                     'wing': float(getattr(_ero_ms, 'wing_span_exposed_m', 0.0) or 0.0) > 0.0,
                     'pullup_g_max':    float(getattr(_ero_ms, 'glider_pullup_g_max', 0.0) or 0.0),

@@ -5244,10 +5244,45 @@ nose piece overstates it away from the tip.  With a different nose
 material and no extent entered, the wall is drawn as the body's to the tip
 and the drawing and the export say so.
 
-*Not modelled (next step).*  The payload's own heat capacity and the routes
-from the wall to it: radiation across a gap, conduction through the gas in
-the gap, and conduction through mounts; and the soak after landing until
-recovery.
+*The payload* (`payload_thermal`, `heating.payload_coupling`).  The part
+judged against the interior limit is one lumped mass, its specific heat
+from its material's TPSX curve, fed from the wall's innermost face over the
+wall's inner area (`ro_section.interior_wall_area`, the surface of the space
+inside the layers, the base not counted).  The innermost face is then no
+longer insulated, and the payload's own heat capacity holds it below the
+wall.  Three routes, each from what the object enters:
+
+- *radiation*: Siegel & Howell, *Thermal Radiation Heat Transfer* Vol. II
+  (NASA SP-164, 1969), Eq. (3-14), a body enclosed by another, both
+  diffuse-gray: Q = A₁σ(T₁⁴ − T₂⁴) / [1/ε₁ + (A₁/A₂)(1/ε₂ − 1)].  Exact for
+  concentric surfaces; the book notes the error grows for a small body far
+  off centre.  An emissivity not entered is taken as 1, the most heat.
+- *gas in the gap*: conduction k·A/gap with air's conductivity from the U.S.
+  Standard Atmosphere 1976 (NOAA-S/T 76-1562), Eq. (53), p. 19,
+  k = 2.64638×10⁻³ T^1.5 / (T + 245.4×10^(−12/T)) W/(m·K), at the mean of
+  the wall and payload temperatures.  It is the continuum value (a
+  near-vacuum gap conducts less) and leaves out convection in the gap
+  (which would add heat).  With no gap entered the route is left out and
+  the interior row says the payload then runs cool.
+- *mounts*: count × k·A/L, k from the mount material at the mean
+  temperature; the mounts store no heat (all of it passes through).
+
+The payload couples to the body column only; under a nose piece the inner
+face stays insulated.  The solver adds the payload as one more node of the
+same implicit system; the stored heat in the wall and payload equals the
+heat absorbed at the surface net of radiation to within 3% on a test pulse
+(`test_interior_layers.py`).
+
+*Wall temperatures.*  Below the answers, the report lists the peak, and
+when, at each place through the body wall: the outer layer 50 mils
+(1.27 mm) from its back face (asked for on a heat shield bonded to an
+aluminium substrate; user, 2026-10-02), each joint, the hottest point
+through each layer behind it (a bond such as RTV-560, a substrate), and the
+payload.
+
+*Not modelled (next step).*  The soak after landing until recovery; a
+heat-shield jettison (Hayabusa2 dropped both shields at about 10 km);
+convection in the gap; heat through the base.
 
 ## 14. Outputs, events, and milestones
 

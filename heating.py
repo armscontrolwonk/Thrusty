@@ -134,6 +134,17 @@ TPS_MATERIALS = {
                             group="insulative", is_ablator=False, density_kg_m3=100, H_eff_MJ_kg=None, oxidation_dwell_s=None,
                             k_W_mK=0.0099,
                             k_source="TPSX id 32, silica aerogel: 0.0099 W/m·K, standard conditions"),
+    # The bond between a heat shield and its substrate, and the Shuttle's
+    # strain-isolation pad: TPSX's own density, specific heat, limits and
+    # standard-conditions conductivity; curves in TPSX_CURVES.
+    "rtv560":          dict(peak_K=672,  continuous_K=561,  melt_K=None, c_J_kgK=1170, label="RTV-560 bond",
+                            group="bond", is_ablator=False, density_kg_m3=1410, H_eff_MJ_kg=None, oxidation_dwell_s=None,
+                            k_W_mK=0.397,
+                            k_source="TPSX id 48, RTV-560 adhesive: 0.397 W/m·K, standard conditions"),
+    "sip":             dict(peak_K=644,  continuous_K=506,  melt_K=None, c_J_kgK=1310, label="Strain isolator pad",
+                            group="insulative", is_ablator=False, density_kg_m3=86.5, H_eff_MJ_kg=None, oxidation_dwell_s=None,
+                            k_W_mK=0.0406,
+                            k_source="TPSX id 11, strain isolator pad: 0.0406 W/m·K through the thickness, standard conditions"),
     # --- ablators (sacrificial layer; recede) ---
     # Ablator verdicts compare the flown heat LOAD against a demonstrated flight
     # record (like the UHTC dwell floor), NOT a computed recession point-value:
@@ -226,7 +237,7 @@ TPS_MATERIALS = {
 }
 
 # Dropdown groups for the GUI flyout (§10.1/§10.4) — order = display order.
-TPS_MATERIAL_GROUPS = ("metal", "hot_structure", "insulative", "ablative")
+TPS_MATERIAL_GROUPS = ("metal", "hot_structure", "insulative", "ablative", "bond")
 
 
 def materials_by_group():
@@ -263,6 +274,8 @@ TPSX_CURVES = {
     "tabi":             dict(k=(17, "Thermal Conductivity (Isotropic)"),  c=(17, "Specific Heat")),
     "nomex_felt":       dict(k=(18, "Thermal Conductivity (Isotropic)"),  c=(18, "Specific Heat")),
     "silica_aerogel":   dict(k=(32, "Thermal Conductivity (Isotropic)"),  c=(32, "Specific Heat")),
+    "rtv560":           dict(k=(48, "Thermal Conductivity (Isotropic)"),  c=(48, "Specific Heat")),
+    "sip":              dict(k=(11, "Thermal Conductivity (Thru-the-Thickness)"), c=(11, "Specific Heat")),
 }
 _CURVE_CACHE = {}
 
@@ -908,6 +921,27 @@ def radiative_flux(rho, V, nose_radius_m):
 BONDLINE_LIMIT_C = 250.0
 
 
+def air_conductivity(T_K):
+    """Thermal conductivity of air, W/(m·K): U.S. Standard Atmosphere 1976
+    (NOAA-S/T 76-1562, NTRS 19770009539), Eq. (53), p. 19, stated there for
+    heights up to 86 km.  Independent of pressure, which holds while the gas
+    is a continuum: in a near-vacuum gap it conducts less, so this is the
+    upper side."""
+    T = np.asarray(T_K, float)
+    return 2.64638e-3 * T ** 1.5 / (T + 245.4 * 10.0 ** (-12.0 / T))
+
+
+def enclosed_radiation_W(A_inner, eps_inner, T_inner, A_outer, eps_outer,
+                         T_outer):
+    """Net radiation, W, from a body of area A_inner enclosed by a surface of
+    area A_outer, both diffuse-gray: Siegel & Howell, Thermal Radiation Heat
+    Transfer Vol. II (NASA SP-164, 1969), Eq. (3-14).  Exact for concentric
+    surfaces; the book notes the error grows when a small inner body sits
+    far off centre.  Positive when the inner body is the hotter."""
+    den = 1.0 / eps_inner + (A_inner / A_outer) * (1.0 / eps_outer - 1.0)
+    return A_inner * SIGMA * (T_inner ** 4 - T_outer ** 4) / den
+
+
 def _layer_props(material):
     """(material dict, k(T), c(T), notes) for one layer, or (None, reason)."""
     mat = TPS_MATERIALS.get(str(material or ""))
@@ -942,24 +976,78 @@ def _layer_props(material):
                 label=mat.get("label") or str(material)), None
 
 
+def payload_coupling(payload, A_wall_m2, T_wall_K, T_pay_K):
+    """Heat flow from the wall's innermost face to a lumped payload, as a
+    conductance in W/K at the given temperatures, by route:
+
+      radiation  enclosed_radiation_W (Siegel & Howell Eq. 3-14), the
+                 payload's area inside the wall's; an emissivity that is not
+                 entered is taken as 1 (black, the most heat)
+      gas        conduction across the gap, air_conductivity (USSA 1976
+                 Eq. 53) at the mean temperature times the payload's area
+                 over the gap width; no convection in the gap
+      mounts     count x k A / L for each mount, k at the mean temperature
+                 from the mount material's curve or single value; no heat
+                 stored in the mounts
+
+    payload: dict with area_m2, emissivity, wall_emissivity, gap_m, mounts.
+    Returns dict(radiation=, gas=, mounts=, total=) in W/K; a route whose
+    numbers are not entered is None."""
+    Tw, Tp = float(T_wall_K), float(T_pay_K)
+    Tm = 0.5 * (Tw + Tp)
+    A_p = float(payload.get('area_m2') or 0.0)
+    out = dict(radiation=None, gas=None, mounts=None)
+    if A_p > 0.0 and A_wall_m2 > 0.0:
+        e_p = float(payload.get('emissivity') or 1.0)
+        e_w = float(payload.get('wall_emissivity') or 1.0)
+        den = 1.0 / e_p + (A_p / A_wall_m2) * (1.0 / e_w - 1.0)
+        # exact secant of T^4 between the two temperatures
+        out['radiation'] = (A_p * SIGMA * (Tw * Tw + Tp * Tp) * (Tw + Tp)
+                            / den)
+        gap = float(payload.get('gap_m') or 0.0)
+        if gap > 0.0:
+            out['gas'] = float(air_conductivity(Tm)) * A_p / gap
+    G = 0.0
+    any_mount = False
+    for mt in payload.get('mounts') or []:
+        pr, _why = _layer_props(mt.get('material'))
+        if pr is None:
+            continue
+        any_mount = True
+        G += (float(mt.get('count') or 1) * float(pr['k'](np.array([Tm]))[0])
+              * float(mt['area_m2']) / float(mt['length_m']))
+    if any_mount:
+        out['mounts'] = G
+    out['total'] = sum(v for v in out.values() if v)
+    return out
+
+
 def layered_conduction(t, q_w, layers, *, emissivity=0.85, T0_K=300.0,
-                       n_per_layer=24, dt_max_s=1.0):
+                       n_per_layer=24, dt_max_s=1.0, payload=None,
+                       A_wall_m2=0.0):
     """One-dimensional transient conduction through a stack of layers.
 
     layers: [(material key, thickness_m), ...] from the outer surface in.
     The outer face takes the absorbed flux and radiates (εq̇ − εσT⁴,
-    linearised about the previous step); the innermost face is insulated,
-    so nothing leaves the stack and every inner temperature is an upper
-    bound.  Layers touch perfectly (no contact resistance, the cautious
-    side).  k and c follow each material's TPSX curve where the catalog
-    names one (material_curve; held at the table's end value outside it),
-    else the catalog's single value; density is constant.  Finite volumes,
-    implicit in temperature, properties taken at the start of each substep.
+    linearised about the previous step).  Without a payload the innermost
+    face is insulated, so nothing leaves the stack and every inner
+    temperature is an upper bound.  With one (a dict: mass_kg, material,
+    and the routes of payload_coupling) the innermost face feeds a single
+    lumped node of the payload's mass and specific heat, over the wall's
+    inner area A_wall_m2; the payload's own heat capacity then holds it
+    below the wall.  Layers touch perfectly (no contact resistance, the
+    cautious side).  k and c follow each material's TPSX curve where the
+    catalog names one (material_curve; held at the table's end value
+    outside it), else the catalog's single value; density is constant.
+    Finite volumes, implicit in temperature, properties and couplings
+    taken at the start of each substep.
 
     Returns dict(evaluated, faces, T_faces (n_faces × len(t), K),
-    T_surf_peak_K, warnings, notes) where face 0 is the outer surface,
-    face i the joint behind layer i, and the last face the innermost; or
-    dict(evaluated=False, reason=...)."""
+    x_m (cell centres from the outer surface), T_cells (len(t) × cells),
+    layer_bounds_m, T_surf_peak_K, T_payload_K (or None), coupling (the
+    payload's routes at its peak, W/K), warnings, notes) where face 0 is
+    the outer surface, face i the joint behind layer i, and the last face
+    the innermost; or dict(evaluated=False, reason=...)."""
     t = np.asarray(t, float); q_w = np.asarray(q_w, float)
     props = []
     for mat, th in layers:
@@ -972,13 +1060,24 @@ def layered_conduction(t, q_w, layers, *, emissivity=0.85, T0_K=300.0,
     if not props or t.size < 2:
         return dict(evaluated=False, reason="material/thickness unset")
     eps = max(float(emissivity or 0.85), 1e-3)
+    pay = None
+    if payload and float(payload.get('mass_kg') or 0.0) > 0.0 \
+            and A_wall_m2 > 0.0:
+        pp, why = _layer_props(payload.get('material'))
+        if pp is None:
+            return dict(evaluated=False,
+                        reason=f"payload: {why}", material=payload.get(
+                            'material'))
+        pay = dict(spec=payload, props=pp, m=float(payload['mass_kg']))
 
     n = int(n_per_layer)
-    lay = np.repeat(np.arange(len(props)), n)            # layer of each cell
     dx = np.concatenate([np.full(n, th / n) for _, th in props])
     rho = np.concatenate([np.full(n, pr['rho']) for pr, _ in props])
     N = dx.size
+    x = np.cumsum(dx) - dx / 2.0
+    bounds = np.concatenate([[0.0], np.cumsum([th for _, th in props])])
     T = np.full(N, float(T0_K))
+    Tp = float(T0_K)
     T_hi = np.full(len(props), float(T0_K))               # hottest per layer
 
     def kc(Tc):
@@ -988,18 +1087,40 @@ def layered_conduction(t, q_w, layers, *, emissivity=0.85, T0_K=300.0,
             k[sl] = pr['k'](Tc[sl]); c[sl] = pr['c'](Tc[sl])
         return k, c
 
+    def couple(Tc, k):
+        """(G_face per m² of wall from the last cell to the payload, routes)"""
+        Gc = 2.0 * k[-1] / dx[-1]
+        Tw = Tc[-1]
+        routes = payload_coupling(pay['spec'], A_wall_m2, Tw, Tp)
+        Gr = routes['total'] / A_wall_m2
+        if Gr <= 0.0:
+            return 0.0, routes
+        return 1.0 / (1.0 / Gc + 1.0 / Gr), routes
+
     def faces(Tc, k):
         out = [Tc[0]]
         for li in range(1, len(props)):
             a, b = li * n - 1, li * n
             Ga, Gb = 2.0 * k[a] / dx[a], 2.0 * k[b] / dx[b]
             out.append((Ga * Tc[a] + Gb * Tc[b]) / (Ga + Gb))
-        out.append(Tc[-1])
+        if pay is not None:
+            Gc = 2.0 * k[-1] / dx[-1]
+            routes = payload_coupling(pay['spec'], A_wall_m2, Tc[-1], Tp)
+            Gr = routes['total'] / A_wall_m2
+            out.append((Gc * Tc[-1] + Gr * Tp) / (Gc + Gr) if Gr > 0
+                       else Tc[-1])
+        else:
+            out.append(Tc[-1])
         return out
 
     k, c = kc(T)
     hist = np.empty((len(props) + 1, t.size))
+    cells = np.empty((t.size, N))
+    pay_hist = np.empty(t.size)
     hist[:, 0] = faces(T, k)
+    cells[0] = T
+    pay_hist[0] = Tp
+    coupling_at_peak, Tp_peak = None, -1.0
     for i in range(1, t.size):
         dt_seg = float(t[i] - t[i - 1])
         if dt_seg > 0:
@@ -1009,26 +1130,43 @@ def layered_conduction(t, q_w, layers, *, emissivity=0.85, T0_K=300.0,
                 frac = (j_ + 0.5) / nsub
                 q_now = q_w[i - 1] + frac * (q_w[i] - q_w[i - 1])
                 k, c = kc(T)
-                C = rho * c * dx / dt                    # J/m²K per step
-                G = 1.0 / (dx[:-1] / (2 * k[:-1]) + dx[1:] / (2 * k[1:]))
+                M = N + (1 if pay is not None else 0)
+                C = np.empty(M)
+                C[:N] = rho * c * dx / dt                # J/m²K per step
+                Gint = 1.0 / (dx[:-1] / (2 * k[:-1]) + dx[1:] / (2 * k[1:]))
+                G = np.empty(M - 1)
+                G[:N - 1] = Gint
+                if pay is not None:
+                    Gp, routes = couple(T, k)
+                    cp = float(pay['props']['c'](np.array([Tp]))[0])
+                    C[N] = pay['m'] * cp / A_wall_m2 / dt
+                    G[N - 1] = Gp
                 Ts = T[0]
-                a = np.zeros(N); cu = np.zeros(N)
+                a = np.zeros(M); cu = np.zeros(M)
                 a[1:] = -G; cu[:-1] = -G
                 b = C.copy()
                 b[:-1] += G; b[1:] += G
                 b[0] += 4.0 * eps * SIGMA * Ts ** 3
-                d = C * T
+                d = C * np.concatenate([T, [Tp]] if pay is not None else [T])
                 d[0] += eps * q_now + 3.0 * eps * SIGMA * Ts ** 4
-                for m in range(1, N):                    # Thomas algorithm
+                for m in range(1, M):                    # Thomas algorithm
                     w = a[m] / b[m - 1]
                     b[m] -= w * cu[m - 1]
                     d[m] -= w * d[m - 1]
-                T[-1] = d[-1] / b[-1]
-                for m in range(N - 2, -1, -1):
-                    T[m] = (d[m] - cu[m] * T[m + 1]) / b[m]
+                sol = np.empty(M)
+                sol[-1] = d[-1] / b[-1]
+                for m in range(M - 2, -1, -1):
+                    sol[m] = (d[m] - cu[m] * sol[m + 1]) / b[m]
+                T = sol[:N]
+                if pay is not None:
+                    Tp = float(sol[N])
+                    if Tp > Tp_peak:
+                        Tp_peak, coupling_at_peak = Tp, routes
                 for li in range(len(props)):
                     T_hi[li] = max(T_hi[li], float(T[li * n:(li + 1) * n].max()))
         hist[:, i] = faces(T, k)
+        cells[i] = T
+        pay_hist[i] = Tp
 
     warnings, notes = [], []
     for li, (pr, th) in enumerate(props):
@@ -1043,9 +1181,19 @@ def layered_conduction(t, q_w, layers, *, emissivity=0.85, T0_K=300.0,
     names = (["outer surface"]
              + [f"behind {pr['label']}" for pr, _ in props])
     return dict(evaluated=True, faces=names, T_faces=hist,
+                x_m=x, T_cells=cells, layer_bounds_m=bounds,
                 T_surf_peak_K=float(hist[0].max()),
-                layer_peak_K=[float(x) for x in T_hi],
+                layer_peak_K=[float(v) for v in T_hi],
+                T_payload_K=pay_hist if pay is not None else None,
+                coupling=coupling_at_peak,
                 warnings=warnings, notes=notes)
+
+
+def temperature_at_depth(res, depth_m):
+    """Temperature history at a depth from the outer surface, from a
+    layered_conduction result (interpolated between cell centres)."""
+    x = res['x_m']
+    return np.array([np.interp(depth_m, x, row) for row in res['T_cells']])
 
 
 def bondline_screen(t, q_w, *, material, thickness_m, emissivity=0.85,

@@ -233,7 +233,8 @@ def test_the_serialisers_agree_with_the_registry():
     ro = ROParams(name="x", mass_kg=1.0, beta_kg_m2=1.0, shape="cone",
                   diameter_m=0.5, length_m=1.0,
                   heating_locations=[{'kind': 'nose_cap', 'name': 'nose'}],
-                  interior_layers=[{'material': 'tabi', 'thickness_m': 0.02}])
+                  interior_layers=[{'material': 'tabi', 'thickness_m': 0.02}],
+                  payload_thermal={'mass_kg': 5.0, 'material': 'aluminum'})
     assert not (RO_HARDWARE - set(ro_to_dict(ro))), (
         f"ro_to_dict does not write hardware fields "
         f"{sorted(RO_HARDWARE - set(ro_to_dict(ro)))}")

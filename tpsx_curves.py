@@ -48,6 +48,7 @@ MATERIALS = (
                                     # silica aerogel, C/C ablative
     41, 43, 57, 60, 113, 162, 249, 261,  # SIRCA, PICA, SS 304, Al 2024,
                                     # Narmco 4028, MX2600, Nomex FRSI, Ti-6-4
+    11, 48,                         # strain isolator pad, RTV-560 adhesive
 )
 PROPERTIES = ("Thermal Conductivity", "Specific Heat", "Density", "Emissivity")
 

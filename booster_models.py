@@ -723,6 +723,11 @@ class ROParams:
     # interior_limit_C.  Drawn in the schematic's half-section and exported
     # as shells (ro_section.py).  Empty = nothing entered.  Hardware.
     interior_layers:        list  = field(default_factory=list)
+    # The part judged against interior_limit_C, as one lumped mass behind
+    # the innermost layer, and the routes heat takes to it from the wall
+    # (field_registry.RO_PAYLOAD_KEYS; heating.payload_coupling).  None =
+    # not entered: the interior is then the innermost face, insulated.
+    payload_thermal:        Optional[dict] = None
     # Provenance: where this vehicle's numbers came from and how firm they are.
     # `source` is a short citation; `notes` is free-form (e.g. "mass 300 kg is a
     # trajectory-fit value, no primary source").  Round-tripped by
@@ -930,6 +935,76 @@ def clean_interior_layers(entries) -> list:
     return out
 
 
+def _copy_payload(p):
+    out = dict(p)
+    if 'mounts' in out:
+        out['mounts'] = [dict(m) for m in out['mounts']]
+    return out
+
+
+def clean_payload_thermal(p):
+    """Check and normalise an object's ``payload_thermal`` entry (None
+    passes through).  The mass must be positive and the material in the
+    catalog (its specific heat); areas, gap and lengths positive;
+    emissivities between 0 and 1; a mount needs its material, area and
+    length, and a count of at least 1."""
+    import heating as _h
+    if p in (None, {}):
+        return None
+    if not isinstance(p, dict):
+        raise ValueError("payload_thermal must be an entry (a JSON object)")
+    for k in p:
+        if k not in _fr.RO_PAYLOAD_KEYS:
+            raise ValueError(f"payload_thermal carries {k!r}; it may carry "
+                             f"only {', '.join(_fr.RO_PAYLOAD_KEYS)}")
+
+    def num(where, v, lo=0.0, hi=None, incl=False):
+        try:
+            if isinstance(v, bool):
+                raise ValueError
+            x = float(v)
+        except (TypeError, ValueError):
+            raise ValueError(f"{where} {v!r} is not a number") from None
+        if not math.isfinite(x) or (x < lo if incl else x <= lo) \
+                or (hi is not None and x > hi):
+            raise ValueError(f"{where} {x:g} is out of range")
+        return x
+    out = {'mass_kg': num("payload_thermal: mass_kg", p.get('mass_kg'))}
+    mat = str(p.get('material', '') or '')
+    if mat not in _h.TPS_MATERIALS:
+        raise ValueError(f"payload_thermal: material {mat!r} is not in the "
+                         f"materials catalog")
+    out['material'] = mat
+    for k in ('area_m2', 'gap_m'):
+        if p.get(k) not in (None, ''):
+            out[k] = num(f"payload_thermal: {k}", p[k])
+    for k in ('emissivity', 'wall_emissivity'):
+        if p.get(k) not in (None, ''):
+            out[k] = num(f"payload_thermal: {k}", p[k], 0.0, 1.0)
+    mounts = []
+    for i, m in enumerate(p.get('mounts') or []):
+        w = f"payload_thermal: mounts[{i}]"
+        if not isinstance(m, dict):
+            raise ValueError(f"{w} must be an entry")
+        for k in m:
+            if k not in _fr.RO_MOUNT_KEYS:
+                raise ValueError(f"{w} carries {k!r}; a mount may carry only "
+                                 f"{', '.join(_fr.RO_MOUNT_KEYS)}")
+        mm_ = str(m.get('material', '') or '')
+        if mm_ not in _h.TPS_MATERIALS:
+            raise ValueError(f"{w}: material {mm_!r} is not in the catalog")
+        mounts.append({'material': mm_,
+                       'area_m2': num(f"{w}: area_m2", m.get('area_m2')),
+                       'length_m': num(f"{w}: length_m", m.get('length_m')),
+                       'count': int(num(f"{w}: count", m.get('count', 1),
+                                        1.0, incl=True))})
+    if mounts:
+        out['mounts'] = mounts
+    if p.get('source'):
+        out['source'] = str(p['source'])
+    return out
+
+
 def ro_to_dict(ro: ROParams, include_reentry_plan: bool = True) -> dict:
     """Serialise an ROParams to a JSON-compatible dict.
 
@@ -1007,6 +1082,8 @@ def ro_to_dict(ro: ROParams, include_reentry_plan: bool = True) -> dict:
         d['heating_locations'] = [dict(e) for e in ro.heating_locations]
     if ro.interior_layers:
         d['interior_layers'] = [dict(e) for e in ro.interior_layers]
+    if ro.payload_thermal:
+        d['payload_thermal'] = _copy_payload(ro.payload_thermal)
     if not include_reentry_plan:
         for _k in _REENTRY_PLAN_KEYS:
             d.pop(_k, None)
@@ -1123,6 +1200,7 @@ def ro_from_dict(d: dict) -> ROParams:
             d.get('heating_locations') or []),
         interior_layers=clean_interior_layers(
             d.get('interior_layers') or []),
+        payload_thermal=clean_payload_thermal(d.get('payload_thermal')),
         source=str(d.get('source', '')),
         notes=str(d.get('notes', '')),
     )

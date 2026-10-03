@@ -404,3 +404,20 @@ def band(outer, inner):
         return list(outer)
     loop = list(outer[1:]) + list(reversed(inner[1:]))
     return loop + [loop[0]]
+
+
+def interior_wall_area(sec):
+    """Area, m², of the wall around the space inside the layers (the
+    surface the payload sees), from the section's interior profile: the
+    surface of revolution of every segment that is not on the axis or the
+    base plane.  The base is not counted: no layers are listed for it.
+    0 when there is no interior."""
+    prof = sec.get("interior")
+    if not prof:
+        return 0.0
+    A = 0.0
+    for (r0, z0), (r1, z1) in zip(prof[:-1], prof[1:]):
+        if (r0 < 1e-9 and r1 < 1e-9) or (abs(z0) < 1e-9 and abs(z1) < 1e-9):
+            continue
+        A += math.pi * (r0 + r1) * math.hypot(r1 - r0, z1 - z0)
+    return A

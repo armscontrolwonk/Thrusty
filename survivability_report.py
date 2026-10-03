@@ -803,16 +803,19 @@ def _stack(arc, prof):
     layers = [(str(mat), thick)] + [
         (str(e['material']), float(e['thickness_m']))
         for e in (prof.get('interior_layers') or [])]
+    pay = prof.get('payload_thermal') or None
+    A_w = float(prof.get('interior_wall_area_m2', 0.0) or 0.0)
     key = (tuple(layers), float(prof.get('emissivity', 0.85) or 0.85),
            float(prof.get('nose_radius_m', 0.0) or 0.0),
-           float(prof.get('diameter_m', 0.0) or 0.0))
+           float(prof.get('diameter_m', 0.0) or 0.0),
+           repr(sorted(pay.items())) if pay else None, A_w)
     cache = arc.setdefault('_stack_cache', {})
     if key not in cache:
         q, _, _ = heating.acreage_flux(
             t, arc['rho'], arc['V'], arc['alt'],
             nose_radius_m=key[2], body_radius_m=key[3] / 2.0)
-        cache[key] = heating.layered_conduction(t, q, layers,
-                                                emissivity=key[1])
+        cache[key] = heating.layered_conduction(
+            t, q, layers, emissivity=key[1], payload=pay, A_wall_m2=A_w)
     return cache[key]
 
 
@@ -907,11 +910,15 @@ def _back_face_answer(arc, prof):
     value = (f"{float(face.max()) - 273.15:,.0f} °C behind "
              f"{thick * 100:.1f} cm of {_label(mat)}")
     inner = len(prof.get('interior_layers') or []) > 0
+    fed = res.get('T_payload_K') is not None
     basis = ("one-dimensional conduction through the body layer "
-             + ("and the layers entered behind it, in perfect contact, with "
-                "an insulated innermost face" if inner
-                else "with an insulated inner face")
-             + " (Dec & Braun), to impact: an upper bound for that face")
+             + ("and the layers entered behind it, in perfect contact, "
+                if inner else "")
+             + ("its innermost face feeding the payload (Dec & Braun), "
+                "to impact" if fed else
+                ("with an insulated innermost face" if inner
+                 else "with an insulated inner face")
+                + " (Dec & Braun), to impact: an upper bound for that face"))
     nz = prof.get('nose_piece')
     nres = _nose_stack(arc, prof)
     reason = ""
@@ -930,19 +937,46 @@ def _back_face_answer(arc, prof):
                 lim_txt, basis=basis, reason=reason, short=short)
 
 
+def _payload_basis(prof, res):
+    """What the payload calculation took, route by route, and what it left
+    out, for the interior row's basis."""
+    pay = prof['payload_thermal']
+    cp = res.get('coupling') or {}
+    parts = []
+    for name, label in (('radiation', 'radiation'), ('gas', 'gas in the gap'),
+                        ('mounts', 'mounts')):
+        v = cp.get(name)
+        parts.append(f"{label} {v:.2g} W/K" if v else f"{label} not entered")
+    out = (f"the wall stack feeds a lumped payload of {pay['mass_kg']:g} kg "
+           f"of {_label(pay['material'])} over the wall's inner area "
+           f"({float(prof.get('interior_wall_area_m2', 0)):.2g} m²); routes "
+           f"at the payload's peak: " + ", ".join(parts))
+    if not pay.get('emissivity') or not pay.get('wall_emissivity'):
+        out += "; an emissivity not entered is taken as 1, the most heat"
+    if not pay.get('gap_m'):
+        out += ("; with no gap entered the gas route is left out, so the "
+                "payload runs cool")
+    out += ("; no convection in the gap, no heat stored in the mounts, no "
+            "heat through the base")
+    return out
+
+
 def _interior_answer(arc, prof):
-    """The payload, judged against the object's interior limit, at the
-    innermost face of the layers entered behind the body's outer layer.
-    Not computed when none are entered: the back of the outer layer is not
-    the inside (Hayabusa2's sample-container plate rose about 2 °C while
-    the shield's back face reached about 84 °C, Yamada & Yoshihara 2023
-    Fig. 19)."""
+    """The payload, judged against the object's interior limit.  With a
+    payload entered (payload_thermal) it is the payload's own temperature,
+    a lumped mass fed from the wall's innermost face; else the innermost
+    face itself, insulated (an upper bound), when layers are entered behind
+    the body layer.  Not computed when neither is entered: the back of the
+    outer layer is not the inside (Hayabusa2's sample-container plate rose
+    about 2 °C while the shield's back face reached about 84 °C, Yamada &
+    Yoshihara 2023 Fig. 19)."""
     limit = float(prof.get('interior_limit_C', 80.0) or 80.0)
     lim_src = ("Hayabusa sample container, Yada et al. 2014"
                if abs(limit - 80.0) < 1e-9 else "entered for this object")
     lim_txt = f"{limit:,.0f} °C ({lim_src})"
     layers = prof.get('interior_layers') or []
-    if not layers:
+    pay = prof.get('payload_thermal') or None
+    if not layers and not pay:
         return _row("Interior (payload)", limit=lim_txt,
                     reason="nothing entered between the shell and the payload",
                     short="interior")
@@ -954,35 +988,92 @@ def _interior_answer(arc, prof):
     if not res.get('evaluated'):
         return _row("Interior (payload)", limit=lim_txt,
                     reason=res.get('reason', ''), short="interior")
-    face = res['T_faces'][-1]
+    if res.get('T_payload_K') is not None:
+        face = res['T_payload_K']
+        value = (f"{float(face.max()) - 273.15:,.0f} °C in the payload "
+                 f"({pay['mass_kg']:g} kg of {_label(pay['material'])})")
+        basis = ("one-dimensional conduction through the body layer"
+                 + (f" and {len(layers)} layer{'s' if len(layers) > 1 else ''}"
+                    f" behind it" if layers else "")
+                 + ", in perfect contact; " + _payload_basis(prof, res)
+                 + "; to impact")
+    else:
+        face = res['T_faces'][-1]
+        last = layers[-1]
+        value = (f"{float(face.max()) - 273.15:,.0f} °C at the inner face of "
+                 f"{float(last['thickness_m']) * 100:.1f} cm of "
+                 f"{_label(last['material'])}")
+        basis = (f"one-dimensional conduction through the body layer "
+                 f"and {len(layers)} layer"
+                 f"{'s' if len(layers) > 1 else ''} behind it, in "
+                 f"perfect contact, the innermost face insulated and "
+                 f"no payload mass, to impact: an upper bound")
+        if pay:
+            basis += ("; the payload is entered but its wall area is not "
+                      "known (the body layer's thickness or the outline)")
     crossed = _crossing(arc['t'], face, limit) is not None
-    last = layers[-1]
-    value = (f"{float(face.max()) - 273.15:,.0f} °C at the inner face of "
-             f"{float(last['thickness_m']) * 100:.1f} cm of "
-             f"{_label(last['material'])}")
     nz = prof.get('nose_piece')
     nres = _nose_stack(arc, prof)
-    nose_basis, reason = "", ""
+    reason = ""
     if nz and nres is not None and nres.get('evaluated'):
         nface = nres['T_faces'][-1]
         crossed = crossed or (_crossing(arc['t'], nface, limit) is not None)
         value += (f"; under the nose ({_nose_phrase(nz)}): "
-                  f"{float(nface.max()) - 273.15:,.0f} °C")
-        nose_basis = _NOSE_BASIS
+                  f"{float(nface.max()) - 273.15:,.0f} °C at its inner face")
+        basis += _NOSE_BASIS + " (its inner face insulated, no payload)"
     elif nz and nres is not None:
         reason = f"the nose path is not computed: {nres.get('reason', '')}"
+    basis += (". Accuracy not yet established; the Hayabusa2 flight record "
+              "is the test case being set up")
     return _row("Interior (payload)",
                 'beyond' if crossed else 'experience',
-                value,
-                lim_txt, reason=reason,
-                basis=(f"one-dimensional conduction through the body layer "
-                       f"and {len(layers)} layer"
-                       f"{'s' if len(layers) > 1 else ''} behind it, in "
-                       f"perfect contact, the innermost face insulated and "
-                       f"no payload mass, to impact: an upper bound. "
-                       f"Accuracy not yet established; the Hayabusa2 flight "
-                       f"record is the test case being set up" + nose_basis),
+                value, lim_txt, reason=reason, basis=basis,
                 short="interior")
+
+
+# The heat shield's temperature this far in from its back face is one of
+# the readings asked for on a heat shield bonded to a substrate (user,
+# 2026-10-02): 50 mils, 1.27 mm.
+PROBE_FROM_BONDLINE_M = 0.050 * 0.0254
+
+
+def wall_temperatures(arc, prof):
+    """Lines for the "Wall temperatures" table: the peak, and when, at
+    each place through the body's wall, outside in: the heat shield 50 mils
+    from its back face (when it is thicker than that), each joint, the
+    peak through each layer behind it, and the payload.  [] when the wall
+    stack is not computed."""
+    res = _stack(arc, prof)
+    if not res or not res.get('evaluated'):
+        return []
+    t = np.asarray(arc['t'], float)
+    mats = [prof['body_material']] + [e['material'] for e in
+                                      (prof.get('interior_layers') or [])]
+    ths = [float(prof['body_thickness_m'])] + [
+        float(e['thickness_m']) for e in (prof.get('interior_layers') or [])]
+    bounds = res['layer_bounds_m']
+    rows = []
+
+    def add(label, T):
+        k = int(np.argmax(T))
+        rows.append(f"  {label}\t{float(T[k]) - 273.15:,.0f} °C\t"
+                    f"at {t[k]:,.0f} s into the flight")
+    if ths[0] > PROBE_FROM_BONDLINE_M:
+        add(f"{_label(mats[0])}, 50 mils (1.27 mm) from its back face",
+            heating.temperature_at_depth(res, ths[0] - PROBE_FROM_BONDLINE_M))
+    for li in range(len(mats)):
+        if li > 0:
+            sl = (res['x_m'] >= bounds[li]) & (res['x_m'] <= bounds[li + 1])
+            add(f"{_label(mats[li])} ({ths[li] * 1000:.2g} mm), its hottest "
+                f"point", res['T_cells'][:, sl].max(axis=1))
+        nxt = (_label(mats[li + 1]) if li + 1 < len(mats)
+               else ("payload" if res.get('T_payload_K') is not None
+                     else "inside, insulated"))
+        add(f"joint: {_label(mats[li])} | {nxt}", res['T_faces'][li + 1])
+    if res.get('T_payload_K') is not None:
+        add("payload", res['T_payload_K'])
+    return (["─── Wall temperatures (peak) ───────────────────────────────"]
+            + rows + [""])
 
 
 def answers(result) -> list:
@@ -1565,6 +1656,11 @@ def build_report(result) -> dict:
     # one-glance station × question matrix; each cell elaborated below it.
     _map_lines, _map_spans = answers_block(_answers)
     _map_block = "\n".join(_map_lines) + "\n\n"
+    _wall = wall_temperatures(result.get('heating_arc') or {},
+                              (result.get('heating_arc') or {}).get(
+                                  'profile') or {})
+    if _wall:
+        _map_block += "\n".join(_wall) + "\n"
 
     # The four answers first; the plain-language lead and everything else
     # below them, the engineering detail behind the divider.

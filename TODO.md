@@ -208,7 +208,20 @@ nose column under the stagnation-point flux.  Open for the user:
   thickness.  The alternative is a continuous structure with the shell
   filling to it (then only the length would be entered, not a thickness).
 
-**Step 3, next (user, 2026-10-02: "payload mass next").** A lumped payload
+**Step 3 built, 2026-10-02: the payload** (METHODS §13.18).  A lumped
+payload (`payload_thermal`: mass, material, area, emissivities, gap,
+mounts), in the object editor's Payload box, the object file and a
+spreadsheet sheet; three routes from the wall, each cited (SP-164 Eq. 3-14,
+USSA 1976 Eq. 53, k·A/L); the interior row reads the payload.  RTV-560 and
+the strain isolator pad added from TPSX (a new "bond" group).  A "Wall
+temperatures" table gives, for a heat shield on an aluminium substrate,
+the shield 50 mils from the bondline, the bond and the substrate (user,
+2026-10-02).  Still to do: the soak after landing until recovery and a
+heat-shield jettison time (plan data); convection in the gap; the payload
+coupled to the nose column too; Hayabusa2 as the test case.  The 50-mil
+reading has no citation yet: ask the user where it comes from.
+
+**Step 3 as planned (user, 2026-10-02: "payload mass next").** A lumped payload
 behind the innermost face: its mass and material, and the routes to it from
 the wall: radiation across the gap (emissivities), conduction through the
 gas in the gap (the pressure from the trajectory; the gap is not a vacuum
